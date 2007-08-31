@@ -1,0 +1,79 @@
+
+import std.file;
+import std.path;
+import std.stdio;
+import std.perf;
+import std.gc;
+
+import position;
+
+int main(char[][] args)
+{
+    if (args.length < 2)
+    {
+        writefln("usage: %s boardfile", getBaseName(args[0]));
+        return 1;
+    }
+    char[] boardstr;
+    try
+    {
+        boardstr = cast(char[])read(args[1]);
+    } catch (FileException fx)
+    {
+        writefln("A file exception occured: " ~ fx.toString());
+        return 2;
+    }
+
+    Position pos = position.parse_long_str(boardstr);
+    writefln("wb"[pos.side]);
+    writefln(pos.to_long_str(true));
+    StepList steps = new StepList();
+    pos.get_single_steps(steps);
+    int ssteps = steps.numsteps;
+    pos.get_double_steps(steps);
+    int dsteps = steps.numsteps - ssteps;
+    StepList gsteps = new StepList();
+    pos.get_steps(gsteps);
+    writefln("There are %d steps with %d single and %d double steps.", 
+                gsteps.numsteps, ssteps, dsteps);
+    ProcessTimesCounter Timer = new ProcessTimesCounter();
+    //std.gc.disable();
+    Timer.start();
+    PosStore moves = pos.get_moves();
+    Timer.stop();
+    writefln("%d unique moves.", moves.length);
+    writefln("Gen time %.4f, Steplists %d, Positions %d", cast(double)Timer.milliseconds / 1000,
+                StepList.allocated, Position.allocated);
+    writefln("reservesize = %d listsize = %d", Position.reserved, Position.rlistsize);
+    delete moves;
+    //std.gc.enable();
+    std.gc.fullCollect();
+
+    /*
+    Timer = new ProcessTimesCounter();
+    Timer.start();
+    Position gamepos = Position.allocate();
+    int wins = 0;
+    for (int plays = 0; plays < 100000; plays++)
+    {
+        gamepos.copy(pos);
+        int score = playout_steps(gamepos);
+        if (gamepos.side == pos.side)
+        {
+            if (score == 1)
+                wins += 1;
+        } else
+        {
+            if (score == -1)
+                wins += 1;
+        }
+    }
+    Position.free(gamepos);
+    Timer.stop();
+    writefln("Win percentage = %.2f playtime = %.2f", cast(double)wins / 1000,
+                cast(double)Timer.milliseconds / 1000);
+    */
+
+    return 0;
+}
+
