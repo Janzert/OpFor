@@ -65,12 +65,20 @@ ulong neighbors_of(ulong value)
     return value;
 }
 
-enum StepType { PASS, SINGLE, DOUBLE }
-
 struct Step
 {
-    StepType type;
-    bitix from, to, pfrom;
+    bitix from, to;
+    bool push;
+
+    void set(bitix f, bitix t, bool p=false)
+    {
+        assert((f == 64 && t == 64) || f != t, format("from %d == to %d", f, t));
+        assert((f == 64 && t == 64) || (f >= 0 && f < 64), format("from %d out of bounds", f));
+
+        from = f;
+        to = t;
+        push = p;
+    }   
 }
 
 class StepList
@@ -157,6 +165,10 @@ class Position
     Piece[64][2] strongest;
     ulong zobrist;
 
+    Piece lastpiece;
+    bitix lastfrom;
+    bool inpush;
+
     invariant
     {
         ulong usedsquares = 0;
@@ -211,6 +223,10 @@ class Position
         {
             zcheck ^= ZOBRIST_SIDE;
         }
+        if (inpush)
+        {
+            zcheck ^= ZOBRIST_INPUSH;
+        }
         for (int pix=1; pix <= Piece.max; pix++)
         {
             ulong board = bitBoards[pix];
@@ -222,6 +238,7 @@ class Position
                 board ^= piecebit;
             }
         }
+        zcheck ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
         assert (zcheck == zobrist, "Incorrect zobrist encountered.");
 
         ulong wneighbors = neighbors_of(placement[Side.WHITE]);
@@ -326,6 +343,9 @@ class Position
         this.bitBoards[] = other.bitBoards[];
         this.pieces[] = other.pieces[];
         this.strongest[][] = other.strongest[][];
+        this.lastpiece = other.lastpiece;
+        this.lastfrom = other.lastfrom;
+        this.inpush = other.inpush;
         allocated++;
     }
 
@@ -390,6 +410,11 @@ class Position
                 strongest[sideix][sqix] = strong;
             }
         }
+
+        lastpiece = Piece.EMPTY;
+        lastfrom = 64;
+        inpush = false;
+
         allocated++;
     }
 
@@ -398,6 +423,9 @@ class Position
         if (zobrist != other.zobrist ||
             stepsLeft != other.stepsLeft ||
             side != other.side ||
+            lastpiece != other.lastpiece ||
+            lastfrom != other.lastfrom ||
+            inpush != other.inpush ||
             placement[Side.WHITE] != other.placement[Side.WHITE] ||
             placement[Side.BLACK] != other.placement[Side.BLACK])
             return false;
@@ -424,6 +452,9 @@ class Position
         this.bitBoards[] = other.bitBoards[];
         this.pieces[] = other.pieces[];
         this.strongest[][] = other.strongest[][];
+        this.lastpiece = other.lastpiece;
+        this.lastfrom = other.lastfrom;
+        this.inpush = other.inpush;
     }
 
     bool is_endstate()
@@ -675,10 +706,11 @@ class Position
     void do_step(Step step)
     {
         //writefln(to_long_str());
-        //writefln("%d, %d, %d, %d", step.type, step.from, step.to, step.pfrom);
+        //writefln("%d, %d", step.from, step.to);
+
         zobrist ^= ZOBRIST_STEP[stepsLeft];
 
-        if (step.type != StepType.PASS)
+        if (step.to < 64) // not a pass or trap step
         {
             ulong frombit = 1UL << step.from;
             Piece piece = pieces[step.from];
@@ -721,45 +753,26 @@ class Position
             updatefrozen(side, piece, step.from, step.to);
             stepsLeft--;
 
-            if (step.type == StepType.DOUBLE)
+            if (inpush != step.push)
             {
-                Side pside = cast(Side)(side ^ 1);
-                Piece ppiece = pieces[step.pfrom];
-                assert (ppiece != Piece.EMPTY);
-                tofrom = (1UL << step.pfrom) ^ (1UL << step.from);
-                bitBoards[Piece.EMPTY] ^= tofrom;
-                bitBoards[ppiece] ^= tofrom;
-                placement[pside] ^= tofrom;
-                pieces[step.pfrom] = Piece.EMPTY;
-                pieces[step.from] = ppiece;
-
-                zobrist ^= ZOBRIST_PIECE[ppiece][step.pfrom] ^
-                           ZOBRIST_PIECE[ppiece][step.from];
-
-                trapped = (neighbors_of(1UL << step.from) & TRAPS)
-                            & placement[pside];
-                if (trapped && (trapped & ~neighbors_of(placement[pside])))
-                {
-                    placement[pside] ^= trapped;
-                    bitix trapix = bitindex(trapped);
-                    Piece piecetr = pieces[trapix];
-                    pieces[trapix] = Piece.EMPTY;
-                    bitBoards[piecetr] ^= trapped;
-                    bitBoards[Piece.EMPTY] ^= trapped;
-                    zobrist ^= ZOBRIST_PIECE[piecetr][trapix];
-                    if (trapix != step.from)
-                        updatefrozen(pside, piecetr, trapix, trapix);
-                }
-                updatefrozen(pside, ppiece, step.pfrom, step.from);
-                stepsLeft--;
+                zobrist ^= ZOBRIST_INPUSH;
             }
+            zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
+            lastpiece = piece;
+            lastfrom = step.from;
+            inpush = step.push;
+            zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
         }
         
-        if (stepsLeft < 1 || step.type == StepType.PASS)
+        if (stepsLeft < 1 || 
+            (step.from == 64 && step.to == 64)) // pass step
         {
+            assert (!inpush, format("stepsleft %d, step.from %d, step.to %d", stepsLeft, step.from, step.to));
             side ^= 1;
-            zobrist ^= ZOBRIST_SIDE;
+            zobrist ^= ZOBRIST_SIDE ^ ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
             stepsLeft = 4;
+            lastpiece = Piece.EMPTY;
+            lastfrom = 64;
         }
 
         zobrist ^= ZOBRIST_STEP[stepsLeft];
@@ -768,6 +781,7 @@ class Position
     void get_single_steps(StepList steps)
     {
         Step* step;
+        bitix to;
         ulong stepbits;
         ulong stepbit;
         ulong mpieces = placement[side] & ~frozen;
@@ -781,10 +795,9 @@ class Position
         {
             stepbit = stepbits & -stepbits;
             stepbits ^= stepbit;
+            to = bitindex(stepbit);
             step = steps.newstep();
-            step.type = StepType.SINGLE;
-            step.to = bitindex(stepbit);
-            step.from = cast(bitix)(step.to - cast(bitix)8);
+            step.set(cast(bitix)(to - cast(bitix)8), to);
         }
 
         stepbits = ((mpieces & NOT_A_FILE) << 1) & bitBoards[Piece.EMPTY];
@@ -792,10 +805,9 @@ class Position
         {
             stepbit = stepbits & -stepbits;
             stepbits ^= stepbit;
+            to = bitindex(stepbit);
             step = steps.newstep();
-            step.type = StepType.SINGLE;
-            step.to = bitindex(stepbit);
-            step.from = cast(bitix)(step.to - cast(bitix)1);
+            step.set(cast(bitix)(to - cast(bitix)1), to);
         }
 
         stepbits = ((mpieces & NOT_H_FILE) >> 1) & bitBoards[Piece.EMPTY];
@@ -803,10 +815,9 @@ class Position
         {
             stepbit = stepbits & -stepbits;
             stepbits ^= stepbit;
+            to = bitindex(stepbit);
             step = steps.newstep();
-            step.type = StepType.SINGLE;
-            step.to = bitindex(stepbit);
-            step.from = cast(bitix)(step.to + cast(bitix)1);
+            step.set(cast(bitix)(to + cast(bitix)1), to);
         }
 
         if (side == Side.WHITE)
@@ -818,10 +829,9 @@ class Position
         {
             stepbit = stepbits & -stepbits;
             stepbits ^= stepbit;
+            to = bitindex(stepbit);
             step = steps.newstep();
-            step.type = StepType.SINGLE;
-            step.to = bitindex(stepbit);
-            step.from = cast(bitix)(step.to + cast(bitix)8);
+            step.set(cast(bitix)(to + cast(bitix)8), to);
         }
     }
 
@@ -834,61 +844,74 @@ class Position
             pieceoffset = 6;
             enemyoffset = -6;
         }
-        ulong weaker = placement[side^1];
-        for (int piece = 6+pieceoffset; piece > pieceoffset; piece--)
+        ulong lfbit = 1UL << lastfrom;
+
+        if (inpush)
         {
-            weaker ^= bitBoards[piece+enemyoffset];
-            ulong mpieces = bitBoards[piece] & (~frozen) & neighbors_of(weaker);
-            ulong pullers = mpieces & neighbors_of(bitBoards[Piece.EMPTY]);
-            while (pullers)
+            ulong pospushers = neighbors_of(lfbit) & placement[side];
+            while (pospushers)
             {
-                ulong pullbit = pullers & -pullers;
-                pullers ^= pullbit;
-                ulong tobits = neighbors_of(pullbit) & bitBoards[Piece.EMPTY];
-                ulong pulledbits = neighbors_of(pullbit) & weaker;
-                bitix from = bitindex(pullbit);
-                while (tobits)
+                ulong pushbit = pospushers & -pospushers;
+                pospushers ^= pushbit;
+                bitix from = bitindex(pushbit);
+                if (pieces[from]+enemyoffset > lastpiece)
                 {
-                    ulong tobit = tobits & -tobits;
-                    tobits ^= tobit;
-                    bitix to = bitindex(tobit);
-                    ulong pbits = pulledbits;
-                    while (pbits)
+                    Step* step = steps.newstep();
+                    step.set(from, lastfrom);
+                }
+            }
+        } else {
+            ulong pullmap = 0UL;
+
+            // Finish any pulls
+            if (lastpiece > pieceoffset && 
+                lastpiece <= pieceoffset+6 &&
+                lastpiece-pieceoffset > Piece.WRABBIT)
+            // last to move was friendly and stronger than a rabbit
+            {
+                pullmap = lfbit;
+                ulong pospulls = neighbors_of(lfbit) & placement[side^1];
+                while (pospulls)
+                {
+                    ulong pullbit = pospulls & -pospulls;
+                    pospulls ^= pullbit;
+                    bitix from = bitindex(pullbit);
+                    if (pieces[from] < lastpiece+enemyoffset)
                     {
-                        ulong pfrombit = pbits & -pbits;
-                        pbits ^= pfrombit;
-                        bitix pfrom = bitindex(pfrombit);
+                        pullmap |= pullbit;
+
                         Step* step = steps.newstep();
-                        step.type = StepType.DOUBLE;
-                        step.from = from;
-                        step.to = to;
-                        step.pfrom = pfrom;
+                        step.set(from, lastfrom);
                     }
                 }
             }
 
-            while (mpieces)
+            if (stepsLeft > 1)
             {
-                ulong pfrombit = mpieces & -mpieces;
-                mpieces ^= pfrombit;
-                bitix pfrom = bitindex(pfrombit);
-                ulong frombits = neighbors_of(pfrombit) & weaker;
-                while (frombits)
+                // Start any pushes
+                ulong pushables = 0UL;
+                ulong weaker = placement[side^1];
+                for (int piece = Piece.WELEPHANT+pieceoffset; piece > Piece.WRABBIT+pieceoffset; piece--)
                 {
-                    ulong frombit = frombits & -frombits;
-                    frombits ^= frombit;
+                    weaker ^= bitBoards[piece+enemyoffset];
+                    pushables |= weaker & neighbors_of(~frozen & bitBoards[piece]);
+                }
+                while (pushables)
+                {
+                    ulong frombit = pushables & -pushables;
+                    pushables ^= frombit;
                     bitix from = bitindex(frombit);
                     ulong tobits = neighbors_of(frombit) & bitBoards[Piece.EMPTY];
                     while (tobits)
                     {
                         ulong tobit = tobits & -tobits;
                         tobits ^= tobit;
-                        bitix to = bitindex(tobit);
-                        Step* step = steps.newstep();
-                        step.type = StepType.DOUBLE;
-                        step.from = from;
-                        step.to = to;
-                        step.pfrom = pfrom;
+                        if (!((frombit & pullmap) && (tobit & pullmap)))
+                        {
+                            bitix to = bitindex(tobit);
+                            Step* step = steps.newstep();
+                            step.set(from, to, true);
+                        }
                     }
                 }
             }
@@ -897,14 +920,16 @@ class Position
 
     void get_steps(StepList steps)
     {
-        if (stepsLeft > 1)
-            get_double_steps(steps);
-        if (stepsLeft != 4)
+        get_double_steps(steps);
+        if (stepsLeft != 4 && !inpush)
         {
             Step* step = steps.newstep();
-            step.type = StepType.PASS;
+            step.set(64, 64);
         }
-        get_single_steps(steps);
+        if (!inpush)
+        {
+            get_single_steps(steps);
+        }
     }
 
     PosStore get_moves()
@@ -949,7 +974,7 @@ class Position
             partial = nextpart;
         }
         Step passmove;
-        passmove.type = StepType.PASS;
+        passmove.set(64, 64);
         Position nullmove = this.dup;
         nullmove.do_step(passmove);
         finished.delpos(nullmove);
@@ -1073,6 +1098,8 @@ class PosStore
         int key = pos.zobrist & keymask;
         while (positions[key] !is null)
         {
+            assert(positions[key].zobrist != pos.zobrist || positions[key] == pos, "Zobrist key collision");
+
             if (positions[key].zobrist == pos.zobrist && positions[key] == pos)
                 return true;
             key = (key + keystep) & keymask;
@@ -1111,7 +1138,7 @@ class PosStore
             nextkey = (nextkey + keystep) & keymask;
         }
         // if the position was in the table.
-        if (positions[nextkey] !is null)
+        if (positions[key] !is null)
         {
             // move up the rest of the chain.
             while (positions[nextkey] !is null &&

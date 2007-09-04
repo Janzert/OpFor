@@ -2,6 +2,7 @@
 import std.file;
 import std.path;
 import std.stdio;
+import std.string;
 import std.perf;
 import std.gc;
 
@@ -45,34 +46,39 @@ int main(char[][] args)
     writefln("Gen time %.4f, Steplists %d, Positions %d", cast(double)Timer.milliseconds / 1000,
                 StepList.allocated, Position.allocated);
     writefln("reservesize = %d listsize = %d", Position.reserved, Position.rlistsize);
+    /*foreach (Position move; moves)
+    {
+        writefln(move.to_short_str());
+    }*/
     delete moves;
     //std.gc.enable();
     std.gc.fullCollect();
 
-    /*
+    
     Timer = new ProcessTimesCounter();
     Timer.start();
     Position gamepos = Position.allocate();
+    const int tests = 10000;
     int wins = 0;
-    for (int plays = 0; plays < 100000; plays++)
+    for (int plays = 0; plays < tests; plays++)
     {
         gamepos.copy(pos);
-        int score = playout_steps(gamepos);
+        PlayoutResult result = playout_steps(gamepos);
         if (gamepos.side == pos.side)
         {
-            if (score == 1)
+            if (result.endscore == 1)
                 wins += 1;
         } else
         {
-            if (score == -1)
+            if (result.endscore == -1)
                 wins += 1;
         }
     }
     Position.free(gamepos);
     Timer.stop();
-    writefln("Win percentage = %.2f playtime = %.2f", cast(double)wins / 1000,
+    writefln("Win percentage = %.2f playtime = %.2f", cast(double)wins / tests,
                 cast(double)Timer.milliseconds / 1000);
-    */
+    
 
     return 0;
 }

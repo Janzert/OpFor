@@ -37,8 +37,10 @@ def popcount(val):
     return intmask((val * SUM_POW) >> 56)
 
 ZOBRIST_PIECE = []
+ZOBRIST_LAST_PIECE = []
 ZOBRIST_STEP = []
 ZOBRIST_SIDE = None
+ZOBRIST_INPUSH = None
 #lowmask = r_ulonglong(0x3FFFF)
 lowmask = r_ulonglong(0xFFFFF)
 usedkeys = [r_ulonglong(0)]
@@ -73,17 +75,24 @@ def generate_zobrist_keys():
     used_bits = 0
     # first zero keys for empty squares
     ZOBRIST_PIECE.append([])
+    ZOBRIST_LAST_PIECE.append([])
     for index in xrange(65):
         ZOBRIST_PIECE[0].append(0)
+        ZOBRIST_LAST_PIECE[0].append(0)
     # then the real keys for pieces
     for piece in xrange(1,13):
         ZOBRIST_PIECE.append([])
+        ZOBRIST_LAST_PIECE.append([])
         for index in xrange(64):
             key = genzobrist_newkey(rnd)
             ZOBRIST_PIECE[piece].append(key)
             used_bits |= key
+            key = genzobrist_newkey(rnd)
+            ZOBRIST_LAST_PIECE[piece].append(key)
+            used_bits |= key
         # Add zero key that won't change hash, used when adding and removing a piece from the board.
         ZOBRIST_PIECE[piece].append(0)
+        ZOBRIST_LAST_PIECE[piece].append(0)
     assert used_bits == 2**64-1, "Didn't use all bits, %s" % hex(used_bits)
     ZOBRIST_STEP.append(0)
     for step in xrange(4):
@@ -95,6 +104,9 @@ def generate_zobrist_keys():
         pop = popcount(key & 0x3FFFF)
     global ZOBRIST_SIDE
     ZOBRIST_SIDE = key
+    global ZOBRIST_INPUSH
+    key = genzobrist_newkey(rnd)
+    ZOBRIST_INPUSH = key
 
 def countbits(val, count):
     bit, ix = bitandix(val)
@@ -156,10 +168,19 @@ for piece in xrange(13):
     outfile.write("\t],\n")
 outfile.write("];\n\n")
 
+outfile.write("const ulong[][] ZOBRIST_LAST_PIECE = [\n")
+for piece in xrange(13):
+    outfile.write("\t[\n")
+    for index in xrange(65):
+        outfile.write("\t\t%sUL,\n" % (hex(ZOBRIST_LAST_PIECE[piece][index]).rstrip('L')),)
+    outfile.write("\t],\n")
+outfile.write("];\n\n")
+
 outfile.write("const ulong[] ZOBRIST_STEP = [")
 for step in xrange(5):
     outfile.write("%sUL," % (hex(ZOBRIST_STEP[step]).rstrip('L')))
 outfile.write("];\n")
+outfile.write("const ulong ZOBRIST_INPUSH = %sUL;\n" % (hex(ZOBRIST_INPUSH).rstrip('L')))
 outfile.write("const ulong ZOBRIST_SIDE = %sUL;\n" % (hex(ZOBRIST_SIDE).rstrip('L')))
 outfile.flush()
 outfile.close()
