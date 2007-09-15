@@ -352,23 +352,18 @@ class Position
     this(Side color, int steps, ulong[Piece.max+1] bitboards)
     {
         this.side = color;
-        if (color)
-            this.zobrist = ZOBRIST_SIDE;
-        else
-            this.zobrist = 0;
         if (steps < 1 || steps > 4)
             throw new ValueException("Invalid number of steps given for Position.");
         this.stepsLeft = steps;
-        this.zobrist ^= ZOBRIST_STEP[steps];
         this.bitBoards[] = bitboards[];
         for (int pix = 1; pix <= Piece.max; pix++)
         {
             if (pix < Piece.BRABBIT)
-                this.placement[0] |= bitboards[pix];
+                placement[0] |= bitBoards[pix];
             else
-                this.placement[1] |= bitboards[pix];
+                placement[1] |= bitBoards[pix];
 
-            ulong board = bitboards[pix];
+            ulong board = bitBoards[pix];
             while (board)
             {
                 ulong piecebit = board & ((board ^ ALL_BITS_SET) + 1);
@@ -376,9 +371,41 @@ class Position
                 bitix pieceix = bitindex(piecebit);
                 assert(pieces[pieceix] == Piece.EMPTY);
                 pieces[pieceix] = cast(Piece)pix;
+            }
+        }
+
+        lastpiece = Piece.EMPTY;
+        lastfrom = 64;
+        inpush = false;
+
+        update_derived();
+
+        allocated++;
+    }
+
+    private void update_derived()
+    {
+        if (side)
+            zobrist = ZOBRIST_SIDE;
+        else
+            zobrist = 0;
+        zobrist ^= ZOBRIST_STEP[stepsLeft];
+        for (int pix = 1; pix <= Piece.max; pix++)
+        {
+            ulong board = bitBoards[pix];
+            while (board)
+            {
+                ulong piecebit = board & ((board ^ ALL_BITS_SET) + 1);
+                board ^= piecebit;
+                bitix pieceix = bitindex(piecebit);
                 zobrist ^= ZOBRIST_PIECE[pix][pieceix];
             }
         }
+        if (inpush)
+        {
+            zobrist ^= ZOBRIST_INPUSH;
+        }
+        zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
 
         ulong wneighbors = neighbors_of(placement[Side.WHITE]);
         ulong bneighbors = neighbors_of(placement[Side.BLACK]);
@@ -410,12 +437,6 @@ class Position
                 strongest[sideix][sqix] = strong;
             }
         }
-
-        lastpiece = Piece.EMPTY;
-        lastfrom = 64;
-        inpush = false;
-
-        allocated++;
     }
 
     bool opEquals(Position other)
@@ -776,6 +797,116 @@ class Position
         }
 
         zobrist ^= ZOBRIST_STEP[stepsLeft];
+    }
+
+    void do_str_move(char[] move)
+    {
+        Side start_side = side;
+
+        foreach (char[] step; split(move))
+        {
+            Piece piece = cast(Piece)(find("RCDHMErcdhme", step[0]) +1);
+            if (piece <= 0)
+            {
+                throw new ValueException(format("Step starts with invalid piece. %s", step));
+            }
+            int column = find("abcdefgh", step[1])+1;
+            if (column < 1)
+            {
+                throw new ValueException(format("Step has invalid column. %s", step));
+            }
+            if (!isNumeric(step[2]))
+            {
+                throw new ValueException(format("Step column is not a number. %s", step));
+            }
+            int rank = atoi(step[2..3])-1;
+            if (rank < 0 || rank > 7)
+            {
+                throw new ValueException(format("Step column is invalid. %s", step));
+            }
+            
+            bitix fromix = cast(bitix)((rank*8) + (8-column));
+            if (step.length > 3)
+            {
+                switch (step[3..4])
+                {
+                    case "n":
+                        if (pieces[fromix] != piece)
+                        {
+                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                        }
+                        if (pieces[fromix+8] != Piece.EMPTY)
+                        {
+                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                        }
+                        Step bstep;
+                        bstep.set(fromix, cast(bitix)(fromix+8));
+                        do_step(bstep);
+                        break;
+                    case "s":
+                        if (pieces[fromix] != piece)
+                        {
+                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                        }
+                        if (pieces[fromix-8] != Piece.EMPTY)
+                        {
+                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                        }
+                        Step bstep;
+                        bstep.set(fromix, cast(bitix)(fromix-8));
+                        do_step(bstep);
+                        break;
+                    case "e":
+                        if (pieces[fromix] != piece)
+                        {
+                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                        }
+                        if (pieces[fromix-1] != Piece.EMPTY)
+                        {
+                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                        }
+                        Step bstep;
+                        bstep.set(fromix, cast(bitix)(fromix-1));
+                        do_step(bstep);
+                        break;
+                    case "w":
+                        if (pieces[fromix] != piece)
+                        {
+                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                        }
+                        if (pieces[fromix+1] != Piece.EMPTY)
+                        {
+                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                        }
+                        Step bstep;
+                        bstep.set(fromix, cast(bitix)(fromix+1));
+                        do_step(bstep);
+                        break;
+                    case "x":
+                        break;
+                    default:
+                        throw new ValueException(format("Step direction is invalid. %s", step));
+                }
+            } else {
+                if (pieces[fromix] != Piece.EMPTY)
+                {
+                    throw new ValueException(format("Tried to place a piece in a non-empty square. %s", step));
+                }
+                pieces[fromix] = piece;
+                ulong frombit = 1UL << fromix;
+                bitBoards[piece] |= frombit;
+                bitBoards[0] &= ~frombit;
+                placement[(piece < Piece.BRABBIT) ? Side.WHITE : Side.BLACK] |= frombit;
+            }
+        }
+        
+        side = cast(Side)(start_side ^ 1);
+        stepsLeft = 4;
+        lastpiece = Piece.EMPTY;
+        lastfrom = 64;
+        inpush = false;
+        update_derived();
+        
     }
 
     void get_single_steps(StepList steps)

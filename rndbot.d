@@ -1,5 +1,6 @@
 
 import std.conv;
+import std.random;
 import std.socket;
 import std.stdio;
 import std.string;
@@ -123,13 +124,39 @@ class SocketServer : ServerConnection
     }
 }
 
-enum ServerCmd { NONE, ISREADY, QUIT, NEWGAME, GO };
+class ServerCmd
+{
+    enum CmdType { NONE, ISREADY, QUIT, NEWGAME, GO, MAKEMOVE };
+    CmdType type;
 
-struct GoCmd {
+    this(CmdType t)
+    {
+        type = t;
+    }
+}
+
+class GoCmd : ServerCmd
+{
     enum Option { NONE, PONDER, INFINITE, GOAL, MOVETIME } 
     Option option;
     int time;
     int depth;
+
+    this()
+    {
+        super(CmdType.GO);
+    }
+
+}
+
+class MoveCmd : ServerCmd
+{
+    char [] move;
+
+    this()
+    {
+        super(CmdType.MAKEMOVE);
+    }
 }
 
 class ServerInterface
@@ -138,7 +165,6 @@ class ServerInterface
     char[] partial;
 
     ServerCmd[] cmd_queue;
-    GoCmd go_options;
 
     this(ServerConnection cn)
     {
@@ -178,43 +204,50 @@ class ServerInterface
                 switch (cmd)
                 {
                     case "isready":
-                        cmd_queue ~= ServerCmd.ISREADY;
+                        cmd_queue ~= new ServerCmd(ServerCmd.CmdType.ISREADY);
                         break;
                     case "quit":
-                        cmd_queue ~= ServerCmd.QUIT;
+                        cmd_queue ~= new ServerCmd(ServerCmd.CmdType.QUIT);
                         break;
                     case "newgame":
-                        cmd_queue ~= ServerCmd.NEWGAME;
+                        cmd_queue ~= new ServerCmd(ServerCmd.CmdType.NEWGAME);
                         break;
                     case "go":
-                        cmd_queue ~= ServerCmd.GO;
+                        GoCmd go_cmd = new GoCmd();
+                        cmd_queue ~= go_cmd;
                         char[][] words = split(line);
                         if (words.length > 1)
                         {
                             switch (strip(words[1]))
                             {
                                 case "ponder":
-                                    go_options.option = GoCmd.Option.PONDER;
+                                    go_cmd.option = GoCmd.Option.PONDER;
                                     break;
                                 case "infinite":
-                                    go_options.option = GoCmd.Option.INFINITE;
+                                    go_cmd.option = GoCmd.Option.INFINITE;
                                     break;
                                 case "goal":
-                                    go_options.option = GoCmd.Option.GOAL;
+                                    go_cmd.option = GoCmd.Option.GOAL;
                                     if (words.length < 3)
                                         throw new Exception("No search depth supplied for goal search");
-                                    go_options.depth = toInt(strip(words[2]));
+                                    go_cmd.depth = toInt(strip(words[2]));
                                     break;
                                 case "movetime":
-                                    go_options.option = GoCmd.Option.MOVETIME;
+                                    go_cmd.option = GoCmd.Option.MOVETIME;
                                     if (words.length < 3)
                                         throw new Exception("No time length supplied for movetime");
-                                    go_options.time = toInt(strip(words[2]));
+                                    go_cmd.time = toInt(strip(words[2]));
                                     break;
                                 default:
                                 throw new Exception("Unrecognized go command option");
                             }
                         }
+                        break;
+                    case "makemove":
+                        MoveCmd move_cmd = new MoveCmd();
+                        cmd_queue ~= move_cmd;
+                        int mix = find(line, "makemove") + 8; // end of makemove
+                        move_cmd.move = strip(line[mix..length]);
                         break;
                     default:
                         throw new Exception("Unrecognized command.");
@@ -244,7 +277,7 @@ class ServerInterface
         {
             return cmd_queue[0];
         } else {
-            return ServerCmd.NONE;
+            return null;
         }
     }
 
@@ -293,12 +326,41 @@ class Engine
         {
             if (position.pieces[11] == Piece.WELEPHANT)
             {
-                bestmove = "Ra8 Rb8 Rc8 Rd8 Re8 Rf8 Rg8 Rh8 Ha7 Db7 Cc7 Ed7 Me7 Cf7 Dg7 Hh7";
+                bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ha7 db7 cc7 ed7 me7 cf7 dg7 hh7";
             } else {
-                bestmove = "Ra8 Rb8 Rc8 Rd8 Re8 Rf8 Rg8 Rh8 Ha7 Db7 Cc7 Md7 Ee7 Cf7 Dg7 Hh7";
+                bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ha7 db7 cc7 md7 ee7 cf7 dg7 hh7";
             }
             state = EngineState.MOVESET;
+        } else {
+            state = EngineState.SEARCHING;
         }
+    }
+
+    void search()
+    {
+        PosStore moves = position.get_moves();
+        int r = rand() % moves.length;
+        int i = 0;
+        Position mpos;
+        foreach (Position p; moves)
+        {
+            i++;
+            mpos = p;
+            if (i > r)
+                break;
+        }
+        StepList msteps = moves.getpos(mpos);
+        
+    }
+
+    void make_move(char[] move)
+    {
+        past ~= position.dup;
+        moves ~= move;
+        position.do_str_move(move);
+        bestmove = null;
+        state = EngineState.IDLE;
+        writefln(position.to_long_str());
     }
 }
 
@@ -320,25 +382,31 @@ int main(char[][] args)
         } else {
             server.check();
         }
-        while (server.current_cmd != ServerCmd.NONE)
+        while (server.current_cmd !is null)
         {
-            switch (server.current_cmd)
+            switch (server.current_cmd.type)
             {
-                case ServerCmd.ISREADY:
+                case ServerCmd.CmdType.ISREADY:
                     server.readyok();
                     server.clear_cmd();
                     break;
-                case ServerCmd.QUIT:
+                case ServerCmd.CmdType.QUIT:
                     writefln("Exiting by server command.");
                     return 0;
-                case ServerCmd.NEWGAME:
+                case ServerCmd.CmdType.NEWGAME:
                     writefln("Starting new game.");
                     engine.new_game();
                     server.clear_cmd();
                     break;
-                case ServerCmd.GO:
+                case ServerCmd.CmdType.GO:
                     writefln("searching move");
                     engine.start_search();
+                    server.clear_cmd();
+                    break;
+                case ServerCmd.CmdType.MAKEMOVE:
+                    MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
+                    writefln("received move %s", mcmd.move);
+                    engine.make_move(mcmd.move);
                     server.clear_cmd();
                     break;
                 default:
