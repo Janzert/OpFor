@@ -47,12 +47,13 @@ int main(char[][] args)
         mix++;
     }
 
-    PerformanceCounter timer = new PerformanceCounter();
-    timer.start();
+    int stopplays = 0;
     int totalplays = 0;
     int lastdisplay = 0;
     int displaystep = 1000;
     ulong totalsteps = 0;
+    PerformanceCounter timer = new PerformanceCounter();
+    timer.start();
     Position gamepos = Position.allocate();
     while (true)
     {
@@ -79,6 +80,8 @@ int main(char[][] args)
                 timer.stop();
                 reportstats(moves, totalplays, totalsteps);
                 writefln("%.2f games per second.", displaystep/(cast(double)timer.microseconds/1000000));
+                if (stopplays > 0 && totalplays >= stopplays)
+                    break;
                 lastdisplay = totalplays;
                 if (totalplays < 10000)
                     displaystep = 1000;
@@ -91,6 +94,9 @@ int main(char[][] args)
                 timer.start();
             }
         }
+
+        if (stopplays > 0 && totalplays >= stopplays)
+            break;
     }
 
     return 0;
