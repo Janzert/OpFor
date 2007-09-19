@@ -7,7 +7,7 @@ import std.string;
 import position;
 import aeibot;
 
-const char[] BOT_NAME = "Random play";
+const char[] BOT_NAME = "Random moves";
 const char[] BOT_AUTHOR = "Janzert";
 
 class Engine : AEIEngine

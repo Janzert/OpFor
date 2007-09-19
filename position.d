@@ -81,6 +81,13 @@ struct Step
     ulong frombit, tobit;
     bool push;
 
+    void copy(Step other)
+    {
+        frombit = other.frombit;
+        tobit = other.tobit;
+        push = other.push;
+    }
+
     bitix fromix()
     {
         return bitindex(frombit);
@@ -219,6 +226,9 @@ class StepList
                 move ~= " ";
             }
         }
+
+        if (move.length == 0)
+            throw new ValueException("Tried to make move with no or pass only steps");
 
         return move[0..length-1];
     }
