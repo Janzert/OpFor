@@ -65,6 +65,15 @@ ulong neighbors_of(ulong value)
     return value;
 }
 
+char[] ix_to_alg(bitix index)
+{
+    char[] alg;
+    alg ~= "hgfedcba"[index % 8];
+    alg ~= toString((index / 8) + 1);
+    
+    return alg;
+}
+
 static const ulong INV_STEP = 3UL;
 
 struct Step
@@ -174,6 +183,44 @@ class StepList
     void clear()
     {
         numsteps = 0;
+    }
+
+    char[] to_move_str(Position start)
+    {
+        char [] move;
+        Position current = start.dup;
+
+        foreach (Step step; steps[0..numsteps])
+        {
+            if (step.frombit == INV_STEP) // pass step
+                break;
+            if (step.tobit != INV_STEP) // trap step
+            {
+                move ~= ".RCDHMErcdhme"[current.pieces[step.fromix]];
+                move ~= ix_to_alg(step.fromix);
+                switch (step.toix - step.fromix)
+                {
+                    case 8:
+                        move ~= "n";
+                        break;
+                    case -8:
+                        move ~= "s";
+                        break;
+                    case -1:
+                        move ~= "e";
+                        break;
+                    case 1:
+                        move ~= "w";
+                        break;
+                    default:
+                        move ~= ix_to_alg(step.toix);
+                }
+                current.do_step(step);
+                move ~= " ";
+            }
+        }
+
+        return move[0..length-1];
     }
 }
 
@@ -483,7 +530,7 @@ class Position
 
     Position dup()
     {
-        return new Position(this);
+        return allocate(this);
     }
 
     void copy(Position other)
@@ -1092,12 +1139,12 @@ class Position
     {
         StepList nextsteps = new StepList(32);
         PosStore partial = new PosStore();
+        PosStore nextpart = new PosStore();
         PosStore finished = new PosStore();
         Position newpos = new Position();
         partial.addpos(this.dup, new StepList());
         while (partial.length != 0)
         {
-            PosStore nextpart = new PosStore();
             foreach (Position curpos; partial)
             {
                 StepList cursteps = partial.getpos(curpos);
@@ -1124,10 +1171,11 @@ class Position
                         newpos = Position.allocate();
                     }
                 }
-                StepList.free(cursteps);
-                Position.free(curpos);
             }
+            PosStore tmp = partial;
             partial = nextpart;
+            tmp.free_items();
+            nextpart = tmp;
         }
         Step passmove;
         passmove.set(INV_STEP, INV_STEP);
@@ -1143,6 +1191,7 @@ class PosStore
     private:
         const int START_SIZE = 14;
         const double MAX_LOAD = 0.7;
+        Position DELETED_ENTRY;
         Position[] positions;
         StepList[] steplists;
         int numstored = 0;
@@ -1186,7 +1235,7 @@ class PosStore
 
             for (int ix=0; ix < positions.length; ix++)
             {
-                if (positions[ix] !is null)
+                if (positions[ix] !is null && positions[ix] !is DELETED_ENTRY)
                 {
                     int key = positions[ix].zobrist & newmask;
                     while (newpos[key] !is null)
@@ -1208,6 +1257,7 @@ class PosStore
     public:
     this()
     {
+        DELETED_ENTRY = new Position();
         positions.length = 1 << keysize;
         steplists.length = 1 << keysize;
     }
@@ -1217,7 +1267,7 @@ class PosStore
         int result = 0;
         for (int ix = 0; ix < positions.length; ix++)
         {
-            if (positions[ix] !is null)
+            if (positions[ix] !is null && positions[ix] !is DELETED_ENTRY)
             {
                 result = lpbody(positions[ix]);
                 if (result)
@@ -1229,22 +1279,28 @@ class PosStore
 
     bool checktable()
     {
+        int found = 0;
         for (int ix=0; ix < positions.length; ix++)
         {
-            if (positions[ix] !is null)
+            if (positions[ix] !is null && positions[ix] !is DELETED_ENTRY)
             {
                 if (!haspos(positions[ix]))
                 {
-                    assert(0, "Couldn't find position in table");
-                    return false;
+                    throw new ValueException("Couldn't find position in table");
                 }
                 StepList list = getpos(positions[ix]);
                 if (list is null || list !is steplists[ix])
                 {
-                    assert(0, "Got wrong step list for position.");
-                    return false;
+                    throw new ValueException("Got wrong step list for position.");
                 }
+                found++;
             }
+        }
+
+        if (numstored != found)
+        {
+            throw new ValueException(format(
+                "found different number of positions %d != %d", numstored, found));
         }
         return true;
     }
@@ -1256,7 +1312,8 @@ class PosStore
         {
             assert(positions[key].zobrist != pos.zobrist || positions[key] == pos, "Zobrist key collision");
 
-            if (positions[key].zobrist == pos.zobrist && positions[key] == pos)
+            if (positions[key] !is DELETED_ENTRY && 
+                    positions[key].zobrist == pos.zobrist && positions[key] == pos)
                 return true;
             key = (key + keystep) & keymask;
         }
@@ -1271,7 +1328,7 @@ class PosStore
             expand();
 
         int key = pos.zobrist & keymask;
-        while (positions[key] !is null)
+        while (positions[key] !is null && positions[key] !is DELETED_ENTRY)
         {
             key = (key + keystep) & keymask;
         }
@@ -1296,16 +1353,19 @@ class PosStore
         // if the position was in the table.
         if (positions[key] !is null)
         {
-            // move up the rest of the chain.
-            while (positions[nextkey] !is null &&
-                   (positions[nextkey].zobrist & keymask) != nextkey)
+            /*// move up the rest of the chain.
+            while (positions[nextkey] !is null)
             {
-                positions[key] = positions[nextkey];
-                steplists[key] = steplists[nextkey];
-                key = nextkey;
+                if ((positions[nextkey].zobrist & keymask) != nextkey)
+                {
+                    positions[key] = positions[nextkey];
+                    steplists[key] = steplists[nextkey];
+                    key = nextkey;
+                }
                 nextkey = (nextkey + keystep) & keymask;
-            }
-            positions[key] = null;
+            }*/
+
+            positions[key] = DELETED_ENTRY;
             steplists[key] = null;
             numstored--;
         }
@@ -1314,7 +1374,9 @@ class PosStore
     StepList getpos(Position pos)
     {
         int key = pos.zobrist & keymask;
-        while (positions[key] !is null && positions[key] != pos)
+        while (positions[key] !is null
+                && (positions[key] is DELETED_ENTRY
+                || positions[key] != pos))
         {
             key = (key + keystep) & keymask;
         }
@@ -1325,6 +1387,21 @@ class PosStore
     int length()
     {
         return numstored;
+    }
+
+    void free_items()
+    {
+        for (int key=0; key < positions.length; key++)
+        {
+            if (positions[key] !is null && positions[key] !is DELETED_ENTRY)
+            {
+                Position.free(positions[key]);
+                StepList.free(steplists[key]);
+            }
+            positions[key] = null;
+            steplists[key] = null;
+        }
+        numstored = 0;
     }
 }
 

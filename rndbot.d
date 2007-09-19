@@ -1,5 +1,6 @@
 
 import std.conv;
+import std.gc;
 import std.random;
 import std.socket;
 import std.stdio;
@@ -313,6 +314,7 @@ class Engine
         position = new Position();
         past.length = 0;
         moves.length = 0;
+        std.gc.fullCollect();
         state = EngineState.IDLE;
     }
 
@@ -341,16 +343,22 @@ class Engine
         PosStore moves = position.get_moves();
         int r = rand() % moves.length;
         int i = 0;
-        Position mpos;
+        moves.checktable();
+        bool mademove = false;
         foreach (Position p; moves)
         {
-            i++;
-            mpos = p;
-            if (i > r)
+            if (i == r)
+            {
+                bestmove = moves.getpos(p).to_move_str(position);
+                mademove = true;
                 break;
+            }
+            i++;
         }
-        StepList msteps = moves.getpos(mpos);
-        
+        if (!mademove)
+            throw new Exception(format("No move made r %d i %d l %d", r, i, moves.length));
+        moves.free_items();
+        state = EngineState.MOVESET;
     }
 
     void make_move(char[] move)
@@ -420,6 +428,10 @@ int main(char[][] args)
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.state = EngineState.IDLE;
+                break;
+            case EngineState.SEARCHING:
+                engine.search();
+                std.gc.fullCollect();
                 break;
             default:
                 break;
