@@ -12,36 +12,6 @@ import position;
 const char[] BOT_NAME = "Random play";
 const char[] BOT_AUTHOR = "Janzert";
 
-void handleAEI()
-{
-    if (!feof(stdin))
-    {
-        char[] buf;
-        while (!ferror(stdin))
-        {
-            char c = getc(stdin);
-            buf ~= c;
-            fwritef(stderr, ".%s", c);
-        }
-        fwritefln(stderr, "Buf: %s", buf);
-        char[][] lines = splitlines(buf);
-        for (int ix=0; ix < lines.length; ix++)
-        {
-            char[] line = stripl(lines[ix]);
-            char[] cmd = tolower(split(line)[0]);
-            switch(cmd)
-            {
-                case "isready":
-                    writefln("readyok");
-                    break;
-                default:
-                    fwritefln(stderr, "Unrecognized command: %s", cmd);
-                    break;
-            }
-        }
-    }
-}
-
 class TimeoutException : Exception
 {
     this(char[] msg)
