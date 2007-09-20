@@ -222,8 +222,36 @@ class StepList
                     default:
                         move ~= ix_to_alg(step.toix);
                 }
-                current.do_step(step);
                 move ~= " ";
+
+                Position previous = current.dup;
+                Side pside = (current.pieces[step.fromix] < Piece.BRABBIT ) ? Side.WHITE : Side.BLACK;
+                current.do_step(step);
+                int prevpop = popcount(previous.placement[0] 
+                        | previous.placement[1]);
+                int curpop = popcount(current.placement[0]
+                        | current.placement[1]);
+                if (prevpop != curpop)
+                {
+                    ulong ntrap = neighbors_of(step.frombit) & TRAPS;
+                    bitix ntrapix = bitindex(ntrap);
+                    if (ntrap && (previous.placement[pside] & ntrap)
+                            && !(current.placement[pside] & ntrap))
+                    {
+                        move ~= ".RCDHMErcdhme"[previous.pieces[ntrapix]];
+                        move ~= ix_to_alg(ntrapix);
+                    } else if ((step.tobit & TRAPS) 
+                            && !(current.placement[pside] & step.tobit))
+                    {
+                        move ~= ".RCDHMErcdhme"[previous.pieces[step.fromix]];
+                        move ~= ix_to_alg(step.toix);
+                    } else {
+                        throw new ValueException(format(
+                                "Piece disappeared without being trapped. %s",
+                                move));
+                    }
+                    move ~= "x ";
+                }
             }
         }
 
