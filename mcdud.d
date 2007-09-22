@@ -63,7 +63,7 @@ int main(char[][] args)
             PlayoutResult results = playout_steps(gamepos);
             totalsteps += results.length;
             int score = results.endscore;
-            if (gamepos.side == pos.side)
+            if (pos.side == Side.WHITE)
             {
                 if (score == 1)
                     moves[mix].wins += 1;

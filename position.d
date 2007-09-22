@@ -611,9 +611,9 @@ class Position
             } else
             {
                 if (ggoal)
-                    return -1;
-                else
                     return 1;
+                else
+                    return -1;
             }
         }
         
@@ -630,9 +630,9 @@ class Position
             } else
             {
                 if (!srabbits)
-                    return -1;
-                else
                     return 1;
+                else
+                    return -1;
             }
         }
         return 0;
@@ -1391,18 +1391,6 @@ class PosStore
         // if the position was in the table.
         if (positions[key] !is null)
         {
-            /*// move up the rest of the chain.
-            while (positions[nextkey] !is null)
-            {
-                if ((positions[nextkey].zobrist & keymask) != nextkey)
-                {
-                    positions[key] = positions[nextkey];
-                    steplists[key] = steplists[nextkey];
-                    key = nextkey;
-                }
-                nextkey = (nextkey + keystep) & keymask;
-            }*/
-
             positions[key] = DELETED_ENTRY;
             steplists[key] = null;
             numstored--;
@@ -1539,7 +1527,12 @@ PlayoutResult playout_steps(Position pos)
         {
             if (pos == movestart)
             {
-                result.endscore = -1;
+                if (pos.side == Side.WHITE)
+                {
+                    result.endscore = -1;
+                } else {
+                    result.endscore = 1;
+                }
                 break;
             } else
             {

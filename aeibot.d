@@ -9,6 +9,7 @@ import std.socket;
 
 import position;
 
+pragma(lib, "ws2_32.lib");
 
 class NotImplementedException : Exception
 {
