@@ -17,8 +17,8 @@ const ulong TRAPS = 0x0000240000240000UL;
 const ulong NOT_A_FILE = 0x7F7F7F7F7F7F7F7FUL;
 const ulong NOT_H_FILE = 0xFEFEFEFEFEFEFEFEUL;
 const ulong RANK_1 = 0xFFUL;
-const ulong NOT_RANK_1 = ~RANK_1;
 const ulong RANK_8 = 0xFF00000000000000UL;
+const ulong NOT_RANK_1 = ~RANK_1;
 const ulong NOT_RANK_8 = ~RANK_8;
 const ulong NOT_EDGE = NOT_A_FILE & NOT_H_FILE & NOT_RANK_1 & NOT_RANK_8;
 
@@ -117,7 +117,14 @@ struct Step
         frombit = f;
         tobit = t;
         push = p;
-    }   
+    }
+
+   void set(Step other)
+   {
+      frombit = other.frombit;
+      tobit = other.tobit;
+      push = other.push;
+   } 
 }
 
 class StepList
@@ -1549,6 +1556,8 @@ PlayoutResult playout_steps(Position pos)
     }
     if (result.endscore == 0)
         result.endscore = pos.endscore();
+
+    assert (result.endscore != 0);
 
     Position.free(movestart);
     StepList.free(steps);
