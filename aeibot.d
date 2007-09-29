@@ -292,7 +292,6 @@ class AEIEngine
         position = new Position();
         past.length = 0;
         moves.length = 0;
-        std.gc.fullCollect();
         state = EngineState.IDLE;
     }
 

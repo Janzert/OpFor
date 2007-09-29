@@ -37,23 +37,24 @@ class SearchStore
     {
         foreach (SearchNode n; store)
         {
-            ulong key = n.position.zobrist;
-            Position.free(n.position);
-            n.position = null;
+            ulong key = n.zobrist;
             store.remove(key);
+            delete n;
         }
     }
 }
 
 class SearchNode
 {
-    Position position;
+    ulong zobrist;
+    Side side;
     int wins;
     int trials;
 
     this(Position p)
     {
-        position = p.dup;
+        side = p.side;
+        zobrist = p.zobrist;
         wins = 0;
         trials = 0;
     }
@@ -121,19 +122,6 @@ class Engine : AEIEngine
                 Position cpos = cur_pos.dup;
                 cpos.do_step(cur_steps.steps[index]);
                 SearchNode cnode = search_store.get_node(cpos);
-                if (cnode.position != cpos)
-                {
-                    if (cnode.position.zobrist != cpos.zobrist)
-                    {
-                        writefln("cpz %d cnz %d", cpos.zobrist, cnode.position.zobrist);
-                        writefln("cps %d cns %d", cpos.side, cnode.position.side);
-                        writefln("cp %s", cpos.to_short_str());
-                        writefln("cn %s", cnode.position.to_short_str());
-                        throw new ValueException("Getting wrong node back.");
-                    } else {
-                        throw new Exception("Zobrist collision");
-                    }
-                }
                 parent_trials += cnode.trials;
                 child_nodes ~= cnode;
                 Position.free(cpos);
@@ -149,7 +137,7 @@ class Engine : AEIEngine
                 int repeats = 0;
                 for (int i=0; i < search_path.length; i++)
                 {
-                    if (child.position == search_path[i].position)
+                    if (child.zobrist == search_path[i].zobrist)
                     {
                         repeats += 1;
                     }
@@ -157,7 +145,7 @@ class Engine : AEIEngine
 
                 for (int i=0; i < past.length; i++)
                 {
-                    if (child.position == past[i])
+                    if (child.zobrist == past[i].zobrist)
                     {
                         repeats += 1;
                     }
@@ -171,7 +159,7 @@ class Engine : AEIEngine
                     ucb = initial_ucb;
                 } else {
                     real winrate = cast(real)child.wins / child.trials;
-                    if (child.position.side != cur_pos.side)
+                    if (child.side != cur_pos.side)
                     {
                         winrate = 1 - winrate;
                     }
@@ -204,7 +192,7 @@ class Engine : AEIEngine
 
         foreach (SearchNode node; search_path)
         {
-            if (node.position.side == winner)
+            if (node.side == winner)
             {
                 node.wins += 1;
             }
@@ -248,7 +236,7 @@ class Engine : AEIEngine
                 {
                     best_trials = tnode.trials;
                     best_winrate = cast(real)tnode.wins/tnode.trials;
-                    if (tnode.position.side != position.side)
+                    if (tnode.side != position.side)
                     {
                         best_winrate = 1 - best_winrate;
                     }
