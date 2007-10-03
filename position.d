@@ -1504,11 +1504,11 @@ Position parse_short_str(Side side, int steps, char[] boardstr)
         throw new InvalidBoardException("Not long enough for full board.");
     
     ulong[Piece.max+1] bitboards;
-    foreach (int squareix, char piecech; boardstr[1..66])
+    foreach (int squareix, char piecech; boardstr[1..65])
     {
         int piece = std.string.find(" RCDHMErcdhme", piecech);
         if (piece == -1)
-            throw new InvalidBoardException("Invalid piece encountered.");
+            throw new InvalidBoardException(format("Invalid piece encountered. %s %s", boardstr, piecech));
         bitboards[piece] |= 1UL << (63-squareix);
     }
     return new Position(side, steps, bitboards);

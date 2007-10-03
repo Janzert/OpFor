@@ -105,7 +105,7 @@ class SocketServer : ServerConnection
 
 class ServerCmd
 {
-    enum CmdType { NONE, ISREADY, QUIT, NEWGAME, GO, MAKEMOVE };
+    enum CmdType { NONE, ISREADY, QUIT, NEWGAME, GO, MAKEMOVE, SETPOSITION };
     CmdType type;
 
     this(CmdType t)
@@ -130,7 +130,7 @@ class GoCmd : ServerCmd
 
 class MoveCmd : ServerCmd
 {
-    char [] move;
+    char[] move;
 
     this()
     {
@@ -138,6 +138,16 @@ class MoveCmd : ServerCmd
     }
 }
 
+class PositionCmd : ServerCmd
+{
+    char[] pos_str;
+    Side side;
+
+    this()
+    {
+        super(CmdType.SETPOSITION);
+    }
+}
 class ServerInterface
 {
     ServerConnection con;
@@ -228,6 +238,24 @@ class ServerInterface
                         int mix = find(line, "makemove") + 8; // end of makemove
                         move_cmd.move = strip(line[mix..length]);
                         break;
+                    case "setposition":
+                        PositionCmd p_cmd = new PositionCmd();
+                        cmd_queue ~= p_cmd;
+                        int six = find(line, "setposition") + 11;
+                        switch(stripl(line[six..length])[0])
+                        {
+                            case 'w':
+                                p_cmd.side = Side.WHITE;
+                                break;
+                            case 'b':
+                                p_cmd.side = Side.BLACK;
+                                break;
+                            default:
+                                throw new Exception("Bad side sent in setposition from server.");
+                        }
+                        int pix = find(line, "[");
+                        p_cmd.pos_str = strip(line[pix..length]);
+                        break;
                     default:
                         throw new Exception("Unrecognized command.");
                 }
@@ -248,6 +276,11 @@ class ServerInterface
     void bestmove(char[] move)
     {
         con.send(format("bestmove %s\n", move));
+    }
+
+    void info(char[] msg)
+    {
+        con.send(format("info %s\n", msg));
     }
 
     ServerCmd current_cmd()
@@ -279,6 +312,7 @@ class AEIEngine
     char[] bestmove;
 
     Position position;
+    int ply;
     Position[] past;
     char[][] moves;
 
@@ -290,6 +324,7 @@ class AEIEngine
     void new_game()
     {
         position = new Position();
+        ply = 1;
         past.length = 0;
         moves.length = 0;
         state = EngineState.IDLE;
@@ -310,7 +345,18 @@ class AEIEngine
         past ~= position.dup;
         moves ~= move;
         position.do_str_move(move);
+        ply += 1;
         bestmove = null;
+        state = EngineState.IDLE;
+    }
+
+    void set_position(Side side, char[] pstr)
+    {
+        position = parse_short_str(side, 4, pstr);
+        if (ply < 3)
+        {
+            ply = 3;
+        }
         state = EngineState.IDLE;
     }
 }

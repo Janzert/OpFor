@@ -1,4 +1,5 @@
 
+import std.date;
 import std.math;
 import std.random;
 import std.stdio;
@@ -62,7 +63,6 @@ class SearchNode
 
 class Engine : AEIEngine
 {
-    int num_trials;
     int total_trials;
     SearchStore search_store;
 
@@ -79,11 +79,11 @@ class Engine : AEIEngine
 
     void start_search()
     {
-        if (past.length == 0) // white setup move
+        if (ply == 1) // white setup move
         {
             bestmove = "Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Ha2 Db2 Cc2 Md2 Ee2 Cf2 Dg2 Hh2";
             state = EngineState.MOVESET;
-        } else if (past.length == 1)
+        } else if (ply == 2)
         {
             if (position.pieces[11] == Piece.WELEPHANT)
             {
@@ -134,6 +134,8 @@ class Engine : AEIEngine
             {
                 SearchNode child = child_nodes[index];
                 real ucb;
+
+                // XXX: This stops loops in the search and repeated positions but isn't correct
                 int repeats = 0;
                 for (int i=0; i < search_path.length; i++)
                 {
@@ -204,11 +206,6 @@ class Engine : AEIEngine
         StepList.free(cur_steps);
         search_path.length = 0;
 
-        if (total_trials >= num_trials)
-        {
-            set_bestmove();
-            state = EngineState.MOVESET;
-        }
         return;
     }
 
@@ -217,7 +214,6 @@ class Engine : AEIEngine
         Position cur_pos = position.dup;
         StepList cur_steps = StepList.allocate();
         StepList move_steps = StepList.allocate();
-        SearchNode cur_node = search_store.get_node(cur_pos);
         int[] b_trials;
         real[] b_winrate;
         while (cur_pos.side == position.side)
@@ -272,6 +268,64 @@ class Engine : AEIEngine
 
     }
 
+    char[] get_bestline()
+    {
+        char[] bline;
+        Position cur_pos = position.dup;
+        StepList cur_steps = StepList.allocate();
+        StepList move_steps = StepList.allocate();
+        SearchNode cur_node = search_store.get_node(cur_pos);
+        while (cur_node.trials > 0)
+        {
+            Position start_pos = cur_pos.dup;
+            if (start_pos.side == Side.WHITE)
+            {
+                bline ~= "w ";
+            } else {
+                bline ~= "b ";
+            }
+
+            while (cur_pos.side == start_pos.side && cur_node.trials > 0)
+            {
+                cur_pos.get_steps(cur_steps);
+                int best_trials = 0;
+                real best_winrate;
+                Step* best_step = move_steps.newstep();
+                best_step.frombit = 0xFF;
+                for (int ix=0; ix < cur_steps.numsteps; ix++)
+                {
+                    Position tpos = cur_pos.dup;
+                    tpos.do_step(cur_steps.steps[ix]);
+                    SearchNode tnode = search_store.get_node(tpos);
+                    if (best_step.frombit == 0xFF || tnode.trials > best_trials)
+                    {
+                        best_trials = tnode.trials;
+                        best_winrate = cast(real)tnode.wins/tnode.trials;
+                        if (tnode.side != position.side)
+                        {
+                            best_winrate = 1 - best_winrate;
+                        }
+                        best_step.set(cur_steps.steps[ix]);;
+                    }
+                    Position.free(tpos);
+                }
+                cur_pos.do_step(*best_step);
+                cur_steps.clear();
+                cur_node = search_store.get_node(cur_pos);
+            }
+
+            bline ~= move_steps.to_move_str(start_pos);
+            bline ~= " ";
+            move_steps.clear();
+            Position.free(start_pos);
+        }
+
+        Position.free(cur_pos);
+        StepList.free(cur_steps);
+        StepList.free(move_steps);
+
+        return bline[0..length-1];
+    }
 }
 
 int main(char[][] args)
@@ -279,6 +333,9 @@ int main(char[][] args)
     char[] ip = "127.0.0.1";
     ushort port = 40007;
     int num_trials = 100;
+
+    d_time report_interval = 30 * std.date.TicksPerSecond;
+    d_time nextreport = 0;
 
     if (args.length > 1)
     {
@@ -292,7 +349,6 @@ int main(char[][] args)
             format("%s %d", BOT_NAME, num_trials), BOT_AUTHOR);
     writefln("Connected to server %s:%d", ip, port);
     Engine engine = new Engine();
-    engine.num_trials = num_trials;
 
     while (true)
     {
@@ -324,13 +380,28 @@ int main(char[][] args)
                     break;
                 case ServerCmd.CmdType.GO:
                     writefln("Starting search.");
+                    GoCmd gcmd = cast(GoCmd)server.current_cmd;
                     engine.start_search();
+                    if (gcmd.option == GoCmd.Option.INFINITE)
+                    {
+                        num_trials = 0;
+                        writefln("Starting infinite analyses.");
+                    }
+                    nextreport = getUTCtime() + report_interval;
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.MAKEMOVE:
                     MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
                     engine.make_move(mcmd.move);
                     writefln("made move %s\n%s", mcmd.move, engine.position.to_long_str());
+                    server.clear_cmd();
+                    break;
+                case ServerCmd.CmdType.SETPOSITION:
+                    PositionCmd pcmd = cast(PositionCmd)server.current_cmd;
+                    engine.set_position(pcmd.side, pcmd.pos_str);
+                    writefln("set position\n%s\n%s", 
+                            "wb"[engine.position.side], 
+                            engine.position.to_long_str());
                     server.clear_cmd();
                     break;
                 default:
@@ -347,6 +418,19 @@ int main(char[][] args)
                 break;
             case EngineState.SEARCHING:
                 engine.search();
+                if (num_trials > 0 && engine.total_trials >= num_trials)
+                {
+                    engine.set_bestmove();
+                    engine.state = EngineState.MOVESET;
+                }
+                d_time now = getUTCtime();
+                if (now > nextreport)
+                {
+                    server.info(format("trials %d", engine.total_trials));
+                    char [] currline = engine.get_bestline();
+                    server.info(format("currline %s", currline));
+                    nextreport = now + report_interval;
+                }
                 break;
             default:
                 break;
