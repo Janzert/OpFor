@@ -7,10 +7,11 @@ import std.string;
 import position;
 import aeibot;
 
-const char[] BOT_NAME = "Arimaa score";
 const char[] BOT_AUTHOR = "Janzert";
 
-float score_pos(Position pos)
+typedef real function(Position) ScoreFunc;
+
+real arimaa_score(Position pos)
 {
     float wscore = 0;
     for (Piece i = Piece.WRABBIT; i <= Piece.WELEPHANT; i++)
@@ -45,9 +46,12 @@ float score_pos(Position pos)
 
 class Engine : AEIEngine
 {
-    this()
+    ScoreFunc score_pos;
+
+    this(ScoreFunc s)
     {
         super();
+        score_pos = s;
     }
 
     void start_search()
@@ -73,22 +77,40 @@ class Engine : AEIEngine
     void search()
     {
         PosStore moves = position.get_moves();
-        Position bestpos;
+        Position[] bestpos;
         float bestscore;
         foreach(Position pos; moves)
         {
-            float score = score_pos(pos);
+            float score;
+            if (pos.is_endstate())
+            {
+                score = pos.endscore() * 100000;
+            } else {
+                score = score_pos(pos);
+            }
             if (position.side == Side.BLACK)
             {
                 score = -score;
             }
-            if (bestscore != bestscore || score > bestscore)
+            if (bestscore != bestscore || score >= bestscore)
             {
                 bestscore = score;
-                bestpos = pos;
+                if (score > bestscore)
+                {
+                    bestpos.length = 0;
+                }
+
+                bestpos ~= pos;
             }
         }
-        bestmove = moves.getpos(bestpos).to_move_str(position);
+        
+        if (bestpos.length > 0)
+        {
+            int r = rand() % bestpos.length;
+            bestpos[0] = bestpos[r];
+        }
+
+        bestmove = moves.getpos(bestpos[0]).to_move_str(position);
         state = EngineState.MOVESET;
         moves.free_items();
         return;
@@ -100,11 +122,28 @@ int main(char[][] args)
     char[] ip = "127.0.0.1";
     ushort port = 40007;
 
+    bool fame = false;
+    char[] name = "Arimaa score";
+
+    if (args.length > 1)
+    {
+        if (icmp(args[1], "fame") == 0)
+        {
+            fame = true;
+            name = "FAME score";
+        }
+    }
 
     ServerInterface server = new ServerInterface(new SocketServer(ip, port),
-            BOT_NAME, BOT_AUTHOR);
+            name, BOT_AUTHOR);
     writefln("Connected to server %s:%d", ip, port);
-    Engine engine = new Engine();
+    Engine engine;
+    if (fame)
+    {
+        engine = new Engine(&FAME);
+    } else {
+        engine = new Engine(&arimaa_score);
+    }
 
     while (true)
     {

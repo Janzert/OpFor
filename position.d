@@ -185,6 +185,12 @@ class StepList
         return steps[0..numsteps];
     }
 
+    Step pop()
+    {
+        numsteps--;
+        return steps[numsteps];
+    }
+
     Step* newstep()
     {
         if (numsteps == steps.length)
@@ -1563,6 +1569,101 @@ PlayoutResult playout_steps(Position pos)
     StepList.free(steps);
 
     return result;
+}
+
+real FAME(Position pos)
+{
+    static const int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
+
+    real famescore = 0;
+
+    int wrabbits = popcount(pos.bitBoards[Piece.WRABBIT]);
+    int brabbits = popcount(pos.bitBoards[Piece.BRABBIT]);
+    int wr_left = wrabbits;
+    int br_left = brabbits;
+
+    Piece wp_ix = Piece.WELEPHANT;
+    int wused = 0;
+    Piece bp_ix = Piece.BELEPHANT;
+    int bused = 0;
+
+    for (int i=0; i < 8; i++)
+    {
+        Piece wpiece = Piece.EMPTY;
+        while (wpiece == Piece.EMPTY)
+        {
+            if (wp_ix != Piece.EMPTY 
+                    && popcount(pos.bitBoards[wp_ix]) - wused > 0)
+            {
+                wpiece = wp_ix;
+                wused++;
+            } else {
+                wp_ix--;
+                wused = 0;
+                if (wp_ix < Piece.WRABBIT)
+                {
+                    wp_ix = Piece.EMPTY;
+                    break;
+                }
+            }
+        }
+        
+        Piece bpiece = Piece.EMPTY;
+        while (bpiece == Piece.EMPTY)
+        {
+            if (bp_ix != Piece.EMPTY
+                    && popcount(pos.bitBoards[bp_ix]) - bused > 0)
+            {
+                bpiece = bp_ix;
+                bused++;
+            } else {
+                bp_ix--;
+                bused = 0;
+                if (bp_ix < Piece.BRABBIT)
+                {
+                    bp_ix = Piece.EMPTY;
+                    break;
+                }
+            }
+        }
+
+        if (wp_ix < Piece.WCAT && bp_ix < Piece.BCAT)
+            break;
+
+        if (wpiece <= Piece.WRABBIT)
+            wr_left--;
+
+        if (bpiece <= Piece.BRABBIT)
+            br_left--;
+
+        if (wpiece > bpiece - Piece.WELEPHANT)
+        {
+            famescore += matchscore[i];
+        } else if (wpiece < bpiece - Piece.WELEPHANT)
+        {
+            famescore -= matchscore[i];
+        }
+    }
+
+    if (pos.placement[Side.BLACK])
+    {
+        int bpieces = popcount(pos.placement[Side.BLACK] 
+            & ~pos.bitBoards[Piece.BRABBIT]);
+        famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
+    } else {
+        famescore = 3369.562173913032;
+    }
+
+    if (pos.placement[Side.WHITE])
+    {
+        int wpieces = popcount(pos.placement[Side.WHITE] 
+            & ~pos.bitBoards[Piece.WRABBIT]);
+        famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
+    } else {
+        famescore = -3369.562173913032;
+    }
+
+    return famescore/33.695652173913032;
 }
 
 class InvalidBoardException : Exception

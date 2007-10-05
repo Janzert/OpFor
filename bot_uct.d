@@ -63,6 +63,7 @@ class SearchNode
 
 class Engine : AEIEngine
 {
+    int repeat_break;
     int total_trials;
     SearchStore search_store;
 
@@ -94,6 +95,7 @@ class Engine : AEIEngine
             state = EngineState.MOVESET;
         } else {
             total_trials = 0;
+            repeat_break = 0;
             search_store.clear();
             state = EngineState.SEARCHING;
         }
@@ -106,7 +108,7 @@ class Engine : AEIEngine
         SearchNode cur_node = search_store.get_node(cur_pos);
         search_path ~= cur_node;
         real best_ucb;
-        while (cur_node.trials > search_store.min_trials)
+        while (cur_node.trials > search_store.min_trials && !cur_pos.is_endstate())
         {
             SearchNode[] child_nodes;
             cur_pos.get_steps(cur_steps);
@@ -128,7 +130,7 @@ class Engine : AEIEngine
             }
 
             real ln_ptrials = log(parent_trials);
-            SearchNode best_child;
+            SearchNode best_child = null;
             int best_ix;
             for (int index=0; index < child_nodes.length; index++)
             {
@@ -175,6 +177,9 @@ class Engine : AEIEngine
                     best_ix = index;
                 }
             }
+
+            if (best_child is null) // immobilized
+                break;
             
             cur_pos.do_step(cur_steps.steps[best_ix]);
             cur_node = best_child;
@@ -187,6 +192,7 @@ class Engine : AEIEngine
         {
             winner = cast(Side)(cur_pos.side ^1);
             search_path = search_path[0..length-1];
+            repeat_break += 1;
         } else {
             PlayoutResult result = playout_steps(cur_pos);
             winner = (result.endscore == 1) ? Side.WHITE : Side.BLACK;
@@ -216,7 +222,7 @@ class Engine : AEIEngine
         StepList move_steps = StepList.allocate();
         int[] b_trials;
         real[] b_winrate;
-        while (cur_pos.side == position.side)
+        while (cur_pos.side == position.side && !cur_pos.is_endstate())
         {
             cur_pos.get_steps(cur_steps);
             int best_trials = 0;
@@ -275,7 +281,10 @@ class Engine : AEIEngine
         StepList cur_steps = StepList.allocate();
         StepList move_steps = StepList.allocate();
         SearchNode cur_node = search_store.get_node(cur_pos);
-        while (cur_node.trials > 0)
+
+        bool[ulong] seen;
+        bool repeat = false;
+        while (cur_node.trials > 0 && !cur_pos.is_endstate())
         {
             Position start_pos = cur_pos.dup;
             if (start_pos.side == Side.WHITE)
@@ -285,7 +294,9 @@ class Engine : AEIEngine
                 bline ~= "b ";
             }
 
-            while (cur_pos.side == start_pos.side && cur_node.trials > 0)
+            while (cur_pos.side == start_pos.side
+                    && cur_node.trials > 0
+                    && !cur_pos.is_endstate())
             {
                 cur_pos.get_steps(cur_steps);
                 int best_trials = 0;
@@ -309,15 +320,38 @@ class Engine : AEIEngine
                     }
                     Position.free(tpos);
                 }
+                if (best_step.frombit == 0xFF) // there were no steps
+                {
+                    move_steps.pop();
+                    break;
+                }
+
+                seen[cur_pos.zobrist] = true;
                 cur_pos.do_step(*best_step);
                 cur_steps.clear();
                 cur_node = search_store.get_node(cur_pos);
+                if (cur_pos.zobrist in seen)
+                {
+                    repeat = true;
+                    break;
+                }
+            }
+
+            if (move_steps.numsteps == 0) // immobilized
+            {
+                break;
             }
 
             bline ~= move_steps.to_move_str(start_pos);
             bline ~= " ";
             move_steps.clear();
             Position.free(start_pos);
+
+            if (repeat)
+            {
+                bline ~= "repeat ";
+                break;
+            }
         }
 
         Position.free(cur_pos);
@@ -332,9 +366,9 @@ int main(char[][] args)
 {
     char[] ip = "127.0.0.1";
     ushort port = 40007;
-    int num_trials = 100;
+    int num_trials = 1000;
 
-    d_time report_interval = 30 * std.date.TicksPerSecond;
+    d_time report_interval = 15 * std.date.TicksPerSecond;
     d_time nextreport = 0;
 
     if (args.length > 1)
@@ -412,6 +446,7 @@ int main(char[][] args)
         switch (engine.state)
         {
             case EngineState.MOVESET:
+                writefln("repeats %d", engine.repeat_break);
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.state = EngineState.IDLE;

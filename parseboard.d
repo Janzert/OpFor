@@ -54,17 +54,19 @@ int main(char[][] args)
     //std.gc.enable();
     std.gc.fullCollect();
 
+    writefln("FAME: %.2f", FAME(pos));
     
     Timer = new ProcessTimesCounter();
     Timer.start();
     Position gamepos = Position.allocate();
+    PlayoutResult result;
     const int tests = 10000;
     int wins = 0;
     for (int plays = 0; plays < tests; plays++)
     {
         gamepos.copy(pos);
-        PlayoutResult result = playout_steps(gamepos);
-        if (gamepos.side == pos.side)
+        result = playout_steps(gamepos);
+        if (pos.side == Side.WHITE)
         {
             if (result.endscore == 1)
                 wins += 1;
@@ -74,6 +76,7 @@ int main(char[][] args)
                 wins += 1;
         }
     }
+    writefln("%s\n%d", gamepos.to_long_str(), result.endscore);
     Position.free(gamepos);
     Timer.stop();
     writefln("Win percentage = %.2f playtime = %.2f", (cast(double)wins / tests) *100.0,
