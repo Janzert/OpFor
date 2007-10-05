@@ -1531,33 +1531,23 @@ PlayoutResult playout_steps(Position pos)
 
     PlayoutResult result;
     StepList steps = StepList.allocate();
-    Position movestart = Position.allocate(pos);
+
     while (!pos.is_endstate())
     {
         result.length += 1;
         pos.get_steps(steps);
         if (steps.numsteps == 0)
         {
-            if (pos == movestart)
+            if (pos.side == Side.WHITE)
             {
-                if (pos.side == Side.WHITE)
-                {
-                    result.endscore = -1;
-                } else {
-                    result.endscore = 1;
-                }
-                break;
-            } else
-            {
-                pos.copy(movestart);
+                result.endscore = -1;
+            } else {
+                result.endscore = 1;
             }
+            break;
         }
         int stepix = rand() % steps.numsteps;
         pos.do_step(steps.steps[stepix]);
-        if (pos.side != movestart.side)
-        {
-            movestart.copy(pos);
-        }
         steps.clear();
     }
     if (result.endscore == 0)
@@ -1565,7 +1555,6 @@ PlayoutResult playout_steps(Position pos)
 
     assert (result.endscore != 0);
 
-    Position.free(movestart);
     StepList.free(steps);
 
     return result;
