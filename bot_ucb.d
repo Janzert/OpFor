@@ -88,7 +88,7 @@ class Engine : AEIEngine
                 ucb = 1.2;
             } else {
                 winrate = move.wins/move.tests;
-                ucb = winrate + sqrt(log_tt / move.tests);
+                ucb = winrate + sqrt(log_tt / (5*move.tests));
             }
             if (tmove is null
                     || (tucb < ucb))

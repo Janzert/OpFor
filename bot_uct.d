@@ -48,7 +48,7 @@ class SearchNode
 {
     ulong zobrist;
     Side side;
-    int wins;
+    real wins;
     int trials;
 
     this(Position p)
@@ -62,19 +62,20 @@ class SearchNode
 
 class Engine : AEIEngine
 {
-    int repeat_break;
     int total_trials;
+    int max_playout_len;
     SearchStore search_store;
 
     real initial_ucb;
 
     private SearchNode[] search_path;
 
-    this()
+    this(int plen)
     {
         super();
         search_store = new SearchStore();
-        initial_ucb = 1.2;
+        initial_ucb = 1.5;
+        max_playout_len = plen;
     }
 
     void start_search()
@@ -94,7 +95,6 @@ class Engine : AEIEngine
             state = EngineState.MOVESET;
         } else {
             total_trials = 0;
-            repeat_break = 0;
             search_store.clear();
             state = EngineState.SEARCHING;
         }
@@ -166,7 +166,7 @@ class Engine : AEIEngine
                     {
                         winrate = 1 - winrate;
                     }
-                    ucb = winrate + sqrt(ln_ptrials / child.trials);
+                    ucb = winrate + sqrt(ln_ptrials / (5*child.trials));
                 }
 
                 if (best_child is null || best_ucb < ucb)
@@ -186,22 +186,29 @@ class Engine : AEIEngine
             cur_steps.clear();
         }
 
-        Side winner;
+        real white_value;
         if (best_ucb == -1)
         {
-            winner = cast(Side)(cur_pos.side ^1);
+            white_value = cur_pos.side ^ 1;
             search_path = search_path[0..length-1];
-            repeat_break += 1;
         } else {
-            PlayoutResult result = playout_steps(cur_pos);
-            winner = (result.endscore == 1) ? Side.WHITE : Side.BLACK;
+            PlayoutResult result = playout_steps(cur_pos, max_playout_len);
+            if (result.endscore != 0)
+            {
+                white_value = (result.endscore == 1) ? 1 : 0;
+            } else {
+                white_value = (FAME(cur_pos) / 400) + 0.5;
+            }
         }
+        real black_value = 1 - white_value;
 
         foreach (SearchNode node; search_path)
         {
-            if (node.side == winner)
+            if (node.side == Side.WHITE)
             {
-                node.wins += 1;
+                node.wins += white_value;
+            } else {
+                node.wins += black_value;
             }
             node.trials += 1;
         }
@@ -221,7 +228,7 @@ class Engine : AEIEngine
         StepList move_steps = StepList.allocate();
         int[] b_trials;
         real[] b_winrate;
-        while (cur_pos.side == position.side && !cur_pos.is_endstate())
+        while (cur_pos.side == position.side && (!cur_pos.is_endstate() || cur_pos.inpush))
         {
             cur_pos.get_steps(cur_steps);
             int best_trials = 0;
@@ -366,22 +373,43 @@ int main(char[][] args)
     char[] ip = "127.0.0.1";
     ushort port = 40007;
     int num_trials = 1000;
+    int max_playout_len = 0;
 
-    d_time report_interval = 15 * std.date.TicksPerSecond;
+    d_time report_interval = 30 * std.date.TicksPerSecond;
     d_time nextreport = 0;
 
-    if (args.length > 1)
+    foreach (char[] arg; args[1..$])
     {
-        try {
-            num_trials = std.string.atoi(args[1]);
-            writefln("Number of trials set to %d", num_trials);
-        } catch { }
+        switch (arg[0])
+        {
+            case 't':
+                try {
+                num_trials = std.string.atoi(arg[1..$]);
+                writefln("Number of trials set to %d", num_trials);
+                } catch { }
+                break;
+            case 'l':
+                try {
+                max_playout_len = std.string.atoi(arg[1..$]);
+                writefln("Maximum playout length set to %d", max_playout_len);
+                } catch { }
+                break;
+            default:
+                writefln("usage: bot_uct [t<number of trials>] [l<max playout length>]");
+                return 0;
+        }
+    }
+
+    char[] name = format("%s %d", BOT_NAME, num_trials);
+    if (max_playout_len != 0)
+    {
+        name ~= format(" L%d", max_playout_len);
     }
 
     ServerInterface server = new ServerInterface(new SocketServer(ip, port),
-            format("%s %d", BOT_NAME, num_trials), BOT_AUTHOR);
+            name, BOT_AUTHOR);
     writefln("Connected to server %s:%d", ip, port);
-    Engine engine = new Engine();
+    Engine engine = new Engine(max_playout_len);
 
     while (true)
     {
@@ -445,7 +473,6 @@ int main(char[][] args)
         switch (engine.state)
         {
             case EngineState.MOVESET:
-                writefln("repeats %d", engine.repeat_break);
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.state = EngineState.IDLE;

@@ -76,7 +76,6 @@ int main(char[][] args)
                 wins += 1;
         }
     }
-    writefln("%s\n%d", gamepos.to_long_str(), result.endscore);
     Position.free(gamepos);
     Timer.stop();
     writefln("Win percentage = %.2f playtime = %.2f", (cast(double)wins / tests) *100.0,

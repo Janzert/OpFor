@@ -1104,7 +1104,7 @@ class Position
 
         if (inpush)
         {
-            ulong pospushers = neighbors_of(lfbit) & placement[side];
+            ulong pospushers = neighbors_of(lfbit) & placement[side] & ~frozen;
             while (pospushers)
             {
                 ulong pushbit = pospushers & -pospushers;
@@ -1526,13 +1526,16 @@ struct PlayoutResult
     int length;
 }
 
-PlayoutResult playout_steps(Position pos)
+PlayoutResult playout_steps(Position pos, int max_length = 0)
 {
 
     PlayoutResult result;
+    result.endscore = 0;
+    result.length = 0;
+
     StepList steps = StepList.allocate();
 
-    while (!pos.is_endstate())
+    while (!pos.is_endstate() && (max_length == 0 || result.length < max_length))
     {
         result.length += 1;
         pos.get_steps(steps);
