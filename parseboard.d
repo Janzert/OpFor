@@ -29,14 +29,9 @@ int main(char[][] args)
     writefln("wb"[pos.side]);
     writefln(pos.to_long_str(true));
     StepList steps = new StepList();
-    pos.get_single_steps(steps);
-    int ssteps = steps.numsteps;
-    pos.get_double_steps(steps);
-    int dsteps = steps.numsteps - ssteps;
-    StepList gsteps = new StepList();
-    pos.get_steps(gsteps);
-    writefln("There are %d steps with %d single and %d double steps.", 
-                gsteps.numsteps, ssteps, dsteps);
+    pos.get_steps(steps);
+    writefln("There are %d steps.", 
+                steps.numsteps);
     ProcessTimesCounter Timer = new ProcessTimesCounter();
     //std.gc.disable();
     Timer.start();

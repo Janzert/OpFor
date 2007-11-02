@@ -1039,60 +1039,10 @@ class Position
         
     }
 
-    void get_single_steps(StepList steps)
+    void get_steps(StepList steps)
     {
         Step* step;
-        ulong stepbits;
-        ulong stepbit;
-        ulong mpieces = placement[side] & ~frozen;
-
-        if (side == Side.BLACK)
-            stepbits = ((mpieces & ~bitBoards[Piece.BRABBIT]) << 8) &
-                            bitBoards[Piece.EMPTY];
-        else
-            stepbits = (mpieces << 8) & bitBoards[Piece.EMPTY];
-        while (stepbits)
-        {
-            stepbit = stepbits & -stepbits;
-            stepbits ^= stepbit;
-            step = steps.newstep();
-            step.set(stepbit >> 8, stepbit);
-        }
-
-        stepbits = ((mpieces & NOT_A_FILE) << 1) & bitBoards[Piece.EMPTY];
-        while (stepbits)
-        {
-            stepbit = stepbits & -stepbits;
-            stepbits ^= stepbit;
-            step = steps.newstep();
-            step.set(stepbit >> 1, stepbit);
-        }
-
-        stepbits = ((mpieces & NOT_H_FILE) >> 1) & bitBoards[Piece.EMPTY];
-        while (stepbits)
-        {
-            stepbit = stepbits & -stepbits;
-            stepbits ^= stepbit;
-            step = steps.newstep();
-            step.set(stepbit << 1, stepbit);
-        }
-
-        if (side == Side.WHITE)
-            stepbits = ((mpieces & ~bitBoards[Piece.WRABBIT]) >> 8) &
-                            bitBoards[Piece.EMPTY];
-        else
-            stepbits = (mpieces >> 8) & bitBoards[Piece.EMPTY];
-        while (stepbits)
-        {
-            stepbit = stepbits & -stepbits;
-            stepbits ^= stepbit;
-            step = steps.newstep();
-            step.set(stepbit << 8, stepbit);
-        }
-    }
-
-    void get_double_steps(StepList steps)
-    {
+        
         int pieceoffset = 0;
         int enemyoffset = 6;
         if (side)
@@ -1112,7 +1062,7 @@ class Position
                 bitix fromix = bitindex(pushbit);
                 if (pieces[fromix]+enemyoffset > lastpiece)
                 {
-                    Step* step = steps.newstep();
+                    step = steps.newstep();
                     step.set(pushbit, lfbit);
                 }
             }
@@ -1136,7 +1086,7 @@ class Position
                     {
                         pullmap |= pullbit;
 
-                        Step* step = steps.newstep();
+                        step = steps.newstep();
                         step.set(pullbit, lfbit);
                     }
                 }
@@ -1163,26 +1113,66 @@ class Position
                         tobits ^= tobit;
                         if (!((frombit & pullmap) && (tobit & pullmap)))
                         {
-                            Step* step = steps.newstep();
+                            step = steps.newstep();
                             step.set(frombit, tobit, true);
                         }
                     }
                 }
             }
-        }
-    }
 
-    void get_steps(StepList steps)
-    {
-        get_double_steps(steps);
-        if (stepsLeft != 4 && !inpush)
-        {
-            Step* step = steps.newstep();
-            step.set(INV_STEP, INV_STEP);
-        }
-        if (!inpush)
-        {
-            get_single_steps(steps);
+            if (stepsLeft != 4)
+            {
+                step = steps.newstep();
+                step.set(INV_STEP, INV_STEP);
+            }
+
+            ulong stepbits;
+            ulong stepbit;
+            ulong mpieces = placement[side] & ~frozen;
+
+            if (side == Side.BLACK)
+                stepbits = ((mpieces & ~bitBoards[Piece.BRABBIT]) << 8) &
+                                bitBoards[Piece.EMPTY];
+            else
+                stepbits = (mpieces << 8) & bitBoards[Piece.EMPTY];
+            while (stepbits)
+            {
+                stepbit = stepbits & -stepbits;
+                stepbits ^= stepbit;
+                step = steps.newstep();
+                step.set(stepbit >> 8, stepbit);
+            }
+
+            stepbits = ((mpieces & NOT_A_FILE) << 1) & bitBoards[Piece.EMPTY];
+            while (stepbits)
+            {
+                stepbit = stepbits & -stepbits;
+                stepbits ^= stepbit;
+                step = steps.newstep();
+                step.set(stepbit >> 1, stepbit);
+            }
+
+            stepbits = ((mpieces & NOT_H_FILE) >> 1) & bitBoards[Piece.EMPTY];
+            while (stepbits)
+            {
+                stepbit = stepbits & -stepbits;
+                stepbits ^= stepbit;
+                step = steps.newstep();
+                step.set(stepbit << 1, stepbit);
+            }
+
+            if (side == Side.WHITE)
+                stepbits = ((mpieces & ~bitBoards[Piece.WRABBIT]) >> 8) &
+                                bitBoards[Piece.EMPTY];
+            else
+                stepbits = (mpieces >> 8) & bitBoards[Piece.EMPTY];
+            while (stepbits)
+            {
+                stepbit = stepbits & -stepbits;
+                stepbits ^= stepbit;
+                step = steps.newstep();
+                step.set(stepbit << 8, stepbit);
+            }
         }
     }
 
