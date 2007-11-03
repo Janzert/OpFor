@@ -159,7 +159,7 @@ class StepList
         reservelists[reservesize++] = list;
     }
 
-    this(int startlength=4)
+    this(int startlength=32)
     {
         steps.length = startlength;
         allocated += 1;
