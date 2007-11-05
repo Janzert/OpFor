@@ -323,7 +323,16 @@ class AEIEngine
 
     void new_game()
     {
-        position = new Position();
+        if (position !is null)
+        {
+            Position.free(position);
+            foreach (Position pos; past)
+            {
+                Position.free(pos);
+            }
+        }
+        position = Position.allocate();
+        position.clear();
         ply = 1;
         past.length = 0;
         moves.length = 0;
@@ -352,6 +361,11 @@ class AEIEngine
 
     void set_position(Side side, char[] pstr)
     {
+        if (position !is null)
+        {
+            Position.free(position);
+        }
+
         position = parse_short_str(side, 4, pstr);
         if (ply < 3)
         {

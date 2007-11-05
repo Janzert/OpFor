@@ -9,32 +9,24 @@ const char[] BOT_AUTHOR = "Janzert";
 
 class ABSearch
 {
-    const int WIN_SCORE = 32000;
-    const int MAX_SCORE = 32767;
-    const int MIN_SCORE = -32767;
+    static const int WIN_SCORE = 32000;
+    static const int MAX_SCORE = 32767;
+    static const int MIN_SCORE = -32767;
     static Step nullstep;
 
     Position nullmove;
-    Step[50][50] pvtable;
-    int pvdepth = 0;
-    int pvlength = 0;
 
     static this()
     {
         nullstep.set(INV_STEP, INV_STEP);
     }
 
-    void copy_pv_up()
-    {
-        for (int i = pvdepth+1; i < pvlength; i++)
-        {
-            pvtable[pvdepth][i].set(pvtable[pvdepth][i]);
-        }
-    }
-
     int eval(Position pos)
     {
-        return cast(int)FAME(pos);
+        int score = cast(int)FAME(pos, 0.1716) + (pos.zobrist % 150);
+        if (pos.side == Side.BLACK)
+            score = -score;
+        return score;
     }
 
     int alphabeta(Position pos, int depth, int initialalpha, int initialbeta)
@@ -57,9 +49,6 @@ class ABSearch
 
             StepList steps = StepList.allocate();
             pos.get_steps(steps);
-
-            pvlength++;
-
             for (int six=0; six < steps.numsteps; six++)
             {
                 int cal;
@@ -77,25 +66,19 @@ class ABSearch
                     nullmove = npos.dup;
                     nullmove.do_step(nullstep);
 
-                    pvdepth++;
                     cal = -alphabeta(npos, depth-1, -beta, -alpha);
-                    pvdepth--;
 
                     Position.free(nullmove);
                     nullmove = mynull;
                 } else {
-                    pvdepth++;
                     cal = alphabeta(npos, depth-1, alpha, beta);
-                    pvdepth--;
                 }
+
+                Position.free(npos);
 
                 if (cal > score)
                 {
                     score = cal;
-
-                    pvtable[pvdepth][pvdepth].copy(steps.steps[six]);
-                    copy_pv_up();
-
                     if (cal > alpha)
                     {
                         alpha = cal;
@@ -104,7 +87,6 @@ class ABSearch
                     }
                 }
             }
-
             StepList.free(steps);
         }
         return score;
@@ -114,6 +96,14 @@ class ABSearch
 
 class Engine : AEIEngine
 {
+    ABSearch s_eng;
+    Position[] pos_list;
+    StepList[] move_list;
+
+    this()
+    {
+        s_eng = new ABSearch();
+    }
 
     void start_search()
     {
@@ -131,7 +121,54 @@ class Engine : AEIEngine
             }
             state = EngineState.MOVESET;
         } else {
+            PosStore pstore = position.get_moves();
+            foreach (Position pos; pstore)
+            {
+                pos_list ~= pos;
+                move_list ~= pstore.getpos(pos);
+            }
+            delete pstore;
             state = EngineState.SEARCHING;
+        }
+    }
+
+    void search()
+    {
+        int score = ABSearch.MIN_SCORE;
+        int bestix = -1;
+
+        for (int i = 0; i < pos_list.length; i++)
+        {
+            Position pos = pos_list[i];
+            s_eng.nullmove = pos.dup;
+            s_eng.nullmove.do_step(ABSearch.nullstep);
+            int cal = -s_eng.alphabeta(pos, 2, ABSearch.MIN_SCORE, -score);
+            Position.free(s_eng.nullmove);
+            if (cal > score)
+            {
+                score = cal;
+                bestix = i;
+            }
+        }
+
+        bestmove = move_list[bestix].to_move_str(position);
+        state = EngineState.MOVESET;
+    }
+
+    void cleanup_search()
+    {
+        if (pos_list.length > 0)
+        {
+            foreach (Position pos; pos_list)
+            {
+                Position.free(pos);
+            }
+            pos_list.length = 0;
+            foreach (StepList move; move_list)
+            {
+                StepList.free(move);
+            }
+            move_list.length = 0;
         }
     }
 
@@ -209,6 +246,9 @@ int main(char[][] args)
             case EngineState.MOVESET:
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
+                engine.cleanup_search();
+                writefln("Positions allocated %d, now in reserve %d.", Position.allocated, Position.reserved);
+                writefln("StepLists allocated %d, now in reserve %d.", StepList.allocated, StepList.reserved);
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:

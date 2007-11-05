@@ -44,6 +44,11 @@ real arimaa_score(Position pos)
     return wscore - bscore;
 }
 
+real FAME(Position pos)
+{
+    return position.FAME(pos);
+}
+
 class Engine : AEIEngine
 {
     ScoreFunc score_pos;
@@ -192,6 +197,8 @@ int main(char[][] args)
             case EngineState.MOVESET:
                 server.bestmove(engine.bestmove);
                 engine.state = EngineState.IDLE;
+                writefln("Positions allocated %d now in reserve %d.", Position.allocated, Position.reserved);
+                writefln("StepLists allocated %d, now in reserve %d.", StepList.allocated, StepList.reserved);
                 break;
             case EngineState.SEARCHING:
                 engine.search();

@@ -137,6 +137,11 @@ class StepList
     private static int reservesize;
     static int allocated = 0;
 
+    static int reserved()
+    {
+        return reservesize;
+    }
+
     static StepList allocate()
     {
         if (reservesize)
@@ -216,7 +221,12 @@ class StepList
                 break;
             if (step.tobit != INV_STEP) // trap step
             {
-                move ~= ".RCDHMErcdhme"[current.pieces[step.fromix]];
+                if (step.frombit)
+                {
+                    move ~= ".RCDHMErcdhme"[current.pieces[step.fromix]];
+                } else {
+                    move ~= '.';
+                }
                 move ~= ix_to_alg(step.fromix);
                 switch (step.toix - step.fromix)
                 {
@@ -265,8 +275,10 @@ class StepList
                     }
                     move ~= "x ";
                 }
+                Position.free(previous);
             }
         }
+        Position.free(current);
 
         if (move.length == 0)
             throw new ValueException("Tried to make move with no or pass only steps");
@@ -502,6 +514,38 @@ class Position
         update_derived();
 
         allocated++;
+    }
+
+    void clear()
+    {
+        side = Side.WHITE;
+        stepsLeft = 0;
+
+        frozen = 0;
+        placement[0] = 0;
+        placement[1] = 0;
+        
+        bitBoards[0] = ALL_BITS_SET;
+        for (int i=1; i < bitBoards.length; i++)
+        {
+            bitBoards[i] = 0;
+        }
+        
+        for (int i=0; i < 64; i++)
+        {
+            pieces[i] = Piece.EMPTY;
+
+            for (int j=0; j < 2; j++)
+            {
+                strongest[i][j] = Piece.EMPTY;
+            }
+        }
+
+        zobrist = 0;
+
+        lastpiece = Piece.EMPTY;
+        lastfrom = 0;
+        inpush = false;
     }
 
     private void update_derived()
@@ -1178,12 +1222,12 @@ class Position
 
     PosStore get_moves()
     {
-        StepList nextsteps = new StepList(32);
+        StepList nextsteps = StepList.allocate();
         PosStore partial = new PosStore();
         PosStore nextpart = new PosStore();
         PosStore finished = new PosStore();
-        Position newpos = new Position();
-        partial.addpos(this.dup, new StepList());
+        Position newpos = Position.allocate();
+        partial.addpos(this.dup, StepList.allocate());
         while (partial.length != 0)
         {
             foreach (Position curpos; partial)
@@ -1218,11 +1262,19 @@ class Position
             tmp.free_items();
             nextpart = tmp;
         }
+        Position.free(newpos);
+        StepList.free(nextsteps);
+
         Step passmove;
         passmove.set(INV_STEP, INV_STEP);
         Position nullmove = this.dup;
         nullmove.do_step(passmove);
-        finished.delpos(nullmove);
+        if (finished.haspos(nullmove))
+        {
+            StepList.free(finished.getpos(nullmove));
+            Position.free(finished.delpos(nullmove));
+        }
+        Position.free(nullmove);
         return finished;
     }
 }
@@ -1232,7 +1284,7 @@ class PosStore
     private:
         const int START_SIZE = 14;
         const double MAX_LOAD = 0.7;
-        Position DELETED_ENTRY;
+        static Position DELETED_ENTRY;
         Position[] positions;
         StepList[] steplists;
         int numstored = 0;
@@ -1296,9 +1348,13 @@ class PosStore
         }
 
     public:
-    this()
+    static this()
     {
         DELETED_ENTRY = new Position();
+    }
+
+    this()
+    {
         positions.length = 1 << keysize;
         steplists.length = 1 << keysize;
     }
@@ -1379,10 +1435,12 @@ class PosStore
         numstored++;
     }
 
-    void delpos(Position pos)
+    Position delpos(Position pos)
     {
         int key = pos.zobrist & keymask;
         int nextkey = (key + keystep) & keymask;
+        Position fpos = null;
+
         // find the location
         while (positions[key] !is null)
         {
@@ -1394,10 +1452,13 @@ class PosStore
         // if the position was in the table.
         if (positions[key] !is null)
         {
+            fpos = positions[key];
             positions[key] = DELETED_ENTRY;
             steplists[key] = null;
             numstored--;
         }
+
+        return fpos;
     }
 
     StepList getpos(Position pos)
@@ -1553,7 +1614,7 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
     return result;
 }
 
-real FAME(Position pos)
+real FAME(Position pos, real scale = 33.695652173913032)
 {
     static const int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
 
@@ -1645,7 +1706,7 @@ real FAME(Position pos)
         famescore = -3369.562173913032;
     }
 
-    return famescore/33.695652173913032;
+    return famescore / scale;
 }
 
 class InvalidBoardException : Exception
