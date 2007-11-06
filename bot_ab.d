@@ -7,32 +7,82 @@ import position;
 const char[] BOT_NAME = "AB";
 const char[] BOT_AUTHOR = "Janzert";
 
+enum SType { EXACT, ALPHA, BETA }
+
+struct TTNode
+{
+    ulong zobrist;
+    int depth;
+    int score;
+    SType type;
+    Step beststep;
+}
+
+class TransTable
+{
+    TTNode[] store;
+
+    this (int size)
+    {
+        store.length = (size*1024*1024) / TTNode.sizeof;
+        writefln("Initialized transposition table with %dMB and %d nodes.",
+                size,
+                store.length);
+    }
+
+    TTNode* get(Position pos)
+    {
+        int key = pos.zobrist % store.length;
+        return &store[key];
+    }
+}
+
+void sortsteps(StepList steps, Step* best)
+{
+    if (best !is null && (best.frombit != 0 || best.tobit != 0))
+    {
+        int bix = 0;
+        while (bix < steps.numsteps && steps.steps[bix] != *best)
+        {
+            bix++;
+        }
+        
+        assert (bix < steps.numsteps, "Did not find best step in step list");
+
+        if (bix < steps.numsteps)
+        {
+            steps.steps[bix].copy(steps.steps[0]);
+            steps.steps[0].copy(*best);
+        }
+    }
+}
+
 class ABSearch
 {
     static const int WIN_SCORE = 32000;
     static const int MAX_SCORE = 32767;
     static const int MIN_SCORE = -32767;
-    static Step nullstep;
+    static Step nullstep = { frombit: INV_STEP, tobit: INV_STEP };
 
+    TransTable ttable;
     Position nullmove;
 
-    static this()
+    this(TransTable tt)
     {
-        nullstep.set(INV_STEP, INV_STEP);
+        ttable = tt;
     }
 
     int eval(Position pos)
     {
-        int score = cast(int)FAME(pos, 0.1716) + (pos.zobrist % 150);
+        int score = cast(int)fastFAME(pos, 0.1716) + (pos.zobrist % 150);
         if (pos.side == Side.BLACK)
             score = -score;
         return score;
     }
 
-    int alphabeta(Position pos, int depth, int initialalpha, int initialbeta)
+    int alphabeta(Position pos, int depth, int alpha, int beta)
     {
         int score = MIN_SCORE;
-
         if (pos.is_endstate())
         {
             score = pos.endscore() * WIN_SCORE;
@@ -40,15 +90,38 @@ class ABSearch
             {
                 score = -score;
             }
-        } else if (depth < 1)
+            return score;
+        }
+
+        SType sflag = SType.ALPHA;
+        TTNode* node = ttable.get(pos);
+        Step* prev_best;
+        if (node.zobrist == pos.zobrist)
+        {
+            if (node.depth >= depth)
+            {
+                if (node.type == SType.EXACT
+                    || (node.type == SType.ALPHA && node.score <= alpha)
+                    || (node.type == SType.BETA && node.score >= beta))
+                {
+                    return node.score;
+                }
+            }
+            prev_best = &node.beststep;
+        }
+
+        if (depth < 1 && !pos.inpush)
         {
             score = eval(pos);
+            if (node.zobrist != pos.zobrist)
+            {
+                node.beststep.clear();
+            }
         } else {
-            int alpha = initialalpha;
-            int beta = initialbeta;
-
+            int best_ix;
             StepList steps = StepList.allocate();
             pos.get_steps(steps);
+            sortsteps(steps, prev_best);
             for (int six=0; six < steps.numsteps; six++)
             {
                 int cal;
@@ -79,16 +152,30 @@ class ABSearch
                 if (cal > score)
                 {
                     score = cal;
+                    best_ix = six;
+
                     if (cal > alpha)
                     {
                         alpha = cal;
+                        sflag = SType.EXACT;
+
                         if (cal >= beta)
+                        {
+                            sflag = SType.BETA;
                             break;
+                        }
                     }
                 }
             }
+            node.beststep.copy(steps.steps[best_ix]);
             StepList.free(steps);
         }
+
+        node.zobrist = pos.zobrist;
+        node.depth = depth;
+        node.score = score;
+        node.type = sflag;
+
         return score;
     }
 }
@@ -102,7 +189,7 @@ class Engine : AEIEngine
 
     this()
     {
-        s_eng = new ABSearch();
+        s_eng = new ABSearch(new TransTable(100));
     }
 
     void start_search()
@@ -134,20 +221,32 @@ class Engine : AEIEngine
 
     void search()
     {
-        int score = ABSearch.MIN_SCORE;
-        int bestix = -1;
+        int start_depth = 2;
+        int stop_depth = 4;
 
-        for (int i = 0; i < pos_list.length; i++)
+        int bestix = 0;
+        for (int depth = start_depth; depth < stop_depth; depth++)
         {
-            Position pos = pos_list[i];
+            Position pos = pos_list[bestix];
             s_eng.nullmove = pos.dup;
             s_eng.nullmove.do_step(ABSearch.nullstep);
-            int cal = -s_eng.alphabeta(pos, 2, ABSearch.MIN_SCORE, -score);
+            int score = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, ABSearch.MAX_SCORE);
             Position.free(s_eng.nullmove);
-            if (cal > score)
+
+            for (int i = 0; i < pos_list.length; i++)
             {
-                score = cal;
-                bestix = i;
+                pos = pos_list[i];
+                s_eng.nullmove = pos.dup;
+                s_eng.nullmove.do_step(ABSearch.nullstep);
+                int cal = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, -score);
+                Position.free(s_eng.nullmove);
+                if (cal > score)
+                {
+                    score = cal;
+                    bestix = i;
+                    if (cal >= ABSearch.WIN_SCORE)
+                        break;
+                }
             }
         }
 

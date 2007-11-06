@@ -81,6 +81,13 @@ struct Step
     ulong frombit, tobit;
     bool push;
 
+    void clear()
+    {
+        frombit = 0;
+        tobit = 0;
+        push = false;
+    }
+
     void copy(Step other)
     {
         frombit = other.frombit;
@@ -531,11 +538,14 @@ class Position
             bitBoards[i] = 0;
         }
         
-        for (int i=0; i < 64; i++)
+        for (int i=0; i < pieces.length; i++)
         {
             pieces[i] = Piece.EMPTY;
+        }
 
-            for (int j=0; j < 2; j++)
+        for (int i=0; i < 2; i++)
+        {
+            for (int j=0; j < 64; j++)
             {
                 strongest[i][j] = Piece.EMPTY;
             }
@@ -1707,6 +1717,39 @@ real FAME(Position pos, real scale = 33.695652173913032)
     }
 
     return famescore / scale;
+}
+
+real fastFAME(Position pos, real scale = 33.695652173913032)
+{
+    static real[int] cache;
+
+    int key;
+    if (pos.bitBoards[Piece.WELEPHANT])
+        key = 1;
+    if (pos.bitBoards[Piece.WCAMEL])
+        key |= 1 << 1;
+    key |= popcount(pos.bitBoards[Piece.WHORSE]) << 2;
+    key |= popcount(pos.bitBoards[Piece.WDOG]) << 4;
+    key |= popcount(pos.bitBoards[Piece.WCAT]) << 6;
+    key |= popcount(pos.bitBoards[Piece.WRABBIT]) << 8;
+
+    if (pos.bitBoards[Piece.BELEPHANT])
+        key |= 1 << 12;
+    if (pos.bitBoards[Piece.BCAMEL])
+        key |= 1 << 13;
+    key |= popcount(pos.bitBoards[Piece.BHORSE]) << 14;
+    key |= popcount(pos.bitBoards[Piece.BDOG]) << 16;
+    key |= popcount(pos.bitBoards[Piece.BCAT]) << 18;
+    key |= popcount(pos.bitBoards[Piece.BRABBIT]) << 20;
+
+    if (key in cache)
+    {
+        return cache[key];
+    }
+
+    real score = FAME(pos, scale);
+    cache[key] = score;
+    return score;
 }
 
 class InvalidBoardException : Exception
