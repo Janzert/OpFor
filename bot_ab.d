@@ -37,22 +37,31 @@ class TransTable
     }
 }
 
-void sortsteps(StepList steps, Step* best)
+class HistoryHeuristic
 {
-    if (best !is null && (best.frombit != 0 || best.tobit != 0))
-    {
-        int bix = 0;
-        while (bix < steps.numsteps && steps.steps[bix] != *best)
-        {
-            bix++;
-        }
-        
-        assert (bix < steps.numsteps, "Did not find best step in step list");
+    int[64][64][2] score;
 
-        if (bix < steps.numsteps)
+    int get_score(Position pos, Step step)
+    {
+        return score[pos.side][step.fromix][step.toix];
+    }
+
+    void update(Position pos, Step step, int depth)
+    {
+        score[pos.side][step.fromix][step.toix] += depth;
+    }
+
+    void soften()
+    {
+        for (int s=0; s < 2; s++)
         {
-            steps.steps[bix].copy(steps.steps[0]);
-            steps.steps[0].copy(*best);
+            for (int f=0; f < 64; f++)
+            {
+                for (int t=0; t < 64; t++)
+                {
+                    score[s][f][t] /= 2;
+                }
+            }
         }
     }
 }
@@ -65,16 +74,54 @@ class ABSearch
     static Step nullstep = { frombit: INV_STEP, tobit: INV_STEP };
 
     TransTable ttable;
+    HistoryHeuristic cuthistory;
     Position nullmove;
 
     this(TransTable tt)
     {
         ttable = tt;
+        cuthistory = new HistoryHeuristic();
+    }
+
+    void sortstep(Position pos, StepList steps, Step* best, int num)
+    {
+        if (num == 0 && best !is null && (best.frombit != 0 || best.tobit != 0))
+        {
+            int bix = 0;
+            while (bix < steps.numsteps && steps.steps[bix] != *best)
+            {
+                bix++;
+            }
+            
+            assert (bix < steps.numsteps, "Did not find best step in step list");
+
+            if (bix < steps.numsteps)
+            {
+                steps.steps[bix].copy(steps.steps[0]);
+                steps.steps[0].copy(*best);
+            }
+        }
+
+        int score = cuthistory.get_score(pos, steps.steps[num]);
+        int bix = num;
+        for (int i = num+1; i < steps.numsteps; i++)
+        {
+            int t = cuthistory.get_score(pos, steps.steps[i]);
+            if (t > score)
+            {
+                score = t;
+                bix = i;
+            }
+        }
+
+        Step tmp = steps.steps[num];
+        steps.steps[num] = steps.steps[bix];
+        steps.steps[bix] = tmp;
     }
 
     int eval(Position pos)
     {
-        int score = cast(int)fastFAME(pos, 0.1716) + (pos.zobrist % 150);
+        int score = cast(int)fastFAME(pos, 0.1716); // + (pos.zobrist % 150);
         if (pos.side == Side.BLACK)
             score = -score;
         return score;
@@ -121,11 +168,11 @@ class ABSearch
             int best_ix;
             StepList steps = StepList.allocate();
             pos.get_steps(steps);
-            sortsteps(steps, prev_best);
             for (int six=0; six < steps.numsteps; six++)
             {
                 int cal;
 
+                sortstep(pos, steps, prev_best, six);
                 Position npos = pos.dup;
                 npos.do_step(steps.steps[six]);
 
@@ -162,6 +209,7 @@ class ABSearch
                         if (cal >= beta)
                         {
                             sflag = SType.BETA;
+                            cuthistory.update(pos, steps.steps[best_ix], depth);
                             break;
                         }
                     }
@@ -180,12 +228,45 @@ class ABSearch
     }
 }
 
+class PositionNode
+{
+    private static PositionNode cache_head;
+
+    PositionNode prev;
+    PositionNode next;
+
+    Position pos;
+    StepList move;
+
+    static PositionNode allocate()
+    {
+        if (cache_head !is null)
+        {
+            PositionNode n = cache_head;
+            cache_head = n.next;
+            n.next = null;
+            return n;
+        }
+
+        return new PositionNode();
+    }
+
+    static void free(PositionNode n)
+    {
+        n.pos = null;
+        n.prev = null;
+        n.next = cache_head;
+        cache_head = n.next;
+    }
+}
 
 class Engine : AEIEngine
 {
     ABSearch s_eng;
-    Position[] pos_list;
-    StepList[] move_list;
+    PositionNode pos_list;
+    PositionNode next_pos;
+    int depth;
+    int best_score;
 
     this()
     {
@@ -209,66 +290,86 @@ class Engine : AEIEngine
             state = EngineState.MOVESET;
         } else {
             PosStore pstore = position.get_moves();
+            PositionNode last_pos;
             foreach (Position pos; pstore)
             {
-                pos_list ~= pos;
-                move_list ~= pstore.getpos(pos);
+                PositionNode n = PositionNode.allocate();
+                n.pos = pos;
+                n.move = pstore.getpos(pos);
+                n.prev = last_pos;
+                if (last_pos !is null)
+                {
+                    last_pos.next = n;
+                } else {
+                    pos_list = n;
+                }
+                last_pos = n;
             }
             delete pstore;
+            next_pos = pos_list;
+            best_score = ABSearch.MIN_SCORE;
+            depth = 2;
             state = EngineState.SEARCHING;
         }
     }
 
     void search()
     {
-        int start_depth = 2;
-        int stop_depth = 4;
+        Position pos = next_pos.pos;
+        s_eng.nullmove = pos.dup;
+        s_eng.nullmove.do_step(ABSearch.nullstep);
+        int score = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, -best_score);
+        Position.free(s_eng.nullmove);
 
-        int bestix = 0;
-        for (int depth = start_depth; depth < stop_depth; depth++)
+        if (score > best_score)
         {
-            Position pos = pos_list[bestix];
-            s_eng.nullmove = pos.dup;
-            s_eng.nullmove.do_step(ABSearch.nullstep);
-            int score = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, ABSearch.MAX_SCORE);
-            Position.free(s_eng.nullmove);
-
-            for (int i = 0; i < pos_list.length; i++)
+            best_score = score;
+            
+            if (next_pos !is pos_list)
             {
-                pos = pos_list[i];
-                s_eng.nullmove = pos.dup;
-                s_eng.nullmove.do_step(ABSearch.nullstep);
-                int cal = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, -score);
-                Position.free(s_eng.nullmove);
-                if (cal > score)
-                {
-                    score = cal;
-                    bestix = i;
-                    if (cal >= ABSearch.WIN_SCORE)
-                        break;
-                }
+                PositionNode n = next_pos;
+                next_pos = n.prev;
+
+                if (n.next !is null)
+                    n.next.prev = n.prev;
+                n.prev.next = n.next;
+                n.next = pos_list;
+                n.prev = null;
+                pos_list.prev = n;
+                pos_list = n;
             }
         }
 
-        bestmove = move_list[bestix].to_move_str(position);
-        state = EngineState.MOVESET;
+        if (next_pos.next !is null)
+        {
+            next_pos = next_pos.next;
+        } else {
+            depth++;
+            if (depth == 5)
+            {
+                set_bestmove();
+                state = EngineState.MOVESET;
+            }
+            next_pos = pos_list;
+        }
+    }
+
+    void set_bestmove()
+    {
+        bestmove = pos_list.move.to_move_str(position);
     }
 
     void cleanup_search()
     {
-        if (pos_list.length > 0)
+        while (pos_list !is null)
         {
-            foreach (Position pos; pos_list)
-            {
-                Position.free(pos);
-            }
-            pos_list.length = 0;
-            foreach (StepList move; move_list)
-            {
-                StepList.free(move);
-            }
-            move_list.length = 0;
+            Position.free(pos_list.pos);
+            StepList.free(pos_list.move);
+            PositionNode n = pos_list;
+            pos_list = n.next;
+            PositionNode.free(n);
         }
+        s_eng.cuthistory.soften();
     }
 
 }
