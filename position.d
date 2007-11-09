@@ -12,8 +12,6 @@ enum Side : byte { WHITE, BLACK }
 enum Piece : byte { EMPTY, WRABBIT, WCAT, WDOG, WHORSE, WCAMEL, WELEPHANT, 
                     BRABBIT, BCAT, BDOG, BHORSE, BCAMEL, BELEPHANT }
 
-const ulong TRAPS = 0x0000240000240000UL;
-
 const ulong NOT_A_FILE = 0x7F7F7F7F7F7F7F7FUL;
 const ulong NOT_H_FILE = 0xFEFEFEFEFEFEFEFEUL;
 const ulong RANK_1 = 0xFFUL;
@@ -21,6 +19,12 @@ const ulong RANK_8 = 0xFF00000000000000UL;
 const ulong NOT_RANK_1 = ~RANK_1;
 const ulong NOT_RANK_8 = ~RANK_8;
 const ulong NOT_EDGE = NOT_A_FILE & NOT_H_FILE & NOT_RANK_1 & NOT_RANK_8;
+
+const ulong TRAPS = 0x0000240000240000UL;
+const ulong TRAP_C3 = 0x200000UL;
+const ulong TRAP_F3 = 0x40000UL;
+const ulong TRAP_C6 = 0x200000000000UL;
+const ulong TRAP_F6 = 0x40000000000UL;
 
 const ulong ALL_BITS_SET = 0xFFFFFFFFFFFFFFFFUL;
 
@@ -425,6 +429,11 @@ class Position
         return reservesize;
     }
 
+    static real reserve_size()
+    {
+        return (reservesize * Position.classinfo.init.length) / (1024*1024);
+    }
+
     static int rlistsize()
     {
         return reserve.length;
@@ -457,15 +466,26 @@ class Position
         return new Position(other);
     }
 
-
     static void free(Position pos)
     {
         if (reserve.length == reservesize)
+        {
             reserve.length = (reserve.length+1) * 2;
+        }
 
         reserve[reservesize++] = pos;
     }
 
+    static void reduce_reserve(real size)
+    {
+        int max_num = cast(int)((size * 1024*1024) / Position.classinfo.init.length);
+        while (reservesize > max_num)
+        {
+            delete reserve[--reservesize];
+            reserve[reservesize] = null;
+            allocated--;
+        }
+    }
 
     this()
     {

@@ -1,4 +1,5 @@
 
+import std.date;
 import std.stdio;
 
 import aeibot;
@@ -6,6 +7,8 @@ import position;
 
 const char[] BOT_NAME = "AB";
 const char[] BOT_AUTHOR = "Janzert";
+
+const int START_SEARCH_NODES = 100000;
 
 enum SType { EXACT, ALPHA, BETA }
 
@@ -48,7 +51,7 @@ class HistoryHeuristic
 
     void update(Position pos, Step step, int depth)
     {
-        score[pos.side][step.fromix][step.toix] += depth;
+        score[pos.side][step.fromix][step.toix] += 1 << depth;
     }
 
     void soften()
@@ -66,6 +69,183 @@ class HistoryHeuristic
     }
 }
 
+int trap_safety(Position pos)
+{
+    const int BOTH_SAFE = 1;
+    const int HOME_CONTROL = 5;
+    const int AWAY_CONTROL = 7;
+
+    int score = 0;
+
+    ulong c3_neighbors = neighbors_of(TRAP_C3);
+    int trap_safe = 0;
+    if (c3_neighbors & pos.bitBoards[Piece.WELEPHANT]
+            || (popcount(c3_neighbors & pos.placement[Side.WHITE]) > 1))
+        trap_safe |= 1;
+    if (c3_neighbors & pos.bitBoards[Piece.BELEPHANT]
+            || (popcount(c3_neighbors & pos.placement[Side.BLACK]) > 1))
+        trap_safe |= 2;
+    switch (trap_safe)
+    {
+        case 0:
+            break;
+        case 1:
+            score += HOME_CONTROL;
+            break;
+        case 2:
+            score -= AWAY_CONTROL;
+            break;
+        case 3:
+            score -= BOTH_SAFE;
+            break;
+    }
+
+    ulong f3_neighbors = neighbors_of(TRAP_F3);
+    trap_safe = 0;
+    if (f3_neighbors & pos.bitBoards[Piece.WELEPHANT]
+            || (popcount(f3_neighbors & pos.placement[Side.WHITE]) > 1))
+        trap_safe |= 1;
+    if (f3_neighbors & pos.bitBoards[Piece.BELEPHANT]
+            || (popcount(f3_neighbors & pos.placement[Side.BLACK]) > 1))
+        trap_safe |= 2;
+    switch (trap_safe)
+    {
+        case 0:
+            break;
+        case 1:
+            score += HOME_CONTROL;
+            break;
+        case 2:
+            score -= AWAY_CONTROL;
+            break;
+        case 3:
+            score -= BOTH_SAFE;
+            break;
+    }
+
+    ulong c6_neighbors = neighbors_of(TRAP_C6);
+    trap_safe = 0;
+    if (c6_neighbors & pos.bitBoards[Piece.WELEPHANT]
+            || (popcount(c6_neighbors & pos.placement[Side.WHITE]) > 1))
+        trap_safe |= 1;
+    if (c6_neighbors & pos.bitBoards[Piece.BELEPHANT]
+            || (popcount(c6_neighbors & pos.placement[Side.BLACK]) > 1))
+        trap_safe |= 2;
+    switch (trap_safe)
+    {
+        case 0:
+            break;
+        case 1:
+            score += AWAY_CONTROL;
+            break;
+        case 2:
+            score -= HOME_CONTROL;
+            break;
+        case 3:
+            score += BOTH_SAFE;
+            break;
+    }
+
+    ulong f6_neighbors = neighbors_of(TRAP_F6);
+    trap_safe = 0;
+    if (f6_neighbors & pos.bitBoards[Piece.WELEPHANT]
+            || (popcount(f6_neighbors & pos.placement[Side.WHITE]) > 1))
+        trap_safe |= 1;
+    if (f6_neighbors & pos.bitBoards[Piece.BELEPHANT]
+            || (popcount(f6_neighbors & pos.placement[Side.BLACK]) > 1))
+        trap_safe |= 2;
+    switch (trap_safe)
+    {
+        case 0:
+            break;
+        case 1:
+            score += AWAY_CONTROL;
+            break;
+        case 2:
+            score -= HOME_CONTROL;
+            break;
+        case 3:
+            score += BOTH_SAFE;
+            break;
+    }
+
+    return score;
+}
+
+// penalty for piece on trap, pinned or framed
+int on_trap(Position pos)
+{
+    const int ON_TRAP[13] = [0, -1, -2, -4, -8, -15, -20, 1, 2, 4, 8, 15, 20];
+    const int PINNED[13] = [0, -3, -8, -10, -20, -40, -55, 3, 8, 10, 20, 40, 55];
+    const int FRAMED[13] = [0, -5, -7, -15, -30, -80, 150, 5, 7, 15, 30, 80, 150];
+
+    int score = 0;
+    ulong occupied_traps = pos.placement[Side.WHITE] & TRAPS;
+    while (occupied_traps)
+    {
+        ulong tbit = occupied_traps & -occupied_traps;
+        occupied_traps ^= tbit;
+        bitix tix = bitindex(tbit);
+        Piece tpiece = pos.pieces[tix];
+        score += ON_TRAP[tpiece];
+        Side tside = (tpiece > Piece.WELEPHANT) ? Side.BLACK : Side.WHITE;
+        int pieceoffset = (tside == Side.WHITE) ? 6 : -6;
+        ulong tneighbors = neighbors_of(tbit);
+        ulong fneighbors = tneighbors & pos.placement[tside];
+        if (popcount(fneighbors) == 1)
+        {
+            bitix fix = bitindex(fneighbors);
+            score += PINNED[pos.pieces[fix]];
+            if (!(tneighbors & pos.bitBoards[Piece.EMPTY]))
+            {
+                ulong eneighbors = tneighbors ^ fneighbors;
+                bool framed = true;
+                while (eneighbors)
+                {
+                    ulong ebit = eneighbors & -eneighbors;
+                    eneighbors ^= ebit;
+                    bitix eix = bitindex(ebit);
+                    if (tpiece + pieceoffset > pos.pieces[eix]
+                            && (neighbors_of(ebit) & pos.bitBoards[Piece.EMPTY]))
+                    {
+                        framed = false;
+                        break;
+                    }
+                }
+                if (framed)
+                    score += FRAMED[tpiece];
+            }
+        }
+    }
+    return score;
+}
+
+int central_elephant(Position pos)
+{
+    const int CENTRAL_E_BONUS = 6;
+    const ulong emap = 0x0000183C3C180000UL;
+
+    int score = 0;
+    if (emap & pos.bitBoards[Piece.WELEPHANT])
+        score += CENTRAL_E_BONUS;
+    if (emap & pos.bitBoards[Piece.BELEPHANT])
+        score -= CENTRAL_E_BONUS;
+
+    return score;
+}
+
+int frozen_pieces(Position pos)
+{
+    const int[13] frozen_penalty = [0, -2, -4, -5, -10, -25, 0,
+                              2, 4, 5, 10, 25, 0];
+    int score = 0;
+    for (int p=1; p < 12; p++)
+    {
+        score += popcount(pos.bitBoards[p] & pos.frozen) * frozen_penalty[p];
+    }
+    return score;
+}
+
 class ABSearch
 {
     static const int WIN_SCORE = 32000;
@@ -77,10 +257,13 @@ class ABSearch
     HistoryHeuristic cuthistory;
     Position nullmove;
 
+    int nodes_searched;
+
     this(TransTable tt)
     {
         ttable = tt;
         cuthistory = new HistoryHeuristic();
+        nodes_searched = 0;
     }
 
     void sortstep(Position pos, StepList steps, Step* best, int num)
@@ -100,28 +283,36 @@ class ABSearch
                 steps.steps[bix].copy(steps.steps[0]);
                 steps.steps[0].copy(*best);
             }
-        }
-
-        int score = cuthistory.get_score(pos, steps.steps[num]);
-        int bix = num;
-        for (int i = num+1; i < steps.numsteps; i++)
-        {
-            int t = cuthistory.get_score(pos, steps.steps[i]);
-            if (t > score)
+        } else if (0) {
+            int score = cuthistory.get_score(pos, steps.steps[num]);
+            int bix = num;
+            for (int i = num+1; i < steps.numsteps; i++)
             {
-                score = t;
-                bix = i;
+                int t = cuthistory.get_score(pos, steps.steps[i]);
+                if (t > score)
+                {
+                    score = t;
+                    bix = i;
+                }
             }
-        }
 
-        Step tmp = steps.steps[num];
-        steps.steps[num] = steps.steps[bix];
-        steps.steps[bix] = tmp;
+            Step tmp = steps.steps[num];
+            steps.steps[num] = steps.steps[bix];
+            steps.steps[bix] = tmp;
+        }
     }
 
     int eval(Position pos)
     {
-        int score = cast(int)fastFAME(pos, 0.1716); // + (pos.zobrist % 150);
+        int score = cast(int)fastFAME(pos, 0.1716); // first pawn worth ~196
+                                                    // only a pawn left ~31883
+        score += trap_safety(pos) << 2;
+        score += central_elephant(pos);
+        score += frozen_pieces(pos);
+        score += on_trap(pos);
+
+        // clamp the evaluation to be less than a win
+        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         if (pos.side == Side.BLACK)
             score = -score;
         return score;
@@ -209,11 +400,19 @@ class ABSearch
                         if (cal >= beta)
                         {
                             sflag = SType.BETA;
-                            cuthistory.update(pos, steps.steps[best_ix], depth);
+                            nodes_searched += six;
                             break;
                         }
                     }
                 }
+            }
+            if (sflag != SType.BETA)
+            {
+                nodes_searched += steps.numsteps;
+            }
+            if (0 && sflag != SType.ALPHA)
+            {
+                cuthistory.update(pos, steps.steps[best_ix], depth);
             }
             node.beststep.copy(steps.steps[best_ix]);
             StepList.free(steps);
@@ -231,12 +430,19 @@ class ABSearch
 class PositionNode
 {
     private static PositionNode cache_head;
+    static int allocated;
+    static int reserved;
 
     PositionNode prev;
     PositionNode next;
 
     Position pos;
     StepList move;
+
+    this()
+    {
+        allocated++;
+    }
 
     static PositionNode allocate()
     {
@@ -245,6 +451,7 @@ class PositionNode
             PositionNode n = cache_head;
             cache_head = n.next;
             n.next = null;
+            reserved--;
             return n;
         }
 
@@ -256,7 +463,8 @@ class PositionNode
         n.pos = null;
         n.prev = null;
         n.next = cache_head;
-        cache_head = n.next;
+        cache_head = n;
+        reserved++;
     }
 }
 
@@ -270,7 +478,7 @@ class Engine : AEIEngine
 
     this()
     {
-        s_eng = new ABSearch(new TransTable(100));
+        s_eng = new ABSearch(new TransTable(150));
     }
 
     void start_search()
@@ -309,48 +517,55 @@ class Engine : AEIEngine
             next_pos = pos_list;
             best_score = ABSearch.MIN_SCORE;
             depth = 2;
+            s_eng.nodes_searched = 0;
             state = EngineState.SEARCHING;
         }
     }
 
-    void search()
+    void search(int num_nodes)
     {
-        Position pos = next_pos.pos;
-        s_eng.nullmove = pos.dup;
-        s_eng.nullmove.do_step(ABSearch.nullstep);
-        int score = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, -best_score);
-        Position.free(s_eng.nullmove);
-
-        if (score > best_score)
+        int stop_node = s_eng.nodes_searched + num_nodes;
+        while (s_eng.nodes_searched < stop_node)
         {
-            best_score = score;
-            
-            if (next_pos !is pos_list)
-            {
-                PositionNode n = next_pos;
-                next_pos = n.prev;
+            Position pos = next_pos.pos;
+            s_eng.nullmove = pos.dup;
+            s_eng.nullmove.do_step(ABSearch.nullstep);
+            int score = -s_eng.alphabeta(pos, depth, ABSearch.MIN_SCORE, -best_score);
+            Position.free(s_eng.nullmove);
+            s_eng.nodes_searched++;
 
-                if (n.next !is null)
-                    n.next.prev = n.prev;
-                n.prev.next = n.next;
-                n.next = pos_list;
-                n.prev = null;
-                pos_list.prev = n;
-                pos_list = n;
-            }
-        }
-
-        if (next_pos.next !is null)
-        {
-            next_pos = next_pos.next;
-        } else {
-            depth++;
-            if (depth == 5)
+            if (score > best_score)
             {
-                set_bestmove();
-                state = EngineState.MOVESET;
+                best_score = score;
+                
+                if (next_pos !is pos_list)
+                {
+                    PositionNode n = next_pos;
+                    next_pos = n.prev;
+
+                    if (n.next !is null)
+                        n.next.prev = n.prev;
+                    n.prev.next = n.next;
+                    n.next = pos_list;
+                    n.prev = null;
+                    pos_list.prev = n;
+                    pos_list = n;
+                }
             }
-            next_pos = pos_list;
+
+            if (next_pos.next !is null)
+            {
+                next_pos = next_pos.next;
+            } else {
+                depth++;
+                if (depth == 4)
+                {
+                    set_bestmove();
+                    state = EngineState.MOVESET;
+                    break;
+                }
+                next_pos = pos_list;
+            }
         }
     }
 
@@ -384,6 +599,10 @@ int main(char[][] args)
     writefln("Connected to server %s:%d", ip, port);
     Engine engine = new Engine();
 
+    d_time search_time = 0;
+    d_time search_max = 0;
+    int search_num = 0;
+    d_time search_start;
     while (true)
     {
         if (engine.state == EngineState.IDLE)
@@ -414,6 +633,7 @@ int main(char[][] args)
                     break;
                 case ServerCmd.CmdType.GO:
                     writefln("Starting search.");
+                    search_start = getUTCtime();
                     GoCmd gcmd = cast(GoCmd)server.current_cmd;
                     engine.start_search();
                     if (gcmd.option == GoCmd.Option.INFINITE)
@@ -441,18 +661,45 @@ int main(char[][] args)
             }
         }
 
+        d_time length = getUTCtime() - search_start;
         switch (engine.state)
         {
             case EngineState.MOVESET:
+                if (length > search_max)
+                {
+                    search_max = length;
+                }
+                real seconds = cast(real)length/TicksPerSecond;
+                if (engine.ply > 2)
+                {
+                    search_time += length;
+                    search_num += 1;
+                }
+                real average = 0;
+                if (search_num)
+                {
+                    average = (cast(real)search_time / TicksPerSecond) / search_num;
+                }
+                real max_seconds = cast(real)search_max / TicksPerSecond;
+                writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
+                writefln("Searched %d nodes, %.0f nps.", engine.s_eng.nodes_searched, engine.s_eng.nodes_searched/seconds);
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.cleanup_search();
-                writefln("Positions allocated %d, now in reserve %d.", Position.allocated, Position.reserved);
-                writefln("StepLists allocated %d, now in reserve %d.", StepList.allocated, StepList.reserved);
+                writefln("Positions allocated %d, in reserve %d (%.0fMB).",
+                        Position.allocated, Position.reserved, Position.reserve_size);
+                writefln("StepLists allocated %d, in reserve %d.", StepList.allocated, StepList.reserved);
+                writefln("PNodes allocated %d, in reserve %d.", PositionNode.allocated, PositionNode.reserved);
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
-                engine.search();
+                if (engine.s_eng.nodes_searched && (length > TicksPerSecond))
+                {
+                    int chunk = engine.s_eng.nodes_searched / (length / (TicksPerSecond /2));
+                    engine.search(chunk);
+                } else {
+                    engine.search(START_SEARCH_NODES);
+                }
                 break;
             default:
                 break;
