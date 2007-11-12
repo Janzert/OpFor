@@ -1,6 +1,8 @@
 
+import std.c.string;
 import std.date;
 import std.stdio;
+import std.string;
 
 import aeibot;
 import position;
@@ -246,6 +248,121 @@ int frozen_pieces(Position pos)
     return score;
 }
 
+int rabbit_wall(Position pos)
+{
+    const int[2] BLOCKING_BONUS = [5, -5];
+
+    int score = 0;
+    for (Side s; s < 2; s++)
+    {
+        int p_rabbit = Piece.WRABBIT;
+        int p_cat = Piece.WCAT;
+        int p_dog = Piece.WDOG;
+        if (s == Side.BLACK)
+        {
+            p_rabbit = Piece.BRABBIT;
+            p_cat = Piece.BCAT;
+            p_dog = Piece.BDOG;
+        }
+        ulong rcandd = pos.bitBoards[p_rabbit] | pos.bitBoards[p_cat] | pos.bitBoards[p_dog];
+
+        ulong rabbits = pos.bitBoards[p_rabbit];
+        while (rabbits)
+        {
+            ulong rbit = rabbits & -rabbits;
+            rabbits ^= rbit;
+            ulong ladjacent = rbit << 1 & rbit << 9 & rbit >> 7;
+            if (ladjacent & rcandd)
+            {
+                score += BLOCKING_BONUS[s];
+            }
+            ulong radjacent = rbit >> 1 & rbit >> 9 & rbit << 7;
+            if (radjacent & rcandd)
+            {
+                score += BLOCKING_BONUS[s];
+            }
+        }
+    }
+
+    return score;
+}
+
+int rabbit_open(Position pos)
+{
+    const int[8][2] NORABBIT_FILE = [[1, 1, 1, 2, 3, 5, 7, 0], [0, -7, -5, -3, -2, -1, -1, -1]];
+    const int[8][2] NORABBIT_ADJ = [[1, 1, 1, 2, 2, 4, 4, 0], [0, -4, -4, -2, -2, -1, -1, -1]];
+    const int[8][2] OPEN_FILE = [[2, 2, 2, 3, 5, 10, 20, 0], [0, -20, -10, -5, -3, -2, -2, -2]];
+    const int[8][2] OPEN_ADJ = [[2, 2, 3, 20, 30, 40, 60, 0], [0, -60, -40, -30, -20, -3, -2, -2]];
+
+    int score = 0;
+
+    for (int file=0; file < 8; file++)
+    {
+        ulong fmask = H_FILE << file;
+        ulong rabbits = fmask & pos.bitBoards[Piece.WRABBIT] & ~pos.frozen;
+        if (rabbits)
+        {
+            bitix rix = msbindex(rabbits);
+            ulong mask = H_FILE << rix;
+            if (!(pos.bitBoards[Piece.BRABBIT] & mask))
+            {
+                int rank = rix/8;
+                score += NORABBIT_FILE[Side.WHITE][rank];
+                if (!(pos.placement[Side.BLACK] & mask))
+                {
+                    score += OPEN_FILE[Side.WHITE][rank];
+                }
+                ulong adj_mask = 0;
+                if (file != 0)
+                    adj_mask = H_FILE << (rix+7);
+                if (file != 7)
+                    adj_mask |= H_FILE << (rix+9);
+                adj_mask &= NOT_RANK_8;
+                if (!(pos.bitBoards[Piece.BRABBIT] & adj_mask))
+                {
+                    score += NORABBIT_ADJ[Side.WHITE][rank];
+                    if (!(pos.placement[Side.BLACK] & adj_mask))
+                    {
+                        score += OPEN_ADJ[Side.WHITE][rank];
+                    }
+                }
+            }
+        }
+
+        rabbits = fmask & pos.bitBoards[Piece.BRABBIT] & ~pos.frozen;
+        if (rabbits)
+        {
+            bitix rix = bitindex(rabbits);
+            ulong rmask = A_FILE >> (63-rix);
+            if (!(pos.bitBoards[Piece.WRABBIT] & rmask))
+            {
+                int rank = rix / 8;
+                score += NORABBIT_FILE[Side.BLACK][rank];
+                if (!(pos.placement[Side.BLACK] & rmask))
+                {
+                    score += OPEN_FILE[Side.BLACK][rank];
+                }
+                ulong adj_mask = 0;
+                if (file != 0)
+                    adj_mask = A_FILE >> ((63+9) - rix);
+                if (file != 7)
+                    adj_mask |= A_FILE >> ((63+7) - rix);
+                adj_mask &= NOT_RANK_1;
+                if (!(pos.bitBoards[Piece.WRABBIT] & adj_mask))
+                {
+                    score += NORABBIT_ADJ[Side.BLACK][rank];
+                    if (!(pos.placement[Side.WHITE] & adj_mask))
+                    {
+                        score += OPEN_ADJ[Side.BLACK][rank];
+                    }
+                }
+            }
+        }
+    }
+
+    return score;
+}
+
 class ABSearch
 {
     static const int WIN_SCORE = 32000;
@@ -310,6 +427,8 @@ class ABSearch
         score += central_elephant(pos);
         score += frozen_pieces(pos);
         score += on_trap(pos);
+        score += rabbit_wall(pos);
+        score += rabbit_open(pos);
 
         // clamp the evaluation to be less than a win
         score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
@@ -323,6 +442,8 @@ class ABSearch
         int score = MIN_SCORE;
         if (pos.is_endstate())
         {
+            // This is actually technically incorrect as it disallows 
+            // pushing a rabbit onto then back off of the goal line
             score = pos.endscore() * WIN_SCORE;
             if (pos.side == Side.BLACK)
             {
@@ -359,6 +480,10 @@ class ABSearch
             int best_ix;
             StepList steps = StepList.allocate();
             pos.get_steps(steps);
+            if (steps.numsteps == 0)
+            {
+                return -WIN_SCORE;
+            }
             for (int six=0; six < steps.numsteps; six++)
             {
                 int cal;
@@ -476,9 +601,12 @@ class Engine : AEIEngine
     int depth;
     int best_score;
 
+    int max_depth;
+
     this()
     {
         s_eng = new ABSearch(new TransTable(150));
+        max_depth = 3;
     }
 
     void start_search()
@@ -551,6 +679,11 @@ class Engine : AEIEngine
                     pos_list.prev = n;
                     pos_list = n;
                 }
+
+                if (score >= ABSearch.WIN_SCORE)
+                {
+                    break;
+                }
             }
 
             if (next_pos.next !is null)
@@ -558,10 +691,8 @@ class Engine : AEIEngine
                 next_pos = next_pos.next;
             } else {
                 depth++;
-                if (depth == 4)
+                if (max_depth && depth > max_depth)
                 {
-                    set_bestmove();
-                    state = EngineState.MOVESET;
                     break;
                 }
                 next_pos = pos_list;
@@ -572,6 +703,24 @@ class Engine : AEIEngine
     void set_bestmove()
     {
         bestmove = pos_list.move.to_move_str(position);
+    }
+
+    StepList get_bestline()
+    {
+        StepList bestline = pos_list.move.dup;
+        Position pos = pos_list.pos.dup;
+        TTNode* n = s_eng.ttable.get(pos);
+        while (n.zobrist == pos.zobrist 
+                && (n.beststep.frombit != 0 || n.beststep.tobit != 0))
+        {
+            Step* next_step = bestline.newstep();
+            next_step.copy(n.beststep);
+            pos.do_step(n.beststep);
+            n = s_eng.ttable.get(pos);
+        }
+
+        Position.free(pos);
+        return bestline;
     }
 
     void cleanup_search()
@@ -593,6 +742,10 @@ int main(char[][] args)
 {
     char[] ip = "127.0.0.1";
     ushort port = 40007;
+
+    d_time report_interval = 30 * std.date.TicksPerSecond;
+    d_time nextreport = 0;
+    int report_depth = 0;
 
     ServerInterface server = new ServerInterface(new SocketServer(ip, port),
             BOT_NAME, BOT_AUTHOR);
@@ -638,8 +791,11 @@ int main(char[][] args)
                     engine.start_search();
                     if (gcmd.option == GoCmd.Option.INFINITE)
                     {
+                        engine.max_depth = 20;
                         writefln("Starting infinite analyses.");
                     }
+                    nextreport = getUTCtime() + report_interval;
+                    report_depth = 0;
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.MAKEMOVE:
@@ -683,12 +839,12 @@ int main(char[][] args)
                 real max_seconds = cast(real)search_max / TicksPerSecond;
                 writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
                 writefln("Searched %d nodes, %.0f nps.", engine.s_eng.nodes_searched, engine.s_eng.nodes_searched/seconds);
+                writefln("Current score %.2f", engine.best_score / 196.0);
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.cleanup_search();
                 writefln("Positions allocated %d, in reserve %d (%.0fMB).",
                         Position.allocated, Position.reserved, Position.reserve_size);
-                writefln("StepLists allocated %d, in reserve %d.", StepList.allocated, StepList.reserved);
                 writefln("PNodes allocated %d, in reserve %d.", PositionNode.allocated, PositionNode.reserved);
                 engine.state = EngineState.IDLE;
                 break;
@@ -699,6 +855,25 @@ int main(char[][] args)
                     engine.search(chunk);
                 } else {
                     engine.search(START_SEARCH_NODES);
+                }
+                if ((engine.max_depth && engine.depth > engine.max_depth)
+                    || (engine.best_score >= ABSearch.WIN_SCORE))
+                {
+                    engine.set_bestmove();
+                    engine.state = EngineState.MOVESET;
+                }
+                d_time now = getUTCtime();
+                if (now > nextreport || engine.depth > report_depth)
+                {
+                    server.info(format("depth %d", engine.depth+4));
+                    server.info(format("time %d", length/TicksPerSecond));
+                    server.info(format("nodes %d", engine.s_eng.nodes_searched));
+                    server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
+                    StepList bestline = engine.get_bestline();
+                    server.info(format("pv %s", bestline.to_move_str(engine.position)));
+                    StepList.free(bestline);
+                    nextreport = now + report_interval;
+                    report_depth = engine.depth+1;
                 }
                 break;
             default:

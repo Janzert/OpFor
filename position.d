@@ -14,6 +14,8 @@ enum Piece : byte { EMPTY, WRABBIT, WCAT, WDOG, WHORSE, WCAMEL, WELEPHANT,
 
 const ulong NOT_A_FILE = 0x7F7F7F7F7F7F7F7FUL;
 const ulong NOT_H_FILE = 0xFEFEFEFEFEFEFEFEUL;
+const ulong A_FILE = ~NOT_A_FILE;
+const ulong H_FILE = ~NOT_H_FILE;
 const ulong RANK_1 = 0xFFUL;
 const ulong RANK_8 = 0xFF00000000000000UL;
 const ulong NOT_RANK_1 = ~RANK_1;
@@ -51,6 +53,14 @@ body
     index |= ((value & 0xFFFFFFFF00000000UL) != 0) << 5;
     return index;
 }*/
+
+bitix msbindex(ulong value)
+{
+    if (value >> 32)
+        return cast(bitix)(bsr(cast(uint)(value >> 32)) + 32);
+    else
+        return cast(bitix)(bsr(cast(uint)(value)));
+}
 
 int popcount(ulong value)
 {
@@ -286,6 +296,10 @@ class StepList
                     }
                     move ~= "x ";
                 }
+                if (previous.side != current.side)
+                {
+                    move ~= (current.side == Side.WHITE) ? "w " : "b ";
+                }
                 Position.free(previous);
             }
         }
@@ -294,7 +308,11 @@ class StepList
         if (move.length == 0)
             throw new ValueException("Tried to make move with no or pass only steps");
 
-        return move[0..length-1];
+        move = move[0..length-1];
+        if (move[length-2] == ' ')
+            move = move[0..length-2];
+
+        return move;
     }
 }
 
