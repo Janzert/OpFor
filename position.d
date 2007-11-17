@@ -90,6 +90,24 @@ char[] ix_to_alg(bitix index)
 
 static const ulong INV_STEP = 3UL;
 
+static int[64][64] taxicab_dist;
+
+static this()
+{
+    for (int i = 0; i < 64; i++)
+    {
+        for (int j = 0; j < 64; j++)
+        {
+            int rd = (i/8) - (j/8);
+            rd = (rd < 0) ? -rd : rd;
+            int fd = (i%8) - (j%8);
+            fd = (fd < 0) ? -fd : fd;
+            int dist = rd + fd;
+            taxicab_dist[i][j] = dist;
+        }
+    }
+}
+
 struct Step
 {
     ulong frombit, tobit;

@@ -6,6 +6,7 @@ import std.string;
 import std.perf;
 import std.gc;
 
+import goalsearch;
 import position;
 
 int main(char[][] args)
@@ -50,6 +51,17 @@ int main(char[][] args)
     std.gc.fullCollect();
 
     writefln("FAME: %.2f", FAME(pos));
+    GoalSearch gsearch = new GoalSearch(30);
+    gsearch.set_start(pos);
+    gsearch.find_goals();
+    if (gsearch.goals_found[Side.WHITE] > 0)
+    {
+        writefln("White has a goal in %d unopposed steps.", gsearch.goal_depth[Side.WHITE][0]);
+    }
+    if (gsearch.goals_found[Side.BLACK] > 0)
+    {
+        writefln("Black has a goal in %d unopposed steps.", gsearch.goal_depth[Side.BLACK][0]);
+    }
     
     Timer = new ProcessTimesCounter();
     Timer.start();
