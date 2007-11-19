@@ -5,6 +5,7 @@ import std.stdio;
 import std.string;
 
 import aeibot;
+import goalsearch;
 import position;
 
 const char[] BOT_NAME = "AB";
@@ -372,6 +373,7 @@ class ABSearch
 
     TransTable ttable;
     HistoryHeuristic cuthistory;
+    GoalSearch goal_searcher;
     Position nullmove;
 
     int nodes_searched;
@@ -380,6 +382,7 @@ class ABSearch
     {
         ttable = tt;
         cuthistory = new HistoryHeuristic();
+        goal_searcher = new GoalSearch(16);
         nodes_searched = 0;
     }
 
@@ -430,10 +433,32 @@ class ABSearch
         score += rabbit_wall(pos);
         score += rabbit_open(pos);
 
-        // clamp the evaluation to be less than a win
-        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         if (pos.side == Side.BLACK)
             score = -score;
+
+        const int[17] GOAL_THREAT = [30000, 8000, 4000, 2000, 1000,
+              300, 250, 200, 150,
+              75, 50, 40, 35,
+              20, 10, 7, 5];
+        goal_searcher.set_start(pos);
+        goal_searcher.find_goals();
+        if (goal_searcher.goals_found[pos.side]
+                && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
+        {
+                score = (WIN_SCORE-10) - goal_searcher.goal_depth[pos.side][0];
+        } else { 
+            if (goal_searcher.goals_found[pos.side])
+            {
+                score += GOAL_THREAT[goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft];
+            }
+            if (goal_searcher.goals_found[pos.side^1])
+            {
+                score -= GOAL_THREAT[goal_searcher.goal_depth[pos.side^1][0]];
+            }
+        }
+
+        // clamp the evaluation to be less than a win
+        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         return score;
     }
 
@@ -606,7 +631,7 @@ class Engine : AEIEngine
     this()
     {
         s_eng = new ABSearch(new TransTable(150));
-        max_depth = 3;
+        max_depth = 1;
     }
 
     void start_search()
@@ -644,7 +669,7 @@ class Engine : AEIEngine
             delete pstore;
             next_pos = pos_list;
             best_score = ABSearch.MIN_SCORE;
-            depth = 2;
+            depth = 0;
             s_eng.nodes_searched = 0;
             state = EngineState.SEARCHING;
         }
