@@ -978,19 +978,19 @@ class Position
             assert (piece != Piece.EMPTY);
             assert (pieces[toix] == Piece.EMPTY);
 
-            Side side;
+            Side piece_side;
             if (placement[Side.WHITE] & step.frombit)
             {
-                side = Side.WHITE;
+                piece_side = Side.WHITE;
             } else
             {
-                side = Side.BLACK;
+                piece_side = Side.BLACK;
                 assert (placement[Side.BLACK] & step.frombit);
             }
             ulong tofrom = step.frombit ^ step.tobit;
             bitBoards[Piece.EMPTY] ^= tofrom;
             bitBoards[piece] ^= tofrom;
-            placement[side] ^= tofrom;
+            placement[piece_side] ^= tofrom;
             pieces[fromix] = Piece.EMPTY;
             pieces[toix] = piece;
 
@@ -998,10 +998,10 @@ class Position
                        ZOBRIST_PIECE[piece][toix];
 
             ulong trapped = (neighbors_of(step.frombit) & TRAPS)
-                    & placement[side];
-            if (trapped && (trapped & ~neighbors_of(placement[side])))
+                    & placement[piece_side];
+            if (trapped && (trapped & ~neighbors_of(placement[piece_side])))
             {
-                placement[side] ^= trapped;
+                placement[piece_side] ^= trapped;
                 bitix trapix = bitindex(trapped);
                 Piece piecetr = pieces[trapix];
                 pieces[trapix] = Piece.EMPTY;
@@ -1009,18 +1009,24 @@ class Position
                 bitBoards[Piece.EMPTY] ^= trapped;
                 zobrist ^= ZOBRIST_PIECE[piecetr][trapix];
                 if (trapix != toix)
-                    updatefrozen(side, piecetr, trapped);
+                    updatefrozen(piece_side, piecetr, trapped);
             }
-            updatefrozen(side, piece, step);
+            updatefrozen(piece_side, piece, step);
             stepsLeft--;
 
+            zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
             if (inpush != step.push)
             {
                 zobrist ^= ZOBRIST_INPUSH;
             }
-            zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
-            lastpiece = piece;
-            lastfrom = fromix;
+            if (!inpush && (step.push || (piece_side == side)))
+            {
+                lastpiece = piece;
+                lastfrom = fromix;
+            } else {
+                lastpiece = Piece.EMPTY;
+                lastfrom = 64;
+            }
             inpush = step.push;
             zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
         }
