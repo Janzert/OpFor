@@ -12,11 +12,15 @@ enum Side : byte { WHITE, BLACK }
 enum Piece : byte { EMPTY, WRABBIT, WCAT, WDOG, WHORSE, WCAMEL, WELEPHANT, 
                     BRABBIT, BCAT, BDOG, BHORSE, BCAMEL, BELEPHANT }
 
-const ulong NOT_A_FILE = 0x7F7F7F7F7F7F7F7FUL;
-const ulong NOT_H_FILE = 0xFEFEFEFEFEFEFEFEUL;
-const ulong A_FILE = ~NOT_A_FILE;
-const ulong H_FILE = ~NOT_H_FILE;
+const ulong A_FILE = 0x8080808080808080UL;
+const ulong B_FILE = 0x4040404040404040UL;
+const ulong G_FILE = 0x0202020202020202UL;
+const ulong H_FILE = 0x0101010101010101UL;
+const ulong NOT_A_FILE = ~A_FILE;
+const ulong NOT_H_FILE = ~H_FILE;
 const ulong RANK_1 = 0xFFUL;
+const ulong RANK_2 = 0xFF00UL;
+const ulong RANK_7 = 0xFF000000000000UL;
 const ulong RANK_8 = 0xFF00000000000000UL;
 const ulong NOT_RANK_1 = ~RANK_1;
 const ulong NOT_RANK_8 = ~RANK_8;
