@@ -7,6 +7,7 @@ import std.perf;
 import std.gc;
 
 import goalsearch;
+import trapmoves;
 import position;
 
 int main(char[][] args)
@@ -34,7 +35,6 @@ int main(char[][] args)
     writefln("There are %d steps.", 
                 steps.numsteps);
     ProcessTimesCounter Timer = new ProcessTimesCounter();
-    //std.gc.disable();
     Timer.start();
     PosStore moves = pos.get_moves();
     Timer.stop();
@@ -47,10 +47,10 @@ int main(char[][] args)
         writefln(move.to_short_str());
     }*/
     delete moves;
-    //std.gc.enable();
     std.gc.fullCollect();
 
-    writefln("FAME: %.2f", FAME(pos));
+    writefln("FAME: %.2f\n", FAME(pos));
+
     GoalSearch gsearch = new GoalSearch(30);
     gsearch.set_start(pos);
     gsearch.find_goals();
@@ -61,6 +61,31 @@ int main(char[][] args)
     if (gsearch.goals_found[Side.BLACK] > 0)
     {
         writefln("Black has a goal in %d unopposed steps.", gsearch.goal_depth[Side.BLACK][0]);
+    }
+
+    TrapGenerator tgen = new TrapGenerator();
+    tgen.get_moves(pos);
+    if (tgen.num_captures)
+    {
+        const char[] piece_names = ".RCDHMErcdhme";
+        int[Piece.max+1] min_steps;
+        for (int i=0; i < tgen.num_captures; i++)
+        {
+            if ((min_steps[tgen.piece_captured[i]] == 0)
+                    || (min_steps[tgen.piece_captured[i]] > tgen.capture_steps[i]))
+            {
+                min_steps[tgen.piece_captured[i]] = tgen.capture_steps[i];
+            }
+        }
+        writefln("Can capture:");
+        for (int i=Piece.max; i > 0; i--)
+        {
+            if (min_steps[i] > 0)
+            {
+                writefln("  %s in %d steps.", piece_names[i], min_steps[i]);
+            }
+        }
+        writefln("");
     }
     
     Timer = new ProcessTimesCounter();
