@@ -170,6 +170,8 @@ struct Step
    } 
 }
 
+static Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
+
 class StepList
 {
     const int ALLOCA_MULT = 2;
