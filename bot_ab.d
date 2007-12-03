@@ -1,6 +1,8 @@
 
 import std.c.string;
 import std.date;
+import std.math;
+import std.random;
 import std.stdio;
 import std.string;
 
@@ -306,7 +308,56 @@ int rabbit_open(Position pos)
     return score;
 }
 
-class Search : ABSearch
+class ScoreSearch : ABSearch
+{
+    this (TransTable tt)
+    {
+        super(tt);
+    }
+
+    int eval(Position pos)
+    {
+        float wscore = 0;
+        for (Piece i = Piece.WRABBIT; i <= Piece.WELEPHANT; i++)
+        {
+            wscore += popcount(pos.bitBoards[i]) * i;
+        }
+        wscore *= popcount(pos.bitBoards[Piece.WRABBIT]) + 1;
+        float wrpoints = 0;
+        for (int rank = 1; rank <= 8; rank++)
+        {
+            ulong rmask = position.RANK_1 << (8*(rank-1));
+            wrpoints += popcount(pos.bitBoards[Piece.WRABBIT] & rmask) * pow(cast(real)rank, 3);
+        }
+        wscore += wrpoints;
+
+        float bscore = 0;
+        for (Piece i = Piece.BRABBIT; i <= Piece.BELEPHANT; i++)
+        {
+            bscore += popcount(pos.bitBoards[i]) * (i - Piece.WELEPHANT);
+        }
+        bscore *= popcount(pos.bitBoards[Piece.BRABBIT]) + 1;
+        float brpoints = 0;
+        for (int rank = 1; rank <= 8; rank++)
+        {
+            ulong rmask = position.RANK_8 >> (8*(rank-1));
+            brpoints += popcount(pos.bitBoards[Piece.BRABBIT] & rmask) * pow(cast(real)rank, 3);
+        }
+        bscore += brpoints;
+
+        // Give a small random component so the bot won't always play the same move
+        int score = cast(int)(wscore - bscore) * 10;
+
+        score += rand() % 10;
+
+        if (pos.side == Side.BLACK)
+            score = -score;
+
+        return score;
+    }
+}
+
+class FullSearch : ABSearch
 {
     GoalSearch goal_searcher;
     
@@ -356,6 +407,7 @@ class Search : ABSearch
         return score;
     }
 }
+
 class PositionNode
 {
     private static PositionNode cache_head;
@@ -399,7 +451,7 @@ class PositionNode
 
 class Engine : AEIEngine
 {
-    Search s_eng;
+    ABSearch searcher;
     PositionNode pos_list;
     PositionNode next_pos;
     int depth;
@@ -409,8 +461,9 @@ class Engine : AEIEngine
 
     this()
     {
-        s_eng = new Search(new TransTable(150));
-        max_depth = 1;
+        searcher = new FullSearch(new TransTable(150));
+        //searcher = new ScoreSearch(new TransTable(150));
+        max_depth = 0;
     }
 
     void start_search()
@@ -431,11 +484,30 @@ class Engine : AEIEngine
         } else {
             PosStore pstore = position.get_moves();
             PositionNode last_pos;
+            PositionNode repeated;
+            int[ulong] repetitions;
+            for (int i=0; i < past.length; i++)
+            {
+                repetitions[past[i].zobrist] += 1;
+            }
             foreach (Position pos; pstore)
             {
                 PositionNode n = PositionNode.allocate();
                 n.pos = pos;
                 n.move = pstore.getpos(pos);
+
+                if ((pos.zobrist in repetitions) && (repetitions[pos.zobrist] > 1))
+                {
+                    if (repeated !is null)
+                    {
+                        Position.free(repeated.pos);
+                        StepList.free(repeated.move);
+                        PositionNode.free(repeated);
+                    }
+                    repeated = n;
+                    continue;
+                }
+
                 n.prev = last_pos;
                 if (last_pos !is null)
                 {
@@ -446,25 +518,31 @@ class Engine : AEIEngine
                 last_pos = n;
             }
             delete pstore;
+
+            if (pos_list is null)
+            {
+                // only repetition moves available
+                pos_list = repeated;
+            }
             next_pos = pos_list;
             best_score = MIN_SCORE;
             depth = 0;
-            s_eng.nodes_searched = 0;
+            searcher.nodes_searched = 0;
             state = EngineState.SEARCHING;
         }
     }
 
     void search(int num_nodes)
     {
-        int stop_node = s_eng.nodes_searched + num_nodes;
-        while (s_eng.nodes_searched < stop_node)
+        int stop_node = searcher.nodes_searched + num_nodes;
+        while (searcher.nodes_searched < stop_node)
         {
             Position pos = next_pos.pos;
-            s_eng.nullmove = pos.dup;
-            s_eng.nullmove.do_step(NULL_STEP);
-            int score = -s_eng.alphabeta(pos, depth, MIN_SCORE, -best_score);
-            Position.free(s_eng.nullmove);
-            s_eng.nodes_searched++;
+            searcher.nullmove = pos.dup;
+            searcher.nullmove.do_step(NULL_STEP);
+            int score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
+            Position.free(searcher.nullmove);
+            searcher.nodes_searched++;
 
             if ((score > best_score)
                     || (next_pos is pos_list))
@@ -496,7 +574,7 @@ class Engine : AEIEngine
                 next_pos = next_pos.next;
             } else {
                 depth++;
-                if (max_depth && depth > max_depth)
+                if ((max_depth != -1) && (depth > max_depth))
                 {
                     break;
                 }
@@ -514,14 +592,14 @@ class Engine : AEIEngine
     {
         StepList bestline = pos_list.move.dup;
         Position pos = pos_list.pos.dup;
-        TTNode* n = s_eng.ttable.get(pos);
+        TTNode* n = searcher.ttable.get(pos);
         while (n.zobrist == pos.zobrist 
                 && (n.beststep.frombit != 0 || n.beststep.tobit != 0))
         {
             Step* next_step = bestline.newstep();
             next_step.copy(n.beststep);
             pos.do_step(n.beststep);
-            n = s_eng.ttable.get(pos);
+            n = searcher.ttable.get(pos);
         }
 
         Position.free(pos);
@@ -593,12 +671,12 @@ int main(char[][] args)
                     break;
                 case ServerCmd.CmdType.GO:
                     writefln("Starting search.");
-                    search_start = getUTCtime();
                     GoCmd gcmd = cast(GoCmd)server.current_cmd;
+                    search_start = getUTCtime();
                     engine.start_search();
                     if (gcmd.option == GoCmd.Option.INFINITE)
                     {
-                        engine.max_depth = 20;
+                        engine.max_depth = -1;
                         writefln("Starting infinite analyses.");
                     }
                     nextreport = getUTCtime() + report_interval;
@@ -652,7 +730,7 @@ int main(char[][] args)
                 }
                 real max_seconds = cast(real)search_max / TicksPerSecond;
                 writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
-                writefln("Searched %d nodes, %.0f nps.", engine.s_eng.nodes_searched, engine.s_eng.nodes_searched/seconds);
+                writefln("Searched %d nodes, %.0f nps.", engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds);
                 writefln("Current score %.2f", engine.best_score / 196.0);
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
@@ -663,14 +741,14 @@ int main(char[][] args)
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
-                if (engine.s_eng.nodes_searched && (length > (TicksPerSecond/2)))
+                if (engine.searcher.nodes_searched && (length > (TicksPerSecond/2)))
                 {
-                    int chunk = engine.s_eng.nodes_searched / (length / (TicksPerSecond /2));
+                    int chunk = engine.searcher.nodes_searched / (length / (TicksPerSecond /2));
                     engine.search(chunk);
                 } else {
                     engine.search(START_SEARCH_NODES);
                 }
-                if ((engine.max_depth && engine.depth > engine.max_depth)
+                if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                     || (engine.best_score >= WIN_SCORE))
                 {
                     engine.set_bestmove();
@@ -681,7 +759,7 @@ int main(char[][] args)
                 {
                     server.info(format("depth %d", engine.depth+4));
                     server.info(format("time %d", length/TicksPerSecond));
-                    server.info(format("nodes %d", engine.s_eng.nodes_searched));
+                    server.info(format("nodes %d", engine.searcher.nodes_searched));
                     server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
                     StepList bestline = engine.get_bestline();
                     server.info(format("pv %s", bestline.to_move_str(engine.position)));

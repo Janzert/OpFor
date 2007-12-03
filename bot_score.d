@@ -9,16 +9,16 @@ import aeibot;
 
 const char[] BOT_AUTHOR = "Janzert";
 
-typedef real function(Position) ScoreFunc;
+typedef int function(Position) ScoreFunc;
 
-real arimaa_score(Position pos)
+int arimaa_score(Position pos)
 {
     float wscore = 0;
     for (Piece i = Piece.WRABBIT; i <= Piece.WELEPHANT; i++)
     {
-        wscore += popcount(pos.bitBoards[i]);
+        wscore += popcount(pos.bitBoards[i]) * i;;
     }
-    wscore *= popcount(pos.bitBoards[Piece.WRABBIT]);
+    wscore *= popcount(pos.bitBoards[Piece.WRABBIT]) + 1;
     float wrpoints = 0;
     for (int rank = 1; rank <= 8; rank++)
     {
@@ -30,9 +30,9 @@ real arimaa_score(Position pos)
     float bscore = 0;
     for (Piece i = Piece.BRABBIT; i <= Piece.BELEPHANT; i++)
     {
-        bscore += popcount(pos.bitBoards[i]);
+        bscore += popcount(pos.bitBoards[i]) * (i - Piece.WELEPHANT);
     }
-    bscore *= popcount(pos.bitBoards[Piece.BRABBIT]);
+    bscore *= popcount(pos.bitBoards[Piece.BRABBIT]) + 1;
     float brpoints = 0;
     for (int rank = 1; rank <= 8; rank++)
     {
@@ -41,12 +41,12 @@ real arimaa_score(Position pos)
     }
     bscore += brpoints;
 
-    return wscore - bscore;
+    return cast(int)(wscore - bscore);
 }
 
-real FAME(Position pos)
+int FAME(Position pos)
 {
-    return position.FAME(pos);
+    return cast(int)position.FAME(pos, 0.1716);
 }
 
 class Engine : AEIEngine
@@ -99,17 +99,17 @@ class Engine : AEIEngine
             }
             if (bestscore != bestscore || score >= bestscore)
             {
-                bestscore = score;
                 if (score > bestscore)
                 {
                     bestpos.length = 0;
                 }
+                bestscore = score;
 
                 bestpos ~= pos;
             }
         }
         
-        if (bestpos.length > 0)
+        if (bestpos.length > 1)
         {
             int r = rand() % bestpos.length;
             bestpos[0] = bestpos[r];
