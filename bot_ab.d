@@ -461,9 +461,9 @@ class Engine : AEIEngine
 
     this()
     {
-        searcher = new FullSearch(new TransTable(150));
+        searcher = new FullSearch(new TransTable(500));
         //searcher = new ScoreSearch(new TransTable(150));
-        max_depth = 0;
+        max_depth = 2;
     }
 
     void start_search()
@@ -527,14 +527,14 @@ class Engine : AEIEngine
             next_pos = pos_list;
             best_score = MIN_SCORE;
             depth = 0;
-            searcher.nodes_searched = 0;
+            searcher.prepare();
             state = EngineState.SEARCHING;
         }
     }
 
     void search(int num_nodes)
     {
-        int stop_node = searcher.nodes_searched + num_nodes;
+        ulong stop_node = searcher.nodes_searched + num_nodes;
         while (searcher.nodes_searched < stop_node)
         {
             Position pos = next_pos.pos;
@@ -544,8 +544,7 @@ class Engine : AEIEngine
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
 
-            if ((score > best_score)
-                    || (next_pos is pos_list))
+            if (score > best_score)
             {
                 best_score = score;
                 
@@ -578,6 +577,7 @@ class Engine : AEIEngine
                 {
                     break;
                 }
+                best_score = MIN_SCORE;
                 next_pos = pos_list;
             }
         }
@@ -616,6 +616,7 @@ class Engine : AEIEngine
             pos_list = n.next;
             PositionNode.free(n);
         }
+        searcher.cleanup();
     }
 
 }
@@ -641,6 +642,7 @@ int main(char[][] args)
 
     d_time win_search_time = 0;
     int win_search_num = 0;
+    int check_num = 0;
     while (true)
     {
         if (engine.state == EngineState.IDLE)
@@ -686,7 +688,7 @@ int main(char[][] args)
                 case ServerCmd.CmdType.MAKEMOVE:
                     MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
                     engine.make_move(mcmd.move);
-                    writefln("made move %s\n%s", mcmd.move, engine.position.to_long_str());
+                    writefln("received move %s\n%s", mcmd.move, engine.position.to_long_str());
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.SETPOSITION:
@@ -730,7 +732,8 @@ int main(char[][] args)
                 }
                 real max_seconds = cast(real)search_max / TicksPerSecond;
                 writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
-                writefln("Searched %d nodes, %.0f nps.", engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds);
+                writefln("Searched %d nodes, %.0f nps, %d tthits.",
+                        engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits);
                 writefln("Current score %.2f", engine.best_score / 196.0);
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
@@ -748,6 +751,7 @@ int main(char[][] args)
                 } else {
                     engine.search(START_SEARCH_NODES);
                 }
+                check_num += 1;
                 if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                     || (engine.best_score >= WIN_SCORE))
                 {
@@ -764,8 +768,10 @@ int main(char[][] args)
                     StepList bestline = engine.get_bestline();
                     server.info(format("pv %s", bestline.to_move_str(engine.position)));
                     StepList.free(bestline);
+                    server.info(format("number checks %d", check_num));
+                    check_num = 0;
                     nextreport = now + report_interval;
-                    report_depth = engine.depth+1;
+                    report_depth = engine.depth;
                 }
                 break;
             default:

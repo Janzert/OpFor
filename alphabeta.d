@@ -14,6 +14,7 @@ struct TTNode
     int score;
     SType type;
     Step beststep;
+    bool aged;
 }
 
 class TransTable
@@ -29,6 +30,30 @@ class TransTable
     {
         int key = pos.zobrist % store.length;
         return &store[key];
+    }
+
+    void set(Position pos, int depth, int score, SType type, Step bstep)
+    {
+        int key = pos.zobrist % store.length;
+        if (store[key].aged 
+                || store[key].depth < depth
+                || store[key].zobrist == pos.zobrist)
+        {
+            store[key].zobrist = pos.zobrist;
+            store[key].depth = depth;
+            store[key].score = score;
+            store[key].type = type;
+            store[key].beststep = bstep;
+            store[key].aged = false;
+        }
+    }
+
+    void age()
+    {
+        for (int i=0; i < store.length; i++)
+        {
+            store[i].aged = true;
+        }
     }
 }
 
@@ -68,13 +93,15 @@ class ABSearch
     // HistoryHeuristic cuthistory;
     Position nullmove;
 
-    int nodes_searched;
+    ulong nodes_searched;
+    ulong tthits;
 
     this(TransTable tt)
     {
         ttable = tt;
         // cuthistory = new HistoryHeuristic();
         nodes_searched = 0;
+        tthits = 0;
     }
 
     void sortstep(Position pos, StepList steps, Step* best, int num)
@@ -138,25 +165,25 @@ class ABSearch
         Step* prev_best;
         if (node.zobrist == pos.zobrist)
         {
+            node.aged = false;
             if (node.depth >= depth)
             {
                 if (node.type == SType.EXACT
                     || (node.type == SType.ALPHA && node.score <= alpha)
                     || (node.type == SType.BETA && node.score >= beta))
                 {
+                    tthits++;
                     return node.score;
                 }
             }
             prev_best = &node.beststep;
         }
 
+        Step new_best;
         if (depth < 1 && !pos.inpush)
         {
             score = eval(pos);
-            if (node.zobrist != pos.zobrist)
-            {
-                node.beststep.clear();
-            }
+            new_best.clear();
         } else {
             int best_ix;
             StepList steps = StepList.allocate();
@@ -220,16 +247,25 @@ class ABSearch
             {
                 cuthistory.update(pos, steps.steps[best_ix], depth);
             }*/
-            node.beststep.copy(steps.steps[best_ix]);
+            
+            new_best = steps.steps[best_ix];
             StepList.free(steps);
         }
 
-        node.zobrist = pos.zobrist;
-        node.depth = depth;
-        node.score = score;
-        node.type = sflag;
+        ttable.set(pos, depth, score, sflag, new_best);
 
         return score;
+    }
+
+    void prepare()
+    {
+        nodes_searched = 0;
+        tthits = 0;
+    }
+
+    void cleanup()
+    {
+        ttable.age();
     }
 }
 
