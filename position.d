@@ -725,6 +725,14 @@ class Position
         return false;
     }
 
+    bool is_goal()
+    {
+        if (bitBoards[Piece.WRABBIT] & RANK_8 ||
+                bitBoards[Piece.BRABBIT] & RANK_1)
+            return true;
+        return false;
+    }
+
     int endscore()
     {
         ulong ggoal = bitBoards[Piece.WRABBIT] & RANK_8;

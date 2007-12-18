@@ -96,12 +96,15 @@ class ABSearch
     ulong nodes_searched;
     ulong tthits;
 
+    bool tournament_rules;
+
     this(TransTable tt)
     {
         ttable = tt;
         // cuthistory = new HistoryHeuristic();
         nodes_searched = 0;
         tthits = 0;
+        tournament_rules = true;
     }
 
     void sortstep(Position pos, StepList steps, Step* best, int num)
@@ -150,14 +153,17 @@ class ABSearch
         int score = MIN_SCORE;
         if (pos.is_endstate())
         {
-            // This is actually technically incorrect as it disallows 
-            // pushing a rabbit onto then back off of the goal line
-            score = pos.endscore() * WIN_SCORE;
-            if (pos.side == Side.BLACK)
+            if (tournament_rules || pos.is_goal())
             {
-                score = -score;
+                // This is actually technically incorrect as it disallows 
+                // pushing a rabbit onto then back off of the goal line
+                score = pos.endscore() * WIN_SCORE;
+                if (pos.side == Side.BLACK)
+                {
+                    score = -score;
+                }
+                return score;
             }
-            return score;
         }
 
         SType sflag = SType.ALPHA;

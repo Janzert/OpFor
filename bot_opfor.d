@@ -394,7 +394,9 @@ class FullSearch : ABSearch
         } else { 
             if (goal_searcher.goals_found[pos.side])
             {
-                score += GOAL_THREAT[goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft];
+                int extrasteps = goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft;
+                extrasteps = (extrasteps < 12) ? extrasteps : 12;
+                score += GOAL_THREAT[4+extrasteps];
             }
             if (goal_searcher.goals_found[pos.side^1])
             {
@@ -463,7 +465,8 @@ class Engine : AEIEngine
     {
         searcher = new FullSearch(new TransTable(500));
         //searcher = new ScoreSearch(new TransTable(150));
-        max_depth = 2;
+        max_depth = 0;
+        searcher.tournament_rules = false;
     }
 
     void start_search()
