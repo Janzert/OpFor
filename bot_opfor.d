@@ -11,7 +11,7 @@ import aeibot;
 import goalsearch;
 import position;
 
-const char[] BOT_NAME = "AB";
+const char[] BOT_NAME = "OpFor";
 const char[] BOT_AUTHOR = "Janzert";
 
 const int START_SEARCH_NODES = 100000;
