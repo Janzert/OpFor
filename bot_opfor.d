@@ -695,11 +695,17 @@ int main(char[][] args)
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.GO:
-                    writefln("Starting search.");
                     GoCmd gcmd = cast(GoCmd)server.current_cmd;
+                    if (gcmd.option == GoCmd.Option.PONDER)
+                    {
+                        server.clear_cmd();
+                        break;
+                    }
+                    writefln("Starting search.");
                     search_start = getUTCtime();
                     engine.start_search();
-                    if (gcmd.option == GoCmd.Option.INFINITE)
+                    if (gcmd.option == GoCmd.Option.INFINITE
+                            || gcmd.option == GoCmd.Option.GOAL)
                     {
                         engine.max_depth = -1;
                         writefln("Starting infinite analyses.");
