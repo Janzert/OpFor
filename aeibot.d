@@ -27,6 +27,17 @@ class TimeoutException : Exception
     }
 }
 
+class UnknownCommand : Exception
+{
+    char[] command;
+
+    this(char[] msg, char[] cmd)
+    {
+        super(msg);
+        this.command = cmd;
+    }
+}
+
 interface ServerConnection
 {
     void shutdown();
@@ -257,14 +268,11 @@ class ServerInterface
                         p_cmd.pos_str = strip(line[pix..length]);
                         break;
                     default:
-                        throw new Exception("Unrecognized command.");
+                        throw new UnknownCommand("Unrecognized command.", line);
                 }
             }
-        }
-        catch (TimeoutException e)
-        {
+        } catch (TimeoutException e) { }
 
-        }
         return cast(bool)cmd_queue.length;
     }
 

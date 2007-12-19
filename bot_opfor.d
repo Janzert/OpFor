@@ -371,7 +371,7 @@ class FullSearch : ABSearch
     {
         int score = cast(int)fastFAME(pos, 0.1716); // first pawn worth ~196
                                                     // only a pawn left ~31883
-        score += trap_safety(pos) << 2;
+        score += trap_safety(pos) << 1;
         score += central_elephant(pos);
         score += frozen_pieces(pos);
         score += on_trap(pos);
@@ -381,9 +381,9 @@ class FullSearch : ABSearch
         if (pos.side == Side.BLACK)
             score = -score;
 
-        const int[17] GOAL_THREAT = [30000, 8000, 4000, 2000, 1000,
-              300, 250, 200, 150,
-              75, 50, 40, 35,
+        const int[17] GOAL_THREAT = [30000, 20000, 20000, 15000, 10000,
+              8000, 6000, 4000, 2000,
+              1000, 500, 200, 50,
               20, 10, 7, 5];
         goal_searcher.set_start(pos);
         goal_searcher.find_goals();
@@ -394,13 +394,15 @@ class FullSearch : ABSearch
         } else { 
             if (goal_searcher.goals_found[pos.side])
             {
-                int extrasteps = goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft;
-                extrasteps = (extrasteps < 12) ? extrasteps : 12;
-                score += GOAL_THREAT[4+extrasteps];
+                int extrasteps = (goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft)+8;
+                extrasteps = (extrasteps < 16) ? extrasteps : 16;
+                score += GOAL_THREAT[extrasteps];
             }
             if (goal_searcher.goals_found[pos.side^1])
             {
-                score -= GOAL_THREAT[goal_searcher.goal_depth[pos.side^1][0]];
+                int togoal = goal_searcher.goal_depth[pos.side^1][0] + (pos.stepsLeft << 1);
+                togoal = (togoal < 16) ? togoal : 16;
+                score -= GOAL_THREAT[togoal];
             }
         }
 
@@ -459,12 +461,17 @@ class Engine : AEIEngine
     int depth;
     int best_score;
 
+    bool in_step;
+    int last_score;
+    PositionNode last_best;
+
     int max_depth;
 
     this()
     {
         searcher = new FullSearch(new TransTable(500));
         //searcher = new ScoreSearch(new TransTable(150));
+        in_step = false;
         max_depth = 0;
         searcher.tournament_rules = false;
     }
@@ -537,6 +544,7 @@ class Engine : AEIEngine
 
     void search(int num_nodes)
     {
+        in_step = true;
         ulong stop_node = searcher.nodes_searched + num_nodes;
         while (searcher.nodes_searched < stop_node)
         {
@@ -576,12 +584,12 @@ class Engine : AEIEngine
                 next_pos = next_pos.next;
             } else {
                 depth++;
-                if ((max_depth != -1) && (depth > max_depth))
-                {
-                    break;
-                }
+                last_score = best_score;
+                last_best = pos_list;
                 best_score = MIN_SCORE;
                 next_pos = pos_list;
+                in_step = false;
+                break;
             }
         }
     }
@@ -619,6 +627,11 @@ class Engine : AEIEngine
             pos_list = n.next;
             PositionNode.free(n);
         }
+        next_pos = null;
+        pos_list = null;
+        last_best = null;
+        last_score = MIN_SCORE;
+        best_score = MIN_SCORE;
         searcher.cleanup();
     }
 
@@ -648,12 +661,19 @@ int main(char[][] args)
     int check_num = 0;
     while (true)
     {
-        if (engine.state == EngineState.IDLE)
+        try
         {
-            server.check(10);
-        } else {
-            server.check();
+            if (engine.state == EngineState.IDLE)
+            {
+                server.check(10);
+            } else {
+                server.check();
+            }
+        } catch (UnknownCommand e)
+        {
+            writefln("Received unknown command: %s", e.command);
         }
+
         while (server.current_cmd !is null)
         {
             switch (server.current_cmd.type)
@@ -737,7 +757,12 @@ int main(char[][] args)
                 writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
                 writefln("Searched %d nodes, %.0f nps, %d tthits.",
                         engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits);
-                writefln("Current score %.2f", engine.best_score / 196.0);
+                if (engine.in_step)
+                {
+                    writefln("Current score %.2f", engine.best_score / 196.0);
+                } else {
+                    writefln("Current score %.2f", engine.last_score / 196.0);
+                }
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.cleanup_search();
@@ -764,10 +789,16 @@ int main(char[][] args)
                 d_time now = getUTCtime();
                 if (now > nextreport || engine.depth > report_depth)
                 {
-                    server.info(format("depth %d", engine.depth+4));
+                    int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
+                    server.info(format("depth %d", depth));
                     server.info(format("time %d", length/TicksPerSecond));
                     server.info(format("nodes %d", engine.searcher.nodes_searched));
-                    server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
+                    if (engine.in_step)
+                    {
+                        server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
+                    } else {
+                        server.info(format("score cr %d", cast(int)(engine.last_score / 1.96)));
+                    }
                     StepList bestline = engine.get_bestline();
                     server.info(format("pv %s", bestline.to_move_str(engine.position)));
                     StepList.free(bestline);
