@@ -473,7 +473,7 @@ class Engine : AEIEngine
         searcher = new FullSearch(new TransTable(500));
         //searcher = new ScoreSearch(new TransTable(150));
         in_step = false;
-        max_depth = 0;
+        max_depth = -1;
         searcher.tournament_rules = false;
     }
 

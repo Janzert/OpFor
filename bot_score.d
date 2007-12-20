@@ -187,6 +187,9 @@ int main(char[][] args)
                     engine.make_move(mcmd.move);
                     server.clear_cmd();
                     break;
+                case ServerCmd.CmdType.SETOPTION:
+                    server.clear_cmd();
+                    break;
                 default:
                     throw new Exception("Unhandled server command in main loop.");
             }
