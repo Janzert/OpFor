@@ -116,7 +116,15 @@ class SocketServer : ServerConnection
 
 class ServerCmd
 {
-    enum CmdType { NONE, ISREADY, QUIT, NEWGAME, GO, MAKEMOVE, SETPOSITION };
+    enum CmdType { NONE,
+        ISREADY,
+        QUIT,
+        NEWGAME,
+        GO,
+        MAKEMOVE,
+        SETPOSITION,
+        SETOPTION };
+
     CmdType type;
 
     this(CmdType t)
@@ -127,7 +135,7 @@ class ServerCmd
 
 class GoCmd : ServerCmd
 {
-    enum Option { NONE, PONDER, INFINITE, GOAL, MOVETIME } 
+    enum Option { NONE, PONDER } 
     Option option;
     int time;
     int depth;
@@ -159,6 +167,18 @@ class PositionCmd : ServerCmd
         super(CmdType.SETPOSITION);
     }
 }
+
+class OptionCmd : ServerCmd
+{
+    char[] name;
+    char[] value;
+
+    this()
+    {
+        super(CmdType.SETOPTION);
+    }
+}
+
 class ServerInterface
 {
     ServerConnection con;
@@ -223,23 +243,8 @@ class ServerInterface
                                 case "ponder":
                                     go_cmd.option = GoCmd.Option.PONDER;
                                     break;
-                                case "infinite":
-                                    go_cmd.option = GoCmd.Option.INFINITE;
-                                    break;
-                                case "goal":
-                                    go_cmd.option = GoCmd.Option.GOAL;
-                                    if (words.length < 3)
-                                        throw new Exception("No search depth supplied for goal search");
-                                    go_cmd.depth = toInt(strip(words[2]));
-                                    break;
-                                case "movetime":
-                                    go_cmd.option = GoCmd.Option.MOVETIME;
-                                    if (words.length < 3)
-                                        throw new Exception("No time length supplied for movetime");
-                                    go_cmd.time = toInt(strip(words[2]));
-                                    break;
                                 default:
-                                throw new Exception("Unrecognized go command option");
+                                    throw new Exception("Unrecognized go command option");
                             }
                         }
                         break;
@@ -266,6 +271,20 @@ class ServerInterface
                         }
                         int pix = find(line, "[");
                         p_cmd.pos_str = strip(line[pix..length]);
+                        break;
+                    case "setoption":
+                        OptionCmd option_cmd = new OptionCmd();
+                        cmd_queue ~= option_cmd;
+                        int nameix = find(line, "name") + 4;
+                        int valueix = find(line, "value");
+                        valueix = (valueix == -1) ? line.length : valueix;
+                        option_cmd.name = strip(line[nameix..valueix]);
+                        if (valueix != line.length)
+                        {
+                            option_cmd.value = strip(line[valueix+5..length]);
+                        } else {
+                            option_cmd.value = "";
+                        }
                         break;
                     default:
                         throw new UnknownCommand("Unrecognized command.", line);

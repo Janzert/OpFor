@@ -1,5 +1,6 @@
 
 import std.c.string;
+import std.conv;
 import std.date;
 import std.math;
 import std.random;
@@ -704,12 +705,6 @@ int main(char[][] args)
                     writefln("Starting search.");
                     search_start = getUTCtime();
                     engine.start_search();
-                    if (gcmd.option == GoCmd.Option.INFINITE
-                            || gcmd.option == GoCmd.Option.GOAL)
-                    {
-                        engine.max_depth = -1;
-                        writefln("Starting infinite analyses.");
-                    }
                     nextreport = getUTCtime() + report_interval;
                     report_depth = 0;
                     server.clear_cmd();
@@ -726,6 +721,26 @@ int main(char[][] args)
                     writefln("set position\n%s\n%s", 
                             "wb"[engine.position.side], 
                             engine.position.to_long_str());
+                    server.clear_cmd();
+                    break;
+                case ServerCmd.CmdType.SETOPTION:
+                    OptionCmd scmd = cast(OptionCmd)server.current_cmd;
+                    switch (scmd.name)
+                    {
+                        case "depth":
+                            if (scmd.value == "infinite")
+                            {
+                                engine.max_depth = -1;
+                                writefln("Search depth set to infinite");
+                            } else {
+                                int depth = toInt(scmd.value);
+                                engine.max_depth = (depth > 3) ? depth - 4 : 0;
+                                writefln("Search depth set to %d", engine.max_depth+4);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                     server.clear_cmd();
                     break;
                 default:
