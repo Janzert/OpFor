@@ -121,6 +121,7 @@ class ServerCmd
         QUIT,
         NEWGAME,
         GO,
+        STOP,
         MAKEMOVE,
         SETPOSITION,
         SETOPTION };
@@ -247,6 +248,9 @@ class ServerInterface
                                     throw new Exception("Unrecognized go command option");
                             }
                         }
+                        break;
+                    case "stop":
+                        cmd_queue ~= new ServerCmd(ServerCmd.CmdType.STOP);
                         break;
                     case "makemove":
                         MoveCmd move_cmd = new MoveCmd();

@@ -709,6 +709,14 @@ int main(char[][] args)
                     report_depth = 0;
                     server.clear_cmd();
                     break;
+                case ServerCmd.CmdType.STOP:
+                    if (engine.state == EngineState.SEARCHING)
+                    {
+                        engine.set_bestmove();
+                        engine.state = EngineState.MOVESET;
+                    }
+                    server.clear_cmd();
+                    break;
                 case ServerCmd.CmdType.MAKEMOVE:
                     MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
                     engine.make_move(mcmd.move);
