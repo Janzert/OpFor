@@ -652,10 +652,18 @@ int main(char[][] args)
     writefln("Connected to server %s:%d", ip, port);
     Engine engine = new Engine();
 
+    int tcpermove = 0;
+    int tcmaxreserve = 0;
+    int tcmaxmove = 0;
+    int tcwreserve = 0;
+    int tcbreserve = 0;
+    int tclastmove = 0;
+
     d_time search_time = 0;
     d_time search_max = 0;
     int search_num = 0;
     d_time search_start;
+    d_time move_start;
 
     d_time win_search_time = 0;
     int win_search_num = 0;
@@ -745,6 +753,27 @@ int main(char[][] args)
                                 engine.max_depth = (depth > 3) ? depth - 4 : 0;
                                 writefln("Search depth set to %d", engine.max_depth+4);
                             }
+                            break;
+                        case "tcmove":
+                            tcpermove = toInt(scmd.value);
+                            break;
+                        case "tcmax":
+                            tcmaxreserve = toInt(scmd.value);
+                            break;
+                        case "tcturntime":
+                            tcmaxmove = toInt(scmd.value);
+                            break;
+                        case "wreserve":
+                            tcwreserve = toInt(scmd.value);
+                            break;
+                        case "breserve":
+                            tcbreserve = toInt(scmd.value);
+                            break;
+                        case "tclastmoveused":
+                            tclastmove = toInt(scmd.value);
+                            break;
+                        case "tcmoveused":
+                            move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
                             break;
                         default:
                             break;
