@@ -643,7 +643,7 @@ int main(char[][] args)
     char[] ip = "127.0.0.1";
     ushort port = 40007;
 
-    d_time report_interval = 30 * std.date.TicksPerSecond;
+    d_time report_interval = 60 * std.date.TicksPerSecond;
     d_time nextreport = 0;
     int report_depth = 0;
 
@@ -670,8 +670,6 @@ int main(char[][] args)
     int tc_min_search;
     int tc_max_search;
 
-    d_time win_search_time = 0;
-    int win_search_num = 0;
     int check_num = 0;
     while (true)
     {
@@ -700,10 +698,6 @@ int main(char[][] args)
                     writefln("Exiting by server command.");
                     return 0;
                 case ServerCmd.CmdType.NEWGAME:
-                    if (engine.position !is null)
-                    {
-                        writefln(engine.position.to_long_str());
-                    }
                     writefln("Starting new game.");
                     engine.new_game();
                     server.clear_cmd();
@@ -773,11 +767,11 @@ int main(char[][] args)
                             if (scmd.value == "infinite")
                             {
                                 engine.max_depth = -1;
-                                writefln("Search depth set to infinite");
+                                server.info("log Search depth set to infinite");
                             } else {
                                 int depth = toInt(scmd.value);
                                 engine.max_depth = (depth > 3) ? depth - 4 : 0;
-                                writefln("Search depth set to %d", engine.max_depth+4);
+                                server.info(format("log Search depth set to %d", engine.max_depth+4));
                             }
                             break;
                         case "tcmove":
@@ -826,10 +820,7 @@ int main(char[][] args)
                     search_num += 1;
                     if (engine.best_score >= WIN_SCORE)
                     {
-                        win_search_time += length;
-                        win_search_num += 1;
-                        real avg_wsearch = (cast(real)win_search_time / TicksPerSecond) / win_search_num;
-                        writefln("Sending forced win move %.2f average.", avg_wsearch);
+                        server.info(format("log Sending forced win move in %.2f seconds.", seconds));
                     }
                 }
                 real average = 0;
@@ -838,15 +829,9 @@ int main(char[][] args)
                     average = (cast(real)search_time / TicksPerSecond) / search_num;
                 }
                 real max_seconds = cast(real)search_max / TicksPerSecond;
+                server.info(format("log Searched %d nodes, %.0f nps, %d tthits.",
+                        engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits));
                 writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
-                writefln("Searched %d nodes, %.0f nps, %d tthits.",
-                        engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits);
-                if (engine.in_step)
-                {
-                    writefln("Current score %.2f", engine.best_score / 196.0);
-                } else {
-                    writefln("Current score %.2f", engine.last_score / 196.0);
-                }
                 writefln("Sending move %s", engine.bestmove);
                 server.bestmove(engine.bestmove);
                 engine.cleanup_search();
@@ -856,6 +841,7 @@ int main(char[][] args)
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
+                PositionNode cur_best = engine.pos_list;
                 if (engine.searcher.nodes_searched && (length > (TicksPerSecond/2)))
                 {
                     int chunk = engine.searcher.nodes_searched / (length / (TicksPerSecond /2));
@@ -883,7 +869,9 @@ int main(char[][] args)
                         engine.state = EngineState.MOVESET;
                     }
                 }
-                if (now > nextreport || engine.depth > report_depth)
+                if (now > nextreport 
+                        || engine.depth > report_depth 
+                        || cur_best !is engine.pos_list)
                 {
                     int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
                     server.info(format("depth %d", depth));
