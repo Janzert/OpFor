@@ -652,18 +652,23 @@ int main(char[][] args)
     writefln("Connected to server %s:%d", ip, port);
     Engine engine = new Engine();
 
-    int tcpermove = 0;
-    int tcmaxreserve = 0;
-    int tcmaxmove = 0;
-    int tcwreserve = 0;
-    int tcbreserve = 0;
-    int tclastmove = 0;
-
+    int tc_permove = 0;         // time given per move
+    int tc_maxreserve = 0;      // maximum reserve size
+    int tc_maxmove = 0;         // maximum time for a single move
+    int tc_wreserve = 0;        // white's reserve time
+    int tc_breserve = 0;        // black's reserve time
+    int tc_lastmove = 0;        // time used by opponent for last move
+    int tc_safety_margin = 10;  // safety margin in seconds to end the search
+    real tc_min_search_per = 0.80;  // minimum percentage of permove time to search
+    
     d_time search_time = 0;
     d_time search_max = 0;
     int search_num = 0;
     d_time search_start;
     d_time move_start;
+
+    int tc_min_search;
+    int tc_max_search;
 
     d_time win_search_time = 0;
     int win_search_num = 0;
@@ -715,6 +720,28 @@ int main(char[][] args)
                     engine.start_search();
                     nextreport = getUTCtime() + report_interval;
                     report_depth = 0;
+                    if (tc_permove)
+                    {
+                        Side myside = engine.position.side;
+                        int myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;
+                        tc_min_search = cast(int)(tc_permove * tc_min_search_per);
+                        if (tc_maxreserve && ((tc_maxreserve - myreserve) < (tc_permove - tc_min_search)))
+                        {
+                            tc_min_search = tc_permove;
+                        } else if (tc_maxmove && ((tc_permove + myreserve) > tc_maxmove))
+                        {
+                            tc_min_search = tc_permove;
+                        }
+                        tc_max_search = tc_permove + myreserve;
+                        if (tc_maxmove && (tc_max_search > tc_maxmove))
+                        {
+                            tc_max_search = tc_maxmove;
+                        }
+                        tc_max_search -= tc_safety_margin;
+                    } else {
+                        tc_min_search = 0;
+                        tc_max_search = 0;
+                    }
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.STOP:
@@ -728,7 +755,6 @@ int main(char[][] args)
                 case ServerCmd.CmdType.MAKEMOVE:
                     MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
                     engine.make_move(mcmd.move);
-                    writefln("received move %s\n%s", mcmd.move, engine.position.to_long_str());
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.SETPOSITION:
@@ -755,22 +781,22 @@ int main(char[][] args)
                             }
                             break;
                         case "tcmove":
-                            tcpermove = toInt(scmd.value);
+                            tc_permove = toInt(scmd.value);
                             break;
                         case "tcmax":
-                            tcmaxreserve = toInt(scmd.value);
+                            tc_maxreserve = toInt(scmd.value);
                             break;
                         case "tcturntime":
-                            tcmaxmove = toInt(scmd.value);
+                            tc_maxmove = toInt(scmd.value);
                             break;
                         case "wreserve":
-                            tcwreserve = toInt(scmd.value);
+                            tc_wreserve = toInt(scmd.value);
                             break;
                         case "breserve":
-                            tcbreserve = toInt(scmd.value);
+                            tc_breserve = toInt(scmd.value);
                             break;
                         case "tclastmoveused":
-                            tclastmove = toInt(scmd.value);
+                            tc_lastmove = toInt(scmd.value);
                             break;
                         case "tcmoveused":
                             move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
@@ -838,13 +864,25 @@ int main(char[][] args)
                     engine.search(START_SEARCH_NODES);
                 }
                 check_num += 1;
+                d_time now = getUTCtime();
                 if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
-                    || (engine.best_score >= WIN_SCORE))
+                    || (engine.best_score >= WIN_SCORE)
+                    || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start))))
                 {
                     engine.set_bestmove();
                     engine.state = EngineState.MOVESET;
+                } else if (tc_permove && (now > ((tc_min_search * TicksPerSecond) + move_start)))
+                {
+                    bool longer = cast(bool)(rand() % 2);
+                    if (longer)
+                    {
+                        server.info("Hit min time decided to search longer");
+                        tc_min_search += 15;
+                    } else {
+                        engine.set_bestmove();
+                        engine.state = EngineState.MOVESET;
+                    }
                 }
-                d_time now = getUTCtime();
                 if (now > nextreport || engine.depth > report_depth)
                 {
                     int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
@@ -860,7 +898,6 @@ int main(char[][] args)
                     StepList bestline = engine.get_bestline();
                     server.info(format("pv %s", bestline.to_move_str(engine.position)));
                     StepList.free(bestline);
-                    server.info(format("number checks %d", check_num));
                     check_num = 0;
                     nextreport = now + report_interval;
                     report_depth = engine.depth;
