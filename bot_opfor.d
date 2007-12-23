@@ -470,7 +470,7 @@ class Engine : AEIEngine
 
     this()
     {
-        searcher = new FullSearch(new TransTable(500));
+        searcher = new FullSearch(new TransTable(800));
         //searcher = new ScoreSearch(new TransTable(150));
         in_step = false;
         max_depth = -1;
@@ -659,7 +659,9 @@ int main(char[][] args)
     int tc_breserve = 0;        // black's reserve time
     int tc_lastmove = 0;        // time used by opponent for last move
     int tc_safety_margin = 10;  // safety margin in seconds to end the search
-    real tc_min_search_per = 0.80;  // minimum percentage of permove time to search
+    real tc_min_search_per = 0.66;  // minimum percentage of permove time to search
+    real tc_confidence_denom = 3;
+    real tc_time_left_denom = 3;
     
     d_time search_time = 0;
     d_time search_max = 0;
@@ -669,6 +671,7 @@ int main(char[][] args)
 
     int tc_min_search;
     int tc_max_search;
+    d_time last_decision_change;
 
     int check_num = 0;
     while (true)
@@ -711,6 +714,7 @@ int main(char[][] args)
                     }
                     writefln("Starting search.");
                     search_start = getUTCtime();
+                    last_decision_change = search_start;
                     engine.start_search();
                     nextreport = getUTCtime() + report_interval;
                     report_depth = 0;
@@ -718,14 +722,11 @@ int main(char[][] args)
                     {
                         Side myside = engine.position.side;
                         int myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;
+                        int maxuse = (tc_maxreserve > tc_maxmove - tc_permove) ? tc_maxreserve : tc_maxmove - tc_permove;
+                        real reserve_fill = cast(real)myreserve / maxuse;
                         tc_min_search = cast(int)(tc_permove * tc_min_search_per);
-                        if (tc_maxreserve && ((tc_maxreserve - myreserve) < (tc_permove - tc_min_search)))
-                        {
-                            tc_min_search = tc_permove;
-                        } else if (tc_maxmove && ((tc_permove + myreserve) > tc_maxmove))
-                        {
-                            tc_min_search = tc_permove;
-                        }
+                        tc_min_search += cast(int)((tc_permove * (1-tc_min_search_per)) * reserve_fill);
+                        
                         tc_max_search = tc_permove + myreserve;
                         if (tc_maxmove && (tc_max_search > tc_maxmove))
                         {
@@ -851,6 +852,10 @@ int main(char[][] args)
                 }
                 check_num += 1;
                 d_time now = getUTCtime();
+                if (cur_best != engine.pos_list)
+                {
+                    last_decision_change = now;
+                }
                 if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                     || (engine.best_score >= WIN_SCORE)
                     || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start))))
@@ -859,12 +864,28 @@ int main(char[][] args)
                     engine.state = EngineState.MOVESET;
                 } else if (tc_permove && (now > ((tc_min_search * TicksPerSecond) + move_start)))
                 {
-                    bool longer = cast(bool)(rand() % 2);
-                    if (longer)
+                    server.info("log Min search time reached");
+                    d_time decision_length = now - last_decision_change;
+                    d_time move_length = now - move_start;
+                    d_time time_left = (move_start + (tc_max_search * TicksPerSecond)) - now;
+                    if (decision_length < move_length * (1.0/tc_confidence_denom)
+                            && decision_length < time_left * (1.0/tc_time_left_denom))
                     {
-                        server.info("Hit min time decided to search longer");
-                        tc_min_search += 15;
+                        server.info(format("log move_length %d, decision_length %d, time_left %d", 
+                                    (move_length / TicksPerSecond),
+                                    (decision_length / TicksPerSecond),
+                                    (time_left / TicksPerSecond)));
+                        real tc_cd = 1.0 / (tc_confidence_denom-1);
+                        real tc_tld = 1.0 / (tc_time_left_denom-1);
+                        d_time length_cutoff = cast(d_time)((last_decision_change - move_start) * tc_cd) + last_decision_change;
+                        d_time reserve_cutoff = cast(d_time)(((move_start + (tc_max_search * TicksPerSecond))
+                                    - last_decision_change) * tc_tld) + last_decision_change;
+                        d_time end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
+                        end_search += cast(d_time)(0.5 * TicksPerSecond);
+                        tc_min_search = (end_search - move_start) / TicksPerSecond;
+                        server.info(format("log next min_search set to %d", tc_min_search));
                     } else {
+                        server.info(format("log last decision change %d seconds ago", decision_length / TicksPerSecond));
                         engine.set_bestmove();
                         engine.state = EngineState.MOVESET;
                     }
