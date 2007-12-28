@@ -1,8 +1,10 @@
 
+import std.conv;
+
 import position;
 
-static const int WIN_SCORE = 32000;
-static const int MAX_SCORE = 32767;
+static const int WIN_SCORE = 64000;
+static const int MAX_SCORE = 65000;
 static const int MIN_SCORE = -MAX_SCORE;
 
 enum SType { EXACT, ALPHA, BETA }
@@ -23,6 +25,12 @@ class TransTable
 
     this (int size)
     {
+        set_size(size);
+    }
+
+    void set_size(int size)
+    {
+        store.length = 0;
         store.length = (size*1024*1024) / TTNode.sizeof;
     }
 
@@ -98,13 +106,31 @@ class ABSearch
 
     bool tournament_rules;
 
-    this(TransTable tt)
+    this()
     {
-        ttable = tt;
+        ttable = new TransTable(10);
         // cuthistory = new HistoryHeuristic();
         nodes_searched = 0;
         tthits = 0;
         tournament_rules = true;
+    }
+
+    bool set_option(char[] option, char[] value)
+    {
+        bool handled = false;
+        switch (option)
+        {
+            case "hash":
+                try
+                {
+                    ttable.set_size(toInt(value));
+                    handled = true;
+                } catch (ConvError e) { }
+                break;
+            default:
+                break;
+        }
+        return handled;
     }
 
     void sortstep(Position pos, StepList steps, Step* best, int num)

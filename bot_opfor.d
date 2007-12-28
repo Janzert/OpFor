@@ -311,9 +311,9 @@ int rabbit_open(Position pos)
 
 class ScoreSearch : ABSearch
 {
-    this (TransTable tt)
+    this()
     {
-        super(tt);
+        super();
     }
 
     int eval(Position pos)
@@ -361,23 +361,69 @@ class ScoreSearch : ABSearch
 class FullSearch : ABSearch
 {
     GoalSearch goal_searcher;
+    real tsafety_w = 2;
+    real centralel_w = 1;
+    real frozen_w = 1;
+    real ontrap_w = 1;
+    real rwall_w = 1;
+    real ropen_w = 1;
+    real goal_w = 1;
     
-    this (TransTable tt)
+    this()
     {
-        super(tt);
-        goal_searcher = new GoalSearch(16);
+        super();
+        goal_searcher = new GoalSearch(14);
     }
     
+    bool set_option(char[] option, char[] value)
+    {
+        bool handled = false;
+        switch (option)
+        {
+            case "eval_tsafety":
+                tsafety_w = toReal(value);
+                handled = true;
+                break;
+            case "eval_centralel":
+                centralel_w = toReal(value);
+                handled = true;
+                break;
+            case "eval_frozen":
+                frozen_w = toReal(value);
+                handled = true;
+                break;
+            case "eval_ontrap":
+                ontrap_w = toReal(value);
+                handled = true;
+                break;
+            case "eval_rwall":
+                rwall_w = toReal(value);
+                handled = true;
+                break;
+            case "eval_ropen":
+                ropen_w = toReal(value);
+                handled = true;
+                break;
+            case "eval_goal":
+                goal_w = toReal(value);
+                handled = true;
+                break;
+            default:
+                handled = super.set_option(option, value);
+        }
+        return handled;
+    }
+
     int eval(Position pos)
     {
         int score = cast(int)fastFAME(pos, 0.1716); // first pawn worth ~196
                                                     // only a pawn left ~31883
-        score += trap_safety(pos) << 1;
-        score += central_elephant(pos);
-        score += frozen_pieces(pos);
-        score += on_trap(pos);
-        score += rabbit_wall(pos);
-        score += rabbit_open(pos);
+        score += trap_safety(pos) * tsafety_w;
+        score += central_elephant(pos) * centralel_w;
+        score += frozen_pieces(pos) * frozen_w;
+        score += on_trap(pos) * ontrap_w;
+        score += rabbit_wall(pos) * rwall_w;
+        score += rabbit_open(pos) * ropen_w;
 
         if (pos.side == Side.BLACK)
             score = -score;
@@ -391,24 +437,25 @@ class FullSearch : ABSearch
         if (goal_searcher.goals_found[pos.side]
                 && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
         {
-                score = (WIN_SCORE-10) - goal_searcher.goal_depth[pos.side][0];
+                // score = (WIN_SCORE-10) - goal_searcher.goal_depth[pos.side][0];
+                score = WIN_SCORE;
         } else { 
             if (goal_searcher.goals_found[pos.side])
             {
                 int extrasteps = (goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft)+8;
                 extrasteps = (extrasteps < 16) ? extrasteps : 16;
-                score += GOAL_THREAT[extrasteps];
+                score += GOAL_THREAT[extrasteps] * goal_w;
             }
             if (goal_searcher.goals_found[pos.side^1])
             {
                 int togoal = goal_searcher.goal_depth[pos.side^1][0] + (pos.stepsLeft << 1);
                 togoal = (togoal < 16) ? togoal : 16;
-                score -= GOAL_THREAT[togoal];
+                score -= GOAL_THREAT[togoal] * goal_w;
             }
+            // clamp the evaluation to be less than a win
+            score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         }
 
-        // clamp the evaluation to be less than a win
-        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         return score;
     }
 }
@@ -470,11 +517,16 @@ class Engine : AEIEngine
 
     this()
     {
-        searcher = new FullSearch(new TransTable(800));
-        //searcher = new ScoreSearch(new TransTable(150));
+        searcher = new FullSearch();
+        //searcher = new ScoreSearch();
         in_step = false;
         max_depth = -1;
         searcher.tournament_rules = false;
+    }
+
+    bool set_option(char[] option, char[] value)
+    {
+        return searcher.set_option(option, value);
     }
 
     void start_search()
@@ -797,6 +849,7 @@ int main(char[][] args)
                             move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
                             break;
                         default:
+                            engine.set_option(scmd.name, scmd.value);
                             break;
                     }
                     server.clear_cmd();
