@@ -491,48 +491,43 @@ class FullSearch : ABSearch
         } else {
             pos.get_steps(steps);
         }
-        if (steps.numsteps == 0)
+        for (int six = 0; six < steps.numsteps; six++)
         {
-            score = static_eval(pos);
-        } else {
-            for (int six = 0; six < steps.numsteps; six++)
+            nodes_searched++;
+            nodes_quiesced++;
+            int cal;
+            Position npos = pos.dup;
+            npos.do_step(steps.steps[six]);
+
+            if (npos == nullmove)
             {
-                nodes_searched++;
-                nodes_quiesced++;
-                int cal;
-                Position npos = pos.dup;
-                npos.do_step(steps.steps[six]);
+                cal = -(WIN_SCORE+1);   // Make this worse than a normal
+                                        // loss since it's actually an illegal move
+            } else if (npos.stepsLeft == 4)
+            {
+                Position mynull = nullmove;
+                nullmove = npos.dup;
+                nullmove.do_step(NULL_STEP);
 
-                if (npos == nullmove)
+                cal = -quiesce(npos, -beta, -alpha);
+
+                Position.free(nullmove);
+                nullmove = mynull;
+            } else {
+                cal = quiesce(npos, alpha, beta);
+            }
+
+            Position.free(npos);
+
+            if (cal > score)
+            {
+                score = cal;
+                if (cal > alpha)
                 {
-                    cal = -(WIN_SCORE+1);   // Make this worse than a normal
-                                            // loss since it's actually an illegal move
-                } else if (npos.stepsLeft == 4)
-                {
-                    Position mynull = nullmove;
-                    nullmove = npos.dup;
-                    nullmove.do_step(NULL_STEP);
-
-                    cal = -quiesce(npos, -beta, -alpha);
-
-                    Position.free(nullmove);
-                    nullmove = mynull;
-                } else {
-                    cal = quiesce(npos, alpha, beta);
-                }
-
-                Position.free(npos);
-
-                if (cal > score)
-                {
-                    score = cal;
-                    if (cal > alpha)
+                    alpha = cal;
+                    if (cal >= beta)
                     {
-                        alpha = cal;
-                        if (cal >= beta)
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
             }
