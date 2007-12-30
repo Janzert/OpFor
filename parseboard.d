@@ -51,9 +51,9 @@ int main(char[][] args)
 
     writefln("FAME: %.2f\n", FAME(pos));
 
-    GoalSearch gsearch = new GoalSearch(30);
+    GoalSearch gsearch = new GoalSearch();
     gsearch.set_start(pos);
-    gsearch.find_goals();
+    gsearch.find_goals(30);
     if (gsearch.goals_found[Side.WHITE] > 0)
     {
         writefln("White has a goal in %d unopposed steps.", gsearch.goal_depth[Side.WHITE][0]);
@@ -68,22 +68,11 @@ int main(char[][] args)
     if (tgen.num_captures)
     {
         const char[] piece_names = ".RCDHMErcdhme";
-        int[Piece.max+1] min_steps;
+        writefln("Can capture:");
         for (int i=0; i < tgen.num_captures; i++)
         {
-            if ((min_steps[tgen.piece_captured[i]] == 0)
-                    || (min_steps[tgen.piece_captured[i]] > tgen.capture_steps[i]))
-            {
-                min_steps[tgen.piece_captured[i]] = tgen.capture_steps[i];
-            }
-        }
-        writefln("Can capture:");
-        for (int i=Piece.max; i > 0; i--)
-        {
-            if (min_steps[i] > 0)
-            {
-                writefln("  %s in %d steps.", piece_names[i], min_steps[i]);
-            }
+            writefln("  %s in %d steps %s first", piece_names[tgen.piece_captured[i]],
+                    tgen.capture_steps[i], tgen.first_step[i]);
         }
         writefln("");
     }

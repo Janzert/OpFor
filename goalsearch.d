@@ -5,7 +5,6 @@ import position;
 
 class GoalSearch
 {
-    int search_depth;
     Position start;
 
     int[2] goals_found;
@@ -15,11 +14,6 @@ class GoalSearch
     Side cur_side;
     ulong goal_line;
     int enemy_offset;
-
-    this(int sdepth=16)
-    {
-        search_depth = sdepth;
-    }
 
     void set_start(Position pos)
     {
@@ -87,7 +81,7 @@ class GoalSearch
         return depth;
     }
 
-    void find_goals()
+    void find_goals(int search_depth)
     {
         set_side(Side.WHITE);
         goals_found[Side.WHITE] = 0;

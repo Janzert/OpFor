@@ -169,7 +169,7 @@ class ABSearch
         } */
     }
 
-    int eval(Position pos)
+    int eval(Position pos, int alpha, int beta)
     {
         throw new Exception("eval must be implemented");
     }
@@ -214,7 +214,18 @@ class ABSearch
         Step new_best;
         if (depth < 1 && !pos.inpush)
         {
-            score = eval(pos);
+            score = eval(pos, alpha, beta);
+            if (score > alpha)
+            {
+                alpha = score;
+                sflag = SType.EXACT;
+
+                if (score >= beta)
+                {
+                    sflag = SType.BETA;
+                }
+            }
+            
             new_best.clear();
         } else {
             int best_ix;
@@ -222,6 +233,7 @@ class ABSearch
             pos.get_steps(steps);
             if (steps.numsteps == 0)
             {
+                // immobilized
                 return -WIN_SCORE;
             }
             for (int six=0; six < steps.numsteps; six++)

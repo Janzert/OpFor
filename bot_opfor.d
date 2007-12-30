@@ -11,6 +11,7 @@ import alphabeta;
 import aeibot;
 import goalsearch;
 import position;
+import trapmoves;
 
 const char[] BOT_NAME = "OpFor";
 const char[] BOT_AUTHOR = "Janzert";
@@ -361,6 +362,10 @@ class ScoreSearch : ABSearch
 class FullSearch : ABSearch
 {
     GoalSearch goal_searcher;
+    TrapGenerator trap_search;
+
+    int nodes_quiesced;
+    
     real tsafety_w = 2;
     real centralel_w = 1;
     real frozen_w = 1;
@@ -372,7 +377,15 @@ class FullSearch : ABSearch
     this()
     {
         super();
-        goal_searcher = new GoalSearch(14);
+        goal_searcher = new GoalSearch();
+        trap_search = new TrapGenerator();
+        nodes_quiesced = 0;
+    }
+
+    void prepare()
+    {
+        super.prepare();
+        nodes_quiesced = 0;
     }
     
     bool set_option(char[] option, char[] value)
@@ -414,7 +427,122 @@ class FullSearch : ABSearch
         return handled;
     }
 
-    int eval(Position pos)
+    int eval(Position pos, int alpha, int beta)
+    {
+        //return static_eval(pos);
+        return quiesce(pos, alpha, beta);
+    }
+
+    int quiesce(Position pos, int alpha, int beta)
+    {
+        int score = MIN_SCORE;
+        if (pos.is_endstate())
+        {
+            if (tournament_rules || pos.is_goal())
+            {
+                // This is actually technically incorrect as it disallows 
+                // pushing a rabbit onto then back off of the goal line
+                score = pos.endscore() * WIN_SCORE;
+                if (pos.side == Side.BLACK)
+                {
+                    score = -score;
+                }
+                return score;
+            }
+        }
+
+        goal_searcher.set_start(pos);
+        goal_searcher.find_goals(pos.stepsLeft);
+        if (goal_searcher.goals_found[pos.side])
+        {
+            return WIN_SCORE;
+        }
+
+        score = static_eval(pos);
+        if (score >= beta)
+            return score;
+        if (score > alpha)
+            alpha = score;
+        
+        StepList steps = StepList.allocate();
+        if (!pos.inpush)
+        {
+            trap_search.get_moves(pos);
+            for (int six=0; six < trap_search.num_captures; six++)
+            {
+                if (trap_search.capture_steps[six] <= pos.stepsLeft)
+                {
+                    bool duplicate = false;
+                    for (int cix=0; cix < steps.numsteps; cix++)
+                    {
+                        if (trap_search.first_step[six] == steps.steps[cix])
+                        {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                    if (!duplicate)
+                    {
+                        Step* step = steps.newstep();
+                        step.set(trap_search.first_step[six]);
+                    }
+                }
+            }
+        } else {
+            pos.get_steps(steps);
+        }
+        if (steps.numsteps == 0)
+        {
+            score = static_eval(pos);
+        } else {
+            for (int six = 0; six < steps.numsteps; six++)
+            {
+                nodes_searched++;
+                nodes_quiesced++;
+                int cal;
+                Position npos = pos.dup;
+                npos.do_step(steps.steps[six]);
+
+                if (npos == nullmove)
+                {
+                    cal = -(WIN_SCORE+1);   // Make this worse than a normal
+                                            // loss since it's actually an illegal move
+                } else if (npos.stepsLeft == 4)
+                {
+                    Position mynull = nullmove;
+                    nullmove = npos.dup;
+                    nullmove.do_step(NULL_STEP);
+
+                    cal = -quiesce(npos, -beta, -alpha);
+
+                    Position.free(nullmove);
+                    nullmove = mynull;
+                } else {
+                    cal = quiesce(npos, alpha, beta);
+                }
+
+                Position.free(npos);
+
+                if (cal > score)
+                {
+                    score = cal;
+                    if (cal > alpha)
+                    {
+                        alpha = cal;
+                        if (cal >= beta)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        StepList.free(steps);
+
+        return score;
+    }
+
+    int static_eval(Position pos)
     {
         int score = cast(int)fastFAME(pos, 0.1716); // first pawn worth ~196
                                                     // only a pawn left ~31883
@@ -433,7 +561,7 @@ class FullSearch : ABSearch
               1000, 500, 200, 50,
               20, 10, 7, 5];
         goal_searcher.set_start(pos);
-        goal_searcher.find_goals();
+        goal_searcher.find_goals(14);
         if (goal_searcher.goals_found[pos.side]
                 && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
         {

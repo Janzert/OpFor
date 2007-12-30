@@ -153,9 +153,9 @@ struct Step
 
     void set(ulong f, ulong t, bool p=false)
     {
-        assert((f == INV_STEP && t == INV_STEP) || f != t, format("from %d == to %d", f, t));
-        assert((f == INV_STEP && t == INV_STEP) || popcount(f) == 1, format("invalid f %d", f));
-        assert(t == INV_STEP || popcount(t) == 1, format("invalid t %d", t));
+        assert((f == INV_STEP && t == INV_STEP) || f != t, format("from %X == to %X", f, t));
+        assert((f == INV_STEP && t == INV_STEP) || popcount(f) == 1, format("invalid f %X", f));
+        assert(t == INV_STEP || popcount(t) == 1, format("invalid t %X", t));
 
         frombit = f;
         tobit = t;
@@ -167,7 +167,31 @@ struct Step
       frombit = other.frombit;
       tobit = other.tobit;
       push = other.push;
-   } 
+   }
+
+   char[] toString()
+   {
+        char[] str;
+        str ~= ix_to_alg(fromix);
+        switch (toix - fromix)
+        {
+            case 8:
+                str ~= "n";
+                break;
+            case -8:
+                str ~= "s";
+                break;
+            case -1:
+                str ~= "e";
+                break;
+            case 1:
+                str ~= "w";
+                break;
+            default:
+                str ~= ix_to_alg(toix);
+        }
+        return str;
+   }
 }
 
 static Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
@@ -989,8 +1013,8 @@ class Position
             bitix fromix = step.fromix;
             bitix toix = step.toix;
             Piece piece = pieces[fromix];
-            assert (piece != Piece.EMPTY);
-            assert (pieces[toix] == Piece.EMPTY);
+            assert (piece != Piece.EMPTY, format("move empty piece f%d t%d", fromix, toix));
+            assert (pieces[toix] == Piece.EMPTY, format("occupied to f%d t%d", fromix, toix));
 
             Side piece_side;
             if (placement[Side.WHITE] & step.frombit)
