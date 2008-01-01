@@ -64,8 +64,7 @@ int main(char[][] args)
     }
 
     TrapGenerator tgen = new TrapGenerator();
-    tgen.get_moves(pos);
-    if (tgen.num_captures)
+    if (tgen.find_captures(pos, pos.side))
     {
         const char[] piece_names = ".RCDHMErcdhme";
         writefln("Can capture:");

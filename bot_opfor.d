@@ -364,7 +364,8 @@ class FullSearch : ABSearch
     GoalSearch goal_searcher;
     TrapGenerator trap_search;
 
-    int nodes_quiesced;
+    int nodes_quiesced = 0;
+    int cur_qdepth = 0;
     
     real tsafety_w = 2;
     real centralel_w = 1;
@@ -373,53 +374,57 @@ class FullSearch : ABSearch
     real rwall_w = 1;
     real ropen_w = 1;
     real goal_w = 1;
+    int do_qsearch = 2;
+    int min_qdepth = -8;
     
     this()
     {
         super();
         goal_searcher = new GoalSearch();
         trap_search = new TrapGenerator();
-        nodes_quiesced = 0;
     }
 
     void prepare()
     {
         super.prepare();
         nodes_quiesced = 0;
+        if (cur_qdepth != 0)
+        {
+            throw new Exception("Quiescense depth not returned to zero.");
+        }
     }
     
     bool set_option(char[] option, char[] value)
     {
-        bool handled = false;
+        bool handled = true;
         switch (option)
         {
             case "eval_tsafety":
                 tsafety_w = toReal(value);
-                handled = true;
                 break;
             case "eval_centralel":
                 centralel_w = toReal(value);
-                handled = true;
                 break;
             case "eval_frozen":
                 frozen_w = toReal(value);
-                handled = true;
                 break;
             case "eval_ontrap":
                 ontrap_w = toReal(value);
-                handled = true;
                 break;
             case "eval_rwall":
                 rwall_w = toReal(value);
-                handled = true;
                 break;
             case "eval_ropen":
                 ropen_w = toReal(value);
-                handled = true;
                 break;
             case "eval_goal":
                 goal_w = toReal(value);
-                handled = true;
+                break;
+            case "eval_quiesce":
+                do_qsearch = toInt(value);
+                break;
+            case "eval_qdepth":
+                min_qdepth = toInt(value);
                 break;
             default:
                 handled = super.set_option(option, value);
@@ -429,13 +434,136 @@ class FullSearch : ABSearch
 
     int eval(Position pos, int alpha, int beta)
     {
-        //return static_eval(pos);
-        return quiesce(pos, alpha, beta);
+        switch (do_qsearch)
+        {
+            case 0:
+                return static_eval(pos);
+            case 1:
+                return quiesce(pos, alpha, beta);
+            default:
+                return full_quiesce(pos, alpha, beta);
+        }
+    }
+
+    int full_quiesce(Position pos, int alpha, int beta)
+    {
+        int score;
+        if (pos.is_endstate())
+        {
+            if (tournament_rules || pos.is_goal())
+            {
+                score = pos.endscore() * WIN_SCORE;
+                if (pos.side == Side.BLACK)
+                {
+                    score = -score;
+                }
+                return score;
+            }
+        }
+
+        goal_searcher.set_start(pos);
+        goal_searcher.find_goals(4);
+
+        StepList steps = StepList.allocate();
+        if (pos.inpush)
+        {
+            pos.get_steps(steps);
+        } else if (goal_searcher.goals_found[pos.side]
+                && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
+        {
+            score = WIN_SCORE;
+        } else if (cur_qdepth < min_qdepth)
+        {
+            score = static_eval(pos);
+        } else if (goal_searcher.goals_found[pos.side^1])
+        {
+            cur_qdepth--;
+            score = alphabeta(pos, 1, alpha, beta);
+            cur_qdepth++;
+        } else if (trap_search.find_captures(pos, cast(Side)(pos.side^1), false))
+        {
+            cur_qdepth--;
+            score = alphabeta(pos, 1, alpha, beta);
+            cur_qdepth++;
+        } else if (trap_search.find_captures(pos, pos.side))
+        {
+            for (int six=0; six < trap_search.num_captures; six++)
+            {
+                if (trap_search.capture_steps[six] <= pos.stepsLeft)
+                {
+                    bool duplicate = false;
+                    for (int cix=0; cix < steps.numsteps; cix++)
+                    {
+                        if (trap_search.first_step[six] == steps.steps[cix])
+                        {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                    if (!duplicate)
+                    {
+                        Step* step = steps.newstep();
+                        step.set(trap_search.first_step[six]);
+                    }
+                }
+            }
+        } else {
+            score = static_eval(pos);
+        }
+
+        for (int six = 0; six < steps.numsteps; six++)
+        {
+            nodes_searched++;
+            nodes_quiesced++;
+            int cal;
+            Position npos = pos.dup;
+            npos.do_step(steps.steps[six]);
+
+            if (npos == nullmove)
+            {
+                cal = -(WIN_SCORE+1);   // Make this worse than a normal
+                                        // loss since it's actually an illegal move
+            } else if (npos.stepsLeft == 4)
+            {
+                Position mynull = nullmove;
+                nullmove = npos.dup;
+                nullmove.do_step(NULL_STEP);
+
+                cur_qdepth--;
+                cal = -full_quiesce(npos, -beta, -alpha);
+                cur_qdepth++;
+
+                Position.free(nullmove);
+                nullmove = mynull;
+            } else {
+                cur_qdepth--;
+                cal = quiesce(npos, alpha, beta);
+                cur_qdepth++;
+            }
+
+            Position.free(npos);
+
+            if (cal > score)
+            {
+                score = cal;
+                if (cal > alpha)
+                {
+                    alpha = cal;
+                    if (cal >= beta)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+        StepList.free(steps);
+
+        return score;
     }
 
     int quiesce(Position pos, int alpha, int beta)
     {
-        int score = MIN_SCORE;
+        int score;
         if (pos.is_endstate())
         {
             if (tournament_rules || pos.is_goal())
@@ -451,13 +579,6 @@ class FullSearch : ABSearch
             }
         }
 
-        goal_searcher.set_start(pos);
-        goal_searcher.find_goals(pos.stepsLeft);
-        if (goal_searcher.goals_found[pos.side])
-        {
-            return WIN_SCORE;
-        }
-
         score = static_eval(pos);
         if (score >= beta)
             return score;
@@ -467,7 +588,7 @@ class FullSearch : ABSearch
         StepList steps = StepList.allocate();
         if (!pos.inpush)
         {
-            trap_search.get_moves(pos);
+            trap_search.find_captures(pos, pos.side);
             for (int six=0; six < trap_search.num_captures; six++)
             {
                 if (trap_search.capture_steps[six] <= pos.stepsLeft)
