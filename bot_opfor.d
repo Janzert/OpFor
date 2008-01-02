@@ -310,6 +310,110 @@ int rabbit_open(Position pos)
     return score;
 }
 
+int rabbit_strength(Position pos, GoalSearch goals)
+{
+    const static int[][] pieceval = [[0, 0, 45, 60, 150, 200, 300,
+          0, -45, -60, -150, -200, -300],
+          [0, 0, -45, -60, -150, -200, -300,
+          0, 45, 60, 150, 200, 300]];
+    const static real[] distval = [1.0, 1.0, 1.0, 0.9, 0.7,
+          0.3, 0.2, 0.15, 0.10, 0.05, 0.04, 0.03, 0.02, 0.01, 0, 0];
+    const static real[][] rankval = [[0.2, 0, 0, 0.1, 0.5, 1.0, 1.5, 0],
+          [0, -1.5, -1.0, -0.5, -0.1, 0, 0, -0.2]];
+    const static real[] goalval = [1.0,
+          1.0, 1.0, 1.0, 1.0,
+          1.0, 1.0, 1.0, 0.9,
+          0.8, 0.7, 0.6, 0.5,
+          0.4, 0.3, 0.2, 0.1];
+    const static int[] weakval = [-30, 30];
+    const static int[] rforward = [8, -8];
+
+    int score = 0;
+    ulong allpieces = pos.placement[Side.WHITE] & pos.placement[Side.BLACK]
+        & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
+        & ~pos.frozen;
+    for (Side s = Side.WHITE; s <= Side.BLACK; s++)
+    {
+        ulong rabbits;
+        if (s == Side.WHITE)
+        {
+            rabbits = pos.bitBoards[Piece.WRABBIT];
+        } else {
+            rabbits = pos.bitBoards[Piece.BRABBIT];
+        }
+        while (rabbits)
+        {
+            ulong rbit = rabbits & -rabbits;
+            rabbits ^= rbit;
+            bitix rix = bitindex(rbit);
+
+            int power = 0;
+            ulong piecebits = allpieces;
+            while (piecebits)
+            {
+                ulong pbit = piecebits & -piecebits;
+                piecebits ^= pbit;
+                bitix pix = bitindex(pbit);
+
+                power += cast(int)(pieceval[s][pos.pieces[pix]] * distval[taxicab_dist[pix][rix+rforward[s]]]);
+            }
+
+            if (power < 0)
+            {
+                score += weakval[s];
+            } else {
+                int goalsteps = goals.board_depth[rix];
+                goalsteps = (goalsteps < 16) ? goalsteps : 16;
+
+                int rval = cast(int)(power * rankval[s][rix/8] * goalval[goalsteps]);
+                if (rbit & TRAPS)
+                    rval >>= 1;
+                score += rval;
+            }
+        }
+    }
+    return score;
+}
+
+int piece_strength(Position pos)
+{
+    const static int[] pieceval = [0, 0, 45, 60, 150, 200, 300,
+          0, -45, -60, -150, -200, -300];
+    const static real[] distval = [1.0, 1.0, 1.0, 0.9, 0.7,
+          0.3, 0.2, 0.15, 0.10, 0.05, 0.04, 0.03, 0.02, 0.01, 0, 0];
+    
+    int pieceoffset = 6;
+    int score = 0;
+    ulong stronger = pos.placement[Side.WHITE] & pos.placement[Side.BLACK]
+        & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
+        & ~pos.frozen;
+    for (int p = Piece.WCAT; p < Piece.WELEPHANT; p++)
+    {
+        stronger &= ~pos.bitBoards[p] & ~pos.bitBoards[p+pieceoffset];
+        ulong pieces = pos.bitBoards[p] | pos.bitBoards[p+pieceoffset];
+        while (pieces)
+        {
+            ulong pbit = pieces & -pieces;
+            pieces ^= pbit;
+            bitix pix = bitindex(pbit);
+
+            int power = 0;
+            ulong sbits = stronger;
+            while (sbits)
+            {
+                ulong sbit = sbits & -sbits;
+                sbits ^= sbit;
+                bitix six = bitindex(sbit);
+
+                power += cast(int)(pieceval[pos.pieces[six]] * distval[taxicab_dist[pix][six]]);
+            }
+            score += cast(int)(power * pieceval[p] * 0.1);
+        }
+    }
+    return score;
+}
+
+
 class ScoreSearch : ABSearch
 {
     this()
@@ -363,6 +467,7 @@ class FullSearch : ABSearch
 {
     GoalSearch goal_searcher;
     TrapGenerator trap_search;
+    FastFAME fame;
 
     int nodes_quiesced = 0;
     int cur_qdepth = 0;
@@ -373,25 +478,26 @@ class FullSearch : ABSearch
     real ontrap_w = 1;
     real rwall_w = 1;
     real ropen_w = 1;
+    real rstrength_w = 1;
+    real pstrength_w = 1;
     real goal_w = 1;
-    int do_qsearch = 2;
+    real random_w = 0;
+    int do_qsearch = 1;
     int min_qdepth = -8;
+    bool static_trap = false;
     
     this()
     {
         super();
         goal_searcher = new GoalSearch();
         trap_search = new TrapGenerator();
+        fame = new FastFAME(0.1716);
     }
 
     void prepare()
     {
         super.prepare();
         nodes_quiesced = 0;
-        if (cur_qdepth != 0)
-        {
-            throw new Exception("Quiescense depth not returned to zero.");
-        }
     }
     
     bool set_option(char[] option, char[] value)
@@ -417,14 +523,26 @@ class FullSearch : ABSearch
             case "eval_ropen":
                 ropen_w = toReal(value);
                 break;
+            case "eval_rstrength":
+                rstrength_w = toReal(value);
+                break;
+            case "eval_pstrength":
+                pstrength_w = toReal(value);
+                break;
             case "eval_goal":
                 goal_w = toReal(value);
+                break;
+            case "eval_random":
+                random_w = toReal(value);
                 break;
             case "eval_quiesce":
                 do_qsearch = toInt(value);
                 break;
             case "eval_qdepth":
                 min_qdepth = toInt(value);
+                break;
+            case "eval_static_trap":
+                static_trap = cast(bool)(toInt(value));
                 break;
             default:
                 handled = super.set_option(option, value);
@@ -660,14 +778,49 @@ class FullSearch : ABSearch
 
     int static_eval(Position pos)
     {
-        int score = cast(int)fastFAME(pos, 0.1716); // first pawn worth ~196
-                                                    // only a pawn left ~31883
+        int pop = population(pos);
+        int score = fame.score(pop); // first pawn worth ~196
+                                     // only a pawn left ~31883
+
+        if (static_trap && trap_search.find_captures(pos, cast(Side)(pos.side^1)))
+        {
+            Piece mvv = Piece.EMPTY;
+            int capLength;
+            for (int i=0; i < trap_search.num_captures; i++)
+            {
+                if (trap_search.piece_captured[i] > mvv
+                        || (trap_search.piece_captured[i] == mvv
+                            && capLength > trap_search.capture_steps[i]))
+                {
+                    mvv = trap_search.piece_captured[i];
+                    capLength = trap_search.capture_steps[i];
+                }
+            }
+
+            if (capLength < 5)
+            {
+                int vcnt = pop2count(pop, mvv) - 1;
+                int vpop = pop & ~(pop_mask[mvv] << pop_offset[mvv]);
+                vpop |= vcnt << pop_offset[mvv];
+                real val = (score - fame.score(vpop)) * 0.15;
+                val = (val * (5 - pos.stepsLeft));
+                score -= cast(int)val;
+            }
+        }
+
+        goal_searcher.set_start(pos);
+        goal_searcher.find_goals(16);
+
         score += trap_safety(pos) * tsafety_w;
         score += central_elephant(pos) * centralel_w;
         score += frozen_pieces(pos) * frozen_w;
         score += on_trap(pos) * ontrap_w;
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
+        score += rabbit_strength(pos, goal_searcher) * rstrength_w;
+        score += piece_strength(pos) * pstrength_w;
+        if (random_w)
+            score += (rand()%100) * random_w;
 
         if (pos.side == Side.BLACK)
             score = -score;
@@ -676,8 +829,6 @@ class FullSearch : ABSearch
               8000, 6000, 4000, 2000,
               1000, 500, 200, 50,
               20, 10, 7, 5];
-        goal_searcher.set_start(pos);
-        goal_searcher.find_goals(14);
         if (goal_searcher.goals_found[pos.side]
                 && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
         {
@@ -1009,6 +1160,7 @@ int main(char[][] args)
                         break;
                     }
                     writefln("Starting search.");
+                    writefln("%s\n%s", "wb"[engine.position.side], engine.position.to_long_str);
                     search_start = getUTCtime();
                     last_decision_change = search_start;
                     engine.start_search();

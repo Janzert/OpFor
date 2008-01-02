@@ -5,7 +5,7 @@ import position;
 
 class TrapGenerator
 {
-    static const int MAX_CAPTURES = 50;
+    static const int MAX_CAPTURES = 80;
 
     int num_captures;
     Piece[MAX_CAPTURES] piece_captured;
@@ -722,7 +722,7 @@ class TrapGenerator
                                                 return;
                                         }
                                     }
-                                    break;
+                                    return;
                                 }
                             }
                         }
@@ -802,6 +802,8 @@ class TrapGenerator
                                                 if (!findall)
                                                     return;
                                             }
+                                            if (min_clear_steps == 1)
+                                                return;
                                         } else {
                                             add_capture(pos.pieces[pix], 3, ufbit, anbit);
                                             if (!findall)
@@ -871,11 +873,13 @@ class TrapGenerator
                         if (min_clear_steps)
                         {
                            for (int i=0; i < num_clears; i++)
-                            {
-                                add_capture(pos.pieces[pix], 2 + clear_length[i], &clear_first_step[i]);
-                                if (!findall)
-                                    return;
-                            }
+                           {
+                               add_capture(pos.pieces[pix], 2 + clear_length[i], &clear_first_step[i]);
+                               if (!findall)
+                                   return;
+                           }
+                           if (min_clear_steps < 3)
+                               return;
                         } else { 
                             add_capture(pos.pieces[pix], 2, pbit, tbit, true);
                             if (!findall)
@@ -1004,7 +1008,7 @@ class TrapGenerator
                                                 if (!findall)
                                                     return;
                                             }
-                                            break;
+                                            return;
                                         default:
                                     }
                                 }

@@ -10,6 +10,7 @@ class GoalSearch
     int[2] goals_found;
     bitix[8][2] rabbit_location;
     int[8][2] goal_depth;
+    int[64] board_depth;
 
     Side cur_side;
     ulong goal_line;
@@ -91,7 +92,9 @@ class GoalSearch
             bitix rix = msbindex(rabbits);
             ulong rbit = 1UL << rix;
             rabbits ^= rbit;
+
             int gdepth = find_unassisted(rbit, search_depth);
+            board_depth[rix] = gdepth;
             if (gdepth <= search_depth)
             {
                 int cur_goal = goals_found[Side.WHITE]++;
@@ -117,7 +120,10 @@ class GoalSearch
         {
             ulong rbit = rabbits & -rabbits;
             rabbits ^= rbit;
+            bitix rix = bitindex(rbit);
+
             int gdepth = find_unassisted(rbit, search_depth);
+            board_depth[rix] = gdepth;
             if (gdepth <= search_depth)
             {
                 int cur_goal = goals_found[Side.BLACK]++;

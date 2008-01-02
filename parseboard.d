@@ -49,7 +49,12 @@ int main(char[][] args)
     delete moves;
     std.gc.fullCollect();
 
-    writefln("FAME: %.2f\n", FAME(pos));
+    real slow_score = FAME(pos);
+    writefln("FAME: %.2f\n", slow_score);
+    FastFAME ffame = new FastFAME();
+    int fast_score = ffame.score(pos);
+    if (fast_score != cast(int)(slow_score))
+        writefln("Fast FAME score %d != slow fame score %d", fast_score, cast(int)(slow_score));
 
     GoalSearch gsearch = new GoalSearch();
     gsearch.set_start(pos);

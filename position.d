@@ -379,109 +379,112 @@ class Position
     bitix lastfrom;
     bool inpush;
 
-    invariant
+    debug (extra_checks)
     {
-        ulong usedsquares = 0;
-        foreach(int piece, ulong board; bitBoards)
+        invariant
         {
-            if ((usedsquares & board) != 0)
+            ulong usedsquares = 0;
+            foreach(int piece, ulong board; bitBoards)
             {
-                assert (0, "two pieces on same square");
+                if ((usedsquares & board) != 0)
+                {
+                    assert (0, "two pieces on same square");
+                }
+                usedsquares |= board;
+
+                if (piece == 0)
+                {
+                    if (placement[0] & board)
+                    {
+                        assert (0, "white placement contained empty square");
+                    }
+                    if (placement[1] & board)
+                    {
+                        assert (0, "black placement contained empty square");
+                    }
+                } else
+                {
+                    ulong places = placement[0];
+                    if (piece > Piece.WELEPHANT)
+                        places = placement[1];
+                    if (board != (board & places))
+                    {
+                        assert (0, "placement doesn't have some of the pieces, " ~ std.string.toString(piece));
+                    }
+                }
+
+                while (board)
+                {
+                    ulong piecebit = board & -board;
+                    board ^= piecebit;
+                    int pieceix = bitindex(piecebit);
+                    if (pieces[pieceix] != piece)
+                    {
+                        assert (0, "pieces array has wrong piece");
+                        return false;
+                    }
+                }
             }
-            usedsquares |= board;
-
-            if (piece == 0)
+            if (usedsquares != ALL_BITS_SET)
             {
-                if (placement[0] & board)
-                {
-                    assert (0, "white placement contained empty square");
-                }
-                if (placement[1] & board)
-                {
-                    assert (0, "black placement contained empty square");
-                }
-            } else
-            {
-                ulong places = placement[0];
-                if (piece > Piece.WELEPHANT)
-                    places = placement[1];
-                if (board != (board & places))
-                {
-                    assert (0, "placement doesn't have some of the pieces, " ~ std.string.toString(piece));
-                }
+                assert(0, format("not all squares were accounted for, %X", usedsquares));
             }
 
-            while (board)
+            ulong zcheck = ZOBRIST_STEP[stepsLeft];
+            if (side == Side.BLACK)
             {
-                ulong piecebit = board & -board;
-                board ^= piecebit;
-                int pieceix = bitindex(piecebit);
-                if (pieces[pieceix] != piece)
+                zcheck ^= ZOBRIST_SIDE;
+            }
+            if (inpush)
+            {
+                zcheck ^= ZOBRIST_INPUSH;
+            }
+            for (int pix=1; pix <= Piece.max; pix++)
+            {
+                ulong board = bitBoards[pix];
+                while (board)
                 {
-                    assert (0, "pieces array has wrong piece");
-                    return false;
+                    ulong piecebit = board & -board;
+                    bitix pieceix = bitindex(piecebit);
+                    zcheck ^= ZOBRIST_PIECE[pix][pieceix];
+                    board ^= piecebit;
                 }
             }
-        }
-        if (usedsquares != ALL_BITS_SET)
-        {
-            assert(0, format("not all squares were accounted for, %X", usedsquares));
-        }
+            zcheck ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
+            assert (zcheck == zobrist, "Incorrect zobrist encountered.");
 
-        ulong zcheck = ZOBRIST_STEP[stepsLeft];
-        if (side == Side.BLACK)
-        {
-            zcheck ^= ZOBRIST_SIDE;
-        }
-        if (inpush)
-        {
-            zcheck ^= ZOBRIST_INPUSH;
-        }
-        for (int pix=1; pix <= Piece.max; pix++)
-        {
-            ulong board = bitBoards[pix];
-            while (board)
+            ulong wneighbors = neighbors_of(placement[Side.WHITE]);
+            ulong bneighbors = neighbors_of(placement[Side.BLACK]);
+            ulong wstronger = placement[Side.WHITE];
+            ulong bstronger = placement[Side.BLACK];
+            ulong checkfrozen = 0;
+            for (int pix = 1; pix <= 6; pix++)
             {
-                ulong piecebit = board & -board;
-                bitix pieceix = bitindex(piecebit);
-                zcheck ^= ZOBRIST_PIECE[pix][pieceix];
-                board ^= piecebit;
+                wstronger ^= bitBoards[pix];
+                bstronger ^= bitBoards[pix+6];
+                checkfrozen |= bitBoards[pix] & neighbors_of(bstronger) & (~wneighbors);
+                checkfrozen |= bitBoards[pix+6] & neighbors_of(wstronger) & (~bneighbors);
             }
-        }
-        zcheck ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
-        assert (zcheck == zobrist, "Incorrect zobrist encountered.");
+            assert (checkfrozen == frozen, format("Incorrect frozen board encountered. %X, %X", frozen, checkfrozen));
 
-        ulong wneighbors = neighbors_of(placement[Side.WHITE]);
-        ulong bneighbors = neighbors_of(placement[Side.BLACK]);
-        ulong wstronger = placement[Side.WHITE];
-        ulong bstronger = placement[Side.BLACK];
-        ulong checkfrozen = 0;
-        for (int pix = 1; pix <= 6; pix++)
-        {
-            wstronger ^= bitBoards[pix];
-            bstronger ^= bitBoards[pix+6];
-            checkfrozen |= bitBoards[pix] & neighbors_of(bstronger) & (~wneighbors);
-            checkfrozen |= bitBoards[pix+6] & neighbors_of(wstronger) & (~bneighbors);
-        }
-        assert (checkfrozen == frozen, format("Incorrect frozen board encountered. %X, %X", frozen, checkfrozen));
-
-        for (int sqix = 0; sqix < 64; sqix++)
-        {
-            for (Side sideix = Side.WHITE; sideix < 2; sideix++)
+            for (int sqix = 0; sqix < 64; sqix++)
             {
-                ulong neighbors = neighbors_of(1UL << sqix) & placement[sideix];
-                Piece strong = Piece.EMPTY;
-                while (neighbors)
+                for (Side sideix = Side.WHITE; sideix < 2; sideix++)
                 {
-                    ulong nbit = neighbors & -neighbors;
-                    neighbors ^= nbit;
-                    bitix nix = bitindex(nbit);
-                    if (pieces[nix] > strong)
-                        strong = pieces[nix];
+                    ulong neighbors = neighbors_of(1UL << sqix) & placement[sideix];
+                    Piece strong = Piece.EMPTY;
+                    while (neighbors)
+                    {
+                        ulong nbit = neighbors & -neighbors;
+                        neighbors ^= nbit;
+                        bitix nix = bitindex(nbit);
+                        if (pieces[nix] > strong)
+                            strong = pieces[nix];
+                    }
+                    assert (strongest[sideix][sqix] == strong, 
+                            format("Incorrect strongest neighbor encountered. %d %d %d %d",
+                                   sideix, sqix, strong, strongest[sideix][sqix]));
                 }
-                assert (strongest[sideix][sqix] == strong, 
-                        format("Incorrect strongest neighbor encountered. %d %d %d %d",
-                               sideix, sqix, strong, strongest[sideix][sqix]));
             }
         }
     }
@@ -1819,37 +1822,172 @@ real FAME(Position pos, real scale = 33.695652173913032)
     return famescore / scale;
 }
 
-real fastFAME(Position pos, real scale = 33.695652173913032)
-{
-    static real[int] cache;
+const static int[] pop_offset = [24, 0, 4, 6, 8, 10, 11, 12, 16, 18, 20, 22, 23];
+const static int[] pop_mask = [0, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1];
 
-    int key;
+int population(Position pos)
+{
+    int count;
     if (pos.bitBoards[Piece.WELEPHANT])
-        key = 1;
+        count = 1 << pop_offset[Piece.WELEPHANT];
     if (pos.bitBoards[Piece.WCAMEL])
-        key |= 1 << 1;
-    key |= popcount(pos.bitBoards[Piece.WHORSE]) << 2;
-    key |= popcount(pos.bitBoards[Piece.WDOG]) << 4;
-    key |= popcount(pos.bitBoards[Piece.WCAT]) << 6;
-    key |= popcount(pos.bitBoards[Piece.WRABBIT]) << 8;
+        count |= 1 << pop_offset[Piece.WCAMEL];
+    count |= popcount(pos.bitBoards[Piece.WHORSE]) << pop_offset[Piece.WHORSE];
+    count |= popcount(pos.bitBoards[Piece.WDOG]) << pop_offset[Piece.WDOG];
+    count |= popcount(pos.bitBoards[Piece.WCAT]) << pop_offset[Piece.WCAT];
+    count |= popcount(pos.bitBoards[Piece.WRABBIT]) << pop_offset[Piece.WRABBIT];
 
     if (pos.bitBoards[Piece.BELEPHANT])
-        key |= 1 << 12;
+        count |= 1 << pop_offset[Piece.BELEPHANT];
     if (pos.bitBoards[Piece.BCAMEL])
-        key |= 1 << 13;
-    key |= popcount(pos.bitBoards[Piece.BHORSE]) << 14;
-    key |= popcount(pos.bitBoards[Piece.BDOG]) << 16;
-    key |= popcount(pos.bitBoards[Piece.BCAT]) << 18;
-    key |= popcount(pos.bitBoards[Piece.BRABBIT]) << 20;
+        count |= 1 << pop_offset[Piece.BCAMEL];
+    count |= popcount(pos.bitBoards[Piece.BHORSE]) << pop_offset[Piece.BHORSE];
+    count |= popcount(pos.bitBoards[Piece.BDOG]) << pop_offset[Piece.BDOG];
+    count |= popcount(pos.bitBoards[Piece.BCAT]) << pop_offset[Piece.BCAT];
+    count |= popcount(pos.bitBoards[Piece.BRABBIT]) << pop_offset[Piece.BRABBIT];
 
-    if (key in cache)
+    for (Piece p = Piece.WRABBIT; p < Piece.BELEPHANT; p++)
     {
-        return cache[key];
+        int p2c = pop2count(count, p);
+        int pc = popcount(pos.bitBoards[p]);
+        assert(p2c == pc, format("p2c %d != pc %d for %d from %X", p2c, pc, p, count));
     }
 
-    real score = FAME(pos, scale);
-    cache[key] = score;
-    return score;
+    return count;
+}
+
+int pop2count(int population, Piece piece)
+{
+    return (population >> pop_offset[piece]) & pop_mask[piece];
+}
+
+class FastFAME
+{
+    int[int] cache;
+    real scale;
+
+    this(real s = 33.695652173913032)
+    {
+        scale = s;
+    }
+
+    int score(Position pos)
+    {
+        return score(population(pos));
+    }
+
+    int score(int population)
+    {
+        if (population in cache)
+        {
+            return cache[population];
+        }
+
+        int score = cast(int)(popfame(population));
+        cache[population] = score;
+        return score;
+    }
+
+    real popfame(int population)
+    {
+        static const int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
+
+        real famescore = 0;
+
+        int wrabbits = pop2count(population, Piece.WRABBIT);
+        int brabbits = pop2count(population, Piece.BRABBIT);
+        int wr_left = wrabbits;
+        int br_left = brabbits;
+
+        Piece wp_ix = Piece.WELEPHANT;
+        int wused = 0;
+        Piece bp_ix = Piece.BELEPHANT;
+        int bused = 0;
+
+        for (int i=0; i < 8; i++)
+        {
+            Piece wpiece = Piece.EMPTY;
+            while (wpiece == Piece.EMPTY)
+            {
+                if (wp_ix != Piece.EMPTY 
+                        && (pop2count(population, wp_ix) - wused) > 0)
+                {
+                    wpiece = wp_ix;
+                    wused++;
+                } else {
+                    wp_ix--;
+                    wused = 0;
+                    if (wp_ix < Piece.WRABBIT)
+                    {
+                        wp_ix = Piece.EMPTY;
+                        break;
+                    }
+                }
+            }
+            
+            Piece bpiece = Piece.EMPTY;
+            while (bpiece == Piece.EMPTY)
+            {
+                if (bp_ix != Piece.EMPTY
+                        && (pop2count(population, bp_ix) - bused) > 0)
+                {
+                    bpiece = bp_ix;
+                    bused++;
+                } else {
+                    bp_ix--;
+                    bused = 0;
+                    if (bp_ix < Piece.BRABBIT)
+                    {
+                        bp_ix = Piece.EMPTY;
+                        break;
+                    }
+                }
+            }
+
+            if (wp_ix < Piece.WCAT && bp_ix < Piece.BCAT)
+                break;
+
+            if (wpiece <= Piece.WRABBIT)
+                wr_left--;
+
+            if (bpiece <= Piece.BRABBIT)
+                br_left--;
+
+            if (wpiece > bpiece - Piece.WELEPHANT)
+            {
+                famescore += matchscore[i];
+            } else if (wpiece < bpiece - Piece.WELEPHANT)
+            {
+                famescore -= matchscore[i];
+            }
+        }
+
+        int bpieces = 0;
+        for (Piece i=Piece.BCAT; i <= Piece.BELEPHANT; i++)
+        {
+            bpieces += pop2count(population, i);
+        }
+        if (bpieces || brabbits)
+        {
+            famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
+        } else {
+            famescore = 3369.562173913032;
+        }
+
+        int wpieces = 0;
+        for (Piece i=Piece.WCAT; i <= Piece.WELEPHANT; i++)
+        {
+            wpieces += pop2count(population, i);
+        }
+        if (wpieces || wrabbits)
+        {
+            famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
+        } else {
+            famescore = -3369.562173913032;
+        }
+
+        return famescore / scale;
+    }
 }
 
 class InvalidBoardException : Exception
