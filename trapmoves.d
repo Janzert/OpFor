@@ -103,7 +103,7 @@ class TrapGenerator
                         possibles ^= pbit;
                         bitix pix = bitindex(pbit);
 
-                        if ((nbit & pos.lastfrom) 
+                        if ((side == pos.side) && (nbit & pos.lastfrom) 
                                 && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
                         {
                             // can pull piece closer to trap
@@ -176,7 +176,7 @@ class TrapGenerator
             
             bitix tix = bitindex(tbit);
             ulong lastbit = 1UL << pos.lastfrom;
-            if ((t_neighbors & lastbit)
+            if ((side == pos.side) && (t_neighbors & lastbit)
                     && (t_neighbors & pos.bitBoards[Piece.EMPTY]))
             {
                 ulong possibles = neighbors_of(lastbit) & pos.placement[side^1];
@@ -217,7 +217,7 @@ class TrapGenerator
         if (tbit & pos.placement[side^1])
         {
             ulong pneighbors = neighbors_of(pbit);
-            if ((pneighbors & lastbit)
+            if ((side == pos.side) && (pneighbors & lastbit)
                     && (pos.lastfrom > pos.pieces[pix] + enemyoffset))
             {
                 add_capture(pos.pieces[tix], 1, pbit, lastbit);
@@ -281,9 +281,12 @@ class TrapGenerator
                                     ulong tobits = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
                                     if (pos.pieces[pnix] == Piece.WRABBIT + pieceoffset)
                                     {
-                                        tobits &= ~((pnbit & NOT_RANK_1) >> 8);
-                                    } else {
-                                        tobits &= ~((pnbit & NOT_RANK_8) << 8);
+                                        if (side == Side.WHITE)
+                                        {
+                                            tobits &= ~((pnbit & NOT_RANK_1) >> 8);
+                                        } else {
+                                            tobits &= ~((pnbit & NOT_RANK_8) << 8);
+                                        }
                                     }
                                     
                                     bool real_finish = false;
@@ -551,7 +554,7 @@ class TrapGenerator
                             if ((pos.pieces[perix] > pos.pieces[pnix] + enemyoffset)
                                     && (pos.pieces[perix] > pos.pieces[pix] + enemyoffset)
                                     && ((pos.pieces[perix] >= pos.strongest[side^1][pnix] + enemyoffset)
-                                        || (neighbors_of(pnix) & pos.placement[side] & ~perbit)))
+                                        || (neighbors_of(pnbit) & pos.placement[side] & ~perbit)))
                             {
                                 // pusher can finish it
                                 while (pushtos)
@@ -679,7 +682,7 @@ class TrapGenerator
                 }
             }
 
-            if ((lastbit & tbit)
+            if ((side == pos.side) && (lastbit & tbit)
                     && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
             {
                 // Can finish a pull onto the trap
@@ -1143,8 +1146,8 @@ class TrapGenerator
 
         if ((pos.strongest[side][p1ix] >= pos.pieces[p1ix] + enemyoffset)
                 && (pos.strongest[side][p2ix] >= pos.pieces[p2ix] + enemyoffset)
-                && (p1neighbors & pos.placement[side]
-                    & ~pos.frozen & ~(p2neighbors & pos.placement[side])))
+                && (p1neighbors & pos.placement[side] & ~pos.frozen)
+                && (p2neighbors & pos.placement[side] & ~pos.frozen))
         {
             ulong exclusive = p1neighbors & p2neighbors & pos.placement[side];
 

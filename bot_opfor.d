@@ -129,7 +129,7 @@ int on_trap(Position pos)
     const int FRAMED[13] = [0, -5, -7, -15, -30, -80, 150, 5, 7, 15, 30, 80, 150];
 
     int score = 0;
-    ulong occupied_traps = pos.placement[Side.WHITE] & TRAPS;
+    ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
     while (occupied_traps)
     {
         ulong tbit = occupied_traps & -occupied_traps;
@@ -285,7 +285,7 @@ int rabbit_open(Position pos)
             {
                 int rank = rix / 8;
                 score += NORABBIT_FILE[Side.BLACK][rank];
-                if (!(pos.placement[Side.BLACK] & rmask))
+                if (!(pos.placement[Side.WHITE] & rmask))
                 {
                     score += OPEN_FILE[Side.BLACK][rank];
                 }
@@ -698,6 +698,19 @@ class FullSearch : ABSearch
         }
 
         score = static_eval(pos);
+
+        debug (eval_bias)
+        {
+            Position reversed = pos.reverse();
+            int rscore = static_eval(reversed);
+            if (score != rscore)
+            {
+                writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                writefln("reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
+                throw new Exception(format("Biased eval, %d != %d", score, rscore));
+            }
+        }
+
         if (score >= beta)
             return score;
         if (score > alpha)
@@ -805,6 +818,18 @@ class FullSearch : ABSearch
                 real val = (score - fame.score(vpop)) * 0.15;
                 val = (val * (5 - pos.stepsLeft));
                 score -= cast(int)val;
+            }
+            debug (eval_trap)
+            {
+                writefln("trap:\n%s\n%s", "wb"[pos.side^1], pos.to_long_str());
+                writefln("lf %d, lp %d, ip %d", pos.lastfrom, pos.lastpiece, pos.inpush);
+                writefln("score %d, mvv %d, length %d, num %d", score, mvv, capLength, trap_search.num_captures);
+            }
+        } else {
+            debug (eval_trap)
+            {
+                writefln("no trap:\n%s\n%s", "wb"[pos.side^1], pos.to_long_str());
+                writefln("lf %d, lp %d, ip %d", pos.lastfrom, pos.lastpiece, pos.inpush);
             }
         }
 

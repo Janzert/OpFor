@@ -379,7 +379,7 @@ class Position
     bitix lastfrom;
     bool inpush;
 
-    debug (extra_checks)
+    debug (2)
     {
         invariant
         {
@@ -559,6 +559,7 @@ class Position
     this()
     {
         this.bitBoards[0] = ALL_BITS_SET;
+        this.lastfrom = 64;
         allocated++;
     }
 
@@ -643,7 +644,7 @@ class Position
         zobrist = 0;
 
         lastpiece = Piece.EMPTY;
-        lastfrom = 0;
+        lastfrom = 64;
         inpush = false;
     }
 
@@ -1390,6 +1391,39 @@ class Position
         Position.free(nullmove);
         return finished;
     }
+
+    Position reverse()
+    {
+        Position rpos = Position.allocate();
+        rpos.clear();
+
+        rpos.side = cast(Side)(side^1);
+        rpos.stepsLeft = stepsLeft;
+        if (lastpiece != Piece.EMPTY)
+        {
+            rpos.lastpiece = (lastpiece < Piece.BRABBIT) ?
+                cast(Piece)(lastpiece+6) : cast(Piece)(lastpiece-6);
+            rpos.lastfrom = cast(bitix)(63-lastfrom);
+        }
+        rpos.inpush = inpush;
+
+        for (int ix=0; ix < 64; ix++)
+        {
+            ulong pbit = 1UL << ix;
+            Piece piece = pieces[63-ix];
+            if (piece != Piece.EMPTY)
+            {
+                piece = (piece < Piece.BRABBIT) ?
+                    cast(Piece)(piece+6) : cast(Piece)(piece-6);
+                rpos.pieces[ix] = piece;
+                rpos.bitBoards[piece] |= pbit;
+                rpos.bitBoards[Piece.EMPTY] &= ~pbit;
+                rpos.placement[(piece < Piece.BRABBIT) ? Side.WHITE : Side.BLACK] |= pbit;
+            }
+        }
+        rpos.update_derived();
+        return rpos;
+    }
 }
 
 class PosStore
@@ -1971,7 +2005,7 @@ class FastFAME
         {
             famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
         } else {
-            famescore = 3369.562173913032;
+            return 3369.562173913032 / scale;
         }
 
         int wpieces = 0;
@@ -1983,7 +2017,7 @@ class FastFAME
         {
             famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
         } else {
-            famescore = -3369.562173913032;
+            return -3369.562173913032 / scale;
         }
 
         return famescore / scale;
