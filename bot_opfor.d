@@ -126,7 +126,7 @@ int on_trap(Position pos)
 {
     const int ON_TRAP[13] = [0, -1, -2, -4, -8, -15, -20, 1, 2, 4, 8, 15, 20];
     const int PINNED[13] = [0, -3, -8, -10, -20, -40, -55, 3, 8, 10, 20, 40, 55];
-    const int FRAMED[13] = [0, -5, -7, -15, -30, -80, 150, 5, 7, 15, 30, 80, 150];
+    const int FRAMED[13] = [0, -5, -7, -15, -30, -80, -150, 5, 7, 15, 30, 80, 150];
 
     int score = 0;
     ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
@@ -169,19 +169,27 @@ int on_trap(Position pos)
     return score;
 }
 
-int central_elephant(Position pos)
+int map_elephant(Position pos)
 {
-    const int CENTRAL_E_BONUS = 6;
-    const ulong emap = 0x0000183C3C180000UL;
+    const int[] CENTRAL_MAP =
+        [0, 1, 1, 2, 2, 1, 1, 0,
+         1, 2, 2, 3, 3, 2, 2, 1,
+         1, 2, 1, 4, 4, 1, 2, 1,
+         2, 3, 4, 4, 4, 4, 3, 2,
+         2, 3, 4, 4, 4, 4, 3, 2,
+         1, 2, 1, 4, 4, 1, 2, 1,
+         1, 2, 2, 3, 3, 2, 2, 1,
+         0, 1, 1, 2, 2, 1, 1, 0];
 
     int score = 0;
-    if (emap & pos.bitBoards[Piece.WELEPHANT])
-        score += CENTRAL_E_BONUS;
-    if (emap & pos.bitBoards[Piece.BELEPHANT])
-        score -= CENTRAL_E_BONUS;
+    if (pos.bitBoards[Piece.WELEPHANT])
+        score += CENTRAL_MAP[bitindex(pos.bitBoards[Piece.WELEPHANT])];
+    if (pos.bitBoards[Piece.BELEPHANT])
+        score -= CENTRAL_MAP[bitindex(pos.bitBoards[Piece.BELEPHANT])];
 
     return score;
 }
+
 
 int frozen_pieces(Position pos)
 {
@@ -318,8 +326,8 @@ int rabbit_strength(Position pos, GoalSearch goals)
           0, 45, 60, 150, 200, 300]];
     const static real[] distval = [1.0, 1.0, 1.0, 0.9, 0.7,
           0.3, 0.2, 0.15, 0.10, 0.05, 0.04, 0.03, 0.02, 0.01, 0, 0];
-    const static real[][] rankval = [[0.2, 0, 0, 0.1, 0.5, 1.0, 1.5, 0],
-          [0, -1.5, -1.0, -0.5, -0.1, 0, 0, -0.2]];
+    const static real[][] rankval = [[0, 0, 0, 0, 0.5, 1.0, 1.5, 0],
+          [0, -1.5, -1.0, -0.5, 0, 0, 0, 0]];
     const static real[] goalval = [1.0,
           1.0, 1.0, 1.0, 1.0,
           1.0, 1.0, 1.0, 0.9,
@@ -463,17 +471,24 @@ class ScoreSearch : ABSearch
     }
 }
 
+struct PositionRecord
+{
+    ulong position_key;
+    int total_seen;
+    int gold_wins;
+}
+
 class FullSearch : ABSearch
 {
     GoalSearch goal_searcher;
     TrapGenerator trap_search;
     FastFAME fame;
 
-    int nodes_quiesced = 0;
+    ulong nodes_quiesced = 0;
     int cur_qdepth = 0;
     
+    real map_e_w = 1;
     real tsafety_w = 2;
-    real centralel_w = 1;
     real frozen_w = 1;
     real ontrap_w = 1;
     real rwall_w = 1;
@@ -481,10 +496,10 @@ class FullSearch : ABSearch
     real rstrength_w = 1;
     real pstrength_w = 1;
     real goal_w = 1;
+    real static_trap_w = 0;
     real random_w = 0;
     int do_qsearch = 1;
     int min_qdepth = -8;
-    bool static_trap = false;
     
     this()
     {
@@ -505,11 +520,11 @@ class FullSearch : ABSearch
         bool handled = true;
         switch (option)
         {
+            case "eval_map_e":
+                map_e_w = toReal(value);
+                break;
             case "eval_tsafety":
                 tsafety_w = toReal(value);
-                break;
-            case "eval_centralel":
-                centralel_w = toReal(value);
                 break;
             case "eval_frozen":
                 frozen_w = toReal(value);
@@ -542,7 +557,7 @@ class FullSearch : ABSearch
                 min_qdepth = toInt(value);
                 break;
             case "eval_static_trap":
-                static_trap = cast(bool)(toInt(value));
+                static_trap_w = toReal(value);
                 break;
             default:
                 handled = super.set_option(option, value);
@@ -709,6 +724,7 @@ class FullSearch : ABSearch
                 writefln("reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
                 throw new Exception(format("Biased eval, %d != %d", score, rscore));
             }
+            Position.free(reversed);
         }
 
         if (score >= beta)
@@ -795,7 +811,7 @@ class FullSearch : ABSearch
         int score = fame.score(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
 
-        if (static_trap && trap_search.find_captures(pos, cast(Side)(pos.side^1)))
+        if ((static_trap_w != 0) && trap_search.find_captures(pos, cast(Side)(pos.side^1)))
         {
             Piece mvv = Piece.EMPTY;
             int capLength;
@@ -815,9 +831,9 @@ class FullSearch : ABSearch
                 int vcnt = pop2count(pop, mvv) - 1;
                 int vpop = pop & ~(pop_mask[mvv] << pop_offset[mvv]);
                 vpop |= vcnt << pop_offset[mvv];
-                real val = (score - fame.score(vpop)) * 0.15;
-                val = (val * (5 - pos.stepsLeft));
-                score -= cast(int)val;
+                real val = score - fame.score(vpop);
+                //val = (val * (5 - pos.stepsLeft));
+                score -= cast(int)val * static_trap_w;
             }
             debug (eval_trap)
             {
@@ -830,14 +846,16 @@ class FullSearch : ABSearch
             {
                 writefln("no trap:\n%s\n%s", "wb"[pos.side^1], pos.to_long_str());
                 writefln("lf %d, lp %d, ip %d", pos.lastfrom, pos.lastpiece, pos.inpush);
+                writefln("score %d", score);
             }
         }
 
         goal_searcher.set_start(pos);
         goal_searcher.find_goals(16);
 
+        score += map_elephant(pos) * map_e_w;
+
         score += trap_safety(pos) * tsafety_w;
-        score += central_elephant(pos) * centralel_w;
         score += frozen_pieces(pos) * frozen_w;
         score += on_trap(pos) * ontrap_w;
         score += rabbit_wall(pos) * rwall_w;
@@ -857,7 +875,7 @@ class FullSearch : ABSearch
         if (goal_searcher.goals_found[pos.side]
                 && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
         {
-                // score = (WIN_SCORE-10) - goal_searcher.goal_depth[pos.side][0];
+                //score = (WIN_SCORE-10) - goal_searcher.goal_depth[pos.side][0];
                 score = WIN_SCORE;
         } else { 
             if (goal_searcher.goals_found[pos.side])
@@ -935,6 +953,11 @@ class Engine : AEIEngine
 
     int max_depth;
 
+    const static int BOOK_SIZE = 1000000;
+    PositionRecord[] opening_book;
+    bool position_record = false;
+
+
     this()
     {
         searcher = new FullSearch();
@@ -944,9 +967,45 @@ class Engine : AEIEngine
         searcher.tournament_rules = false;
     }
 
+    void new_game()
+    {
+        if (position_record && past.length > 3)
+        {
+            int record_length = (past.length < 60) ? past.length : 60;
+            for (int i=3; i < record_length; i++)
+            {
+                int key = past[i].zobrist % opening_book.length;
+                if (opening_book[key].position_key != past[i].zobrist)
+                {
+                    opening_book[key].position_key = past[i].zobrist;
+                    opening_book[key].total_seen = 0;
+                    opening_book[key].gold_wins = 0;
+                }
+                opening_book[key].total_seen++;
+                if (position.side == Side.WHITE)
+                    opening_book[key].gold_wins++;
+            }
+        }
+        super.new_game();
+    }
+
     bool set_option(char[] option, char[] value)
     {
-        return searcher.set_option(option, value);
+        bool handled = true;
+        switch (option)
+        {
+            case "opening_book":
+                position_record = cast(bool)toInt(value);
+                if (position_record)
+                {
+                    if (opening_book.length == 0)
+                        opening_book.length = BOOK_SIZE;
+                }
+                break;
+            default:
+                handled = searcher.set_option(option, value);
+        }
+        return handled;
     }
 
     void start_search()
@@ -1027,6 +1086,21 @@ class Engine : AEIEngine
             int score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
+
+            if (position_record)
+            {
+                int key = pos.zobrist % opening_book.length;
+                if (opening_book[key].position_key == pos.zobrist
+                        && opening_book[key].total_seen)
+                {
+                    int val = (opening_book[key].gold_wins - 
+                            (opening_book[key].total_seen - opening_book[key].gold_wins)) * 10;
+                    if (pos.side == Side.BLACK)
+                        val = -val;
+                    score += val;
+                    writefln("Saw position in book added %d to %d score.", val, score);
+                }
+            }
 
             if (score > best_score)
             {
@@ -1355,7 +1429,7 @@ int main(char[][] args)
                         d_time reserve_cutoff = cast(d_time)(((move_start + (tc_max_search * TicksPerSecond))
                                     - last_decision_change) * tc_tld) + last_decision_change;
                         d_time end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
-                        end_search += cast(d_time)(0.5 * TicksPerSecond);
+                        end_search += cast(d_time)(0.1 * TicksPerSecond);
                         tc_min_search = (end_search - move_start) / TicksPerSecond;
                         server.info(format("log next min_search set to %d", tc_min_search));
                     } else {
