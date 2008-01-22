@@ -61,11 +61,13 @@ int main(char[][] args)
     gsearch.find_goals(30);
     if (gsearch.goals_found[Side.WHITE] > 0)
     {
-        writefln("White has a goal in %d unopposed steps.", gsearch.goal_depth[Side.WHITE][0]);
+        writefln("White has a goal in %d unopposed steps from %d.", gsearch.goal_depth[Side.WHITE][0],
+                gsearch.rabbit_location[Side.WHITE][0]);
     }
     if (gsearch.goals_found[Side.BLACK] > 0)
     {
-        writefln("Black has a goal in %d unopposed steps.", gsearch.goal_depth[Side.BLACK][0]);
+        writefln("Black has a goal in %d unopposed steps from %d.", gsearch.goal_depth[Side.BLACK][0],
+                gsearch.rabbit_location[Side.BLACK][0]);
     }
 
     TrapGenerator tgen = new TrapGenerator();
@@ -75,8 +77,8 @@ int main(char[][] args)
         writefln("Can capture:");
         for (int i=0; i < tgen.num_captures; i++)
         {
-            writefln("  %s in %d steps %s first", piece_names[tgen.piece_captured[i]],
-                    tgen.capture_steps[i], tgen.first_step[i]);
+            writefln("  %s in %d steps %s first", piece_names[tgen.captures[i].victim],
+                    tgen.captures[i].length, tgen.captures[i].first_step);
         }
         writefln("");
     }

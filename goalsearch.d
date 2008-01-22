@@ -86,14 +86,20 @@ class GoalSearch
     {
         set_side(Side.WHITE);
         goals_found[Side.WHITE] = 0;
-        ulong rabbits = start.bitBoards[Piece.WRABBIT] & ~start.frozen;
+        ulong rabbits = start.bitBoards[Piece.WRABBIT];
         while (rabbits)
         {
             bitix rix = msbindex(rabbits);
             ulong rbit = 1UL << rix;
             rabbits ^= rbit;
 
-            int gdepth = find_unassisted(rbit, search_depth);
+            int gdepth;
+            if (rbit & start.frozen)
+            {
+                gdepth = search_depth + 1;
+            } else {
+                gdepth = find_unassisted(rbit, search_depth);
+            }
             board_depth[rix] = gdepth;
             if (gdepth <= search_depth)
             {
@@ -115,14 +121,20 @@ class GoalSearch
 
         set_side(Side.BLACK);
         goals_found[Side.BLACK] = 0;
-        rabbits = start.bitBoards[Piece.BRABBIT] & ~start.frozen;
+        rabbits = start.bitBoards[Piece.BRABBIT];
         while (rabbits)
         {
             ulong rbit = rabbits & -rabbits;
             rabbits ^= rbit;
             bitix rix = bitindex(rbit);
 
-            int gdepth = find_unassisted(rbit, search_depth);
+            int gdepth;
+            if (rbit & start.frozen)
+            {
+                gdepth = search_depth + 1;
+            } else {
+                gdepth = find_unassisted(rbit, search_depth);
+            }
             board_depth[rix] = gdepth;
             if (gdepth <= search_depth)
             {
