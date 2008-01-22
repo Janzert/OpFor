@@ -122,11 +122,11 @@ int trap_safety(Position pos)
 }
 
 // penalty for piece on trap, pinned or framed
-int on_trap(Position pos, real pin_w, real framer_w)
+int on_trap(Position pos)
 {
     const int ON_TRAP[13] = [0, -10, -15, -19, -31, -56, -132, 10, 15, 19, 31, 56, 132];
-    const int PINNED[13] = [0, 0, -15, -29, -47, -85, -199, 0, 15, 29, 47, 85, 199];
-    //const int FRAMED[13] = [0, -20, -30, -38, -62, -112, -264, 20, 30, 38, 62, 112, 264];
+    const int PINNED[13] = [0, 0, -4, -8, -14, -25, -59, 0, 4, 8, 14, 25, 59];
+    const int FRAMER[13] = [0, 0, -1, -2, -4, -8, -19, 0, 1, 2, 4, 8, 19];
 
     int score = 0;
     ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
@@ -145,7 +145,7 @@ int on_trap(Position pos, real pin_w, real framer_w)
         if (popcount(fneighbors) == 1)
         {
             bitix fix = bitindex(fneighbors);
-            score += PINNED[pos.pieces[fix]] * pin_w;
+            score += PINNED[pos.pieces[fix]];
 
             tneighbors ^= fneighbors;
             if (tpiece == Piece.WRABBIT)
@@ -173,14 +173,12 @@ int on_trap(Position pos, real pin_w, real framer_w)
                         epiece = pos.strongest[tside^1][eix];
                     else
                         epiece = pos.pieces[eix];
-                    framing_score += PINNED[epiece];
+                    framing_score += FRAMER[epiece];
                 }
                 if (framed)
                 {
                     score += ON_TRAP[tpiece];
-                    score += framing_score * framer_w;
-                    //writefln("%s", pos.to_long_str());
-                    //writefln("Adding frame for %d, f_s %.2f, w %.2f", tpiece, framing_score, pin_w);
+                    score += framing_score;
                 }
             }
         }
@@ -543,8 +541,6 @@ class FullSearch : ABSearch
     real map_e_w = 1;
     real tsafety_w = 0;
     real ontrap_w = 3;
-    real pin_w = 0;
-    real framer_w = 0;
     real frozen_w = 1;
     real rwall_w = 1;
     real ropen_w = 1;
@@ -588,12 +584,6 @@ class FullSearch : ABSearch
                 break;
             case "eval_ontrap":
                 ontrap_w = toReal(value);
-                break;
-            case "eval_pin":
-                pin_w = toReal(value);
-                break;
-            case "eval_framer":
-                framer_w = toReal(value);
                 break;
             case "eval_rwall":
                 rwall_w = toReal(value);
@@ -998,7 +988,7 @@ class FullSearch : ABSearch
         score += map_elephant(pos) * map_e_w;
 
         //score += trap_safety(pos) * tsafety_w; No weight tested showed improvement
-        score += on_trap(pos, pin_w, framer_w) * ontrap_w;
+        score += on_trap(pos) * ontrap_w;
         score += frozen_pieces(pos) * frozen_w;
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
