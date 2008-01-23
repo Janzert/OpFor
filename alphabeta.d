@@ -17,6 +17,21 @@ struct TTNode
     SType type;
     Step beststep;
     bool aged;
+
+    void set(Position pos, int newdepth, int newscore, SType newtype, Step newbstep)
+    {
+        if (aged 
+                || depth < newdepth
+                || zobrist == pos.zobrist)
+        {
+            zobrist = pos.zobrist;
+            depth = newdepth;
+            score = newscore;
+            type = newtype;
+            beststep = newbstep;
+            aged = false;
+        }
+    }
 }
 
 class TransTable
@@ -37,23 +52,38 @@ class TransTable
     TTNode* get(Position pos)
     {
         int key = pos.zobrist % store.length;
-        return &store[key];
-    }
-
-    void set(Position pos, int depth, int score, SType type, Step bstep)
-    {
-        int key = pos.zobrist % store.length;
-        if (store[key].aged 
-                || store[key].depth < depth
-                || store[key].zobrist == pos.zobrist)
+        TTNode* node = &store[key];
+        if (store[key].zobrist != pos.zobrist)
         {
-            store[key].zobrist = pos.zobrist;
-            store[key].depth = depth;
-            store[key].score = score;
-            store[key].type = type;
-            store[key].beststep = bstep;
-            store[key].aged = false;
+            key = (key + 1) % store.length;
+            if (store[key].zobrist == pos.zobrist)
+            {
+                node = &store[key];
+            } else {
+                if (!node.aged && node.depth > store[key].depth)
+                {
+                    node = &store[key];
+                }
+                key = (key + 1) % store.length;
+                if (store[key].zobrist == pos.zobrist)
+                {
+                    node = &store[key];
+                } else {
+                    if (!node.aged && node.depth > store[key].depth)
+                    {
+                        node = &store[key];
+                    }
+                    key = (key + 1) % store.length;
+                    if (node.aged
+                            || store[key].zobrist == pos.zobrist
+                            || node.depth > store[key].depth)
+                    {
+                        node = &store[key];
+                    }
+                }
+            }
         }
+        return node;
     }
 
     void age()
@@ -296,7 +326,7 @@ class ABSearch
             StepList.free(steps);
         }
 
-        ttable.set(pos, depth, score, sflag, new_best);
+        node.set(pos, depth, score, sflag, new_best);
 
         return score;
     }

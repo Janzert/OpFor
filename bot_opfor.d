@@ -541,7 +541,7 @@ class FullSearch : ABSearch
     real map_e_w = 1;
     real tsafety_w = 0;
     real ontrap_w = 3;
-    real frozen_w = 1;
+    real frozen_w = 10;
     real rwall_w = 1;
     real ropen_w = 1;
     real rhome_w = 0;
@@ -727,6 +727,7 @@ class FullSearch : ABSearch
         } else {
             pos.get_steps(steps);
         }
+        int best_ix = -1;
         for (int six = 0; six < steps.numsteps; six++)
         {
             nodes_searched++;
@@ -758,6 +759,8 @@ class FullSearch : ABSearch
             if (cal > score)
             {
                 score = cal;
+                best_ix = six;
+
                 if (cal > alpha)
                 {
                     alpha = cal;
@@ -771,11 +774,16 @@ class FullSearch : ABSearch
                 }
             }
         }
-        StepList.free(steps);
 
         Step bstep;
-        bstep.clear();
-        ttable.set(pos, depth, score, sflag, bstep);
+        if (best_ix != -1)
+        {
+           bstep = steps.steps[best_ix];
+        } else {
+            bstep.clear();
+        }
+        node.set(pos, depth, score, sflag, bstep);
+        StepList.free(steps);
 
         return score;
     }
