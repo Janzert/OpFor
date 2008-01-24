@@ -243,14 +243,28 @@ int rabbit_wall(Position pos)
         {
             ulong rbit = rabbits & -rabbits;
             rabbits ^= rbit;
-            ulong ladjacent = rbit << 1 & rbit << 9 & rbit >> 7;
-            if (ladjacent & rcandd)
+
+            ulong ladjacent = rbit & ~A_FILE;
+            if (ladjacent)
             {
+                ladjacent = (ladjacent << 1) | (ladjacent << 9) | (ladjacent >> 7);
+                if (ladjacent & rcandd)
+                {
+                    score += BLOCKING_BONUS[s];
+                }
+            } else {
                 score += BLOCKING_BONUS[s];
             }
-            ulong radjacent = rbit >> 1 & rbit >> 9 & rbit << 7;
-            if (radjacent & rcandd)
+
+            ulong radjacent = rbit & ~H_FILE;
+            if (radjacent)
             {
+                radjacent = (radjacent >> 1) | (radjacent >> 9) | (radjacent << 7);
+                if (radjacent & rcandd)
+                {
+                    score += BLOCKING_BONUS[s];
+                }
+            } else {
                 score += BLOCKING_BONUS[s];
             }
         }
@@ -278,10 +292,12 @@ int rabbit_open(Position pos)
             ulong mask = H_FILE << rix;
             if (!(pos.bitBoards[Piece.BRABBIT] & mask))
             {
+                bool open_file = false;
                 int rank = rix/8;
                 score += NORABBIT_FILE[Side.WHITE][rank];
                 if (!(pos.placement[Side.BLACK] & mask))
                 {
+                    open_file = true;
                     score += OPEN_FILE[Side.WHITE][rank];
                 }
                 ulong adj_mask = 0;
@@ -289,11 +305,11 @@ int rabbit_open(Position pos)
                     adj_mask = H_FILE << (rix+7);
                 if (file != 7)
                     adj_mask |= H_FILE << (rix+9);
-                adj_mask &= NOT_RANK_8;
                 if (!(pos.bitBoards[Piece.BRABBIT] & adj_mask))
                 {
                     score += NORABBIT_ADJ[Side.WHITE][rank];
-                    if (!(pos.placement[Side.BLACK] & adj_mask))
+                    adj_mask &= NOT_RANK_8;
+                    if (open_file && !(pos.placement[Side.BLACK] & adj_mask))
                     {
                         score += OPEN_ADJ[Side.WHITE][rank];
                     }
@@ -308,22 +324,24 @@ int rabbit_open(Position pos)
             ulong rmask = A_FILE >> (63-rix);
             if (!(pos.bitBoards[Piece.WRABBIT] & rmask))
             {
+                bool open_file = false;
                 int rank = rix / 8;
                 score += NORABBIT_FILE[Side.BLACK][rank];
                 if (!(pos.placement[Side.WHITE] & rmask))
                 {
+                    open_file = true;
                     score += OPEN_FILE[Side.BLACK][rank];
                 }
                 ulong adj_mask = 0;
                 if (file != 0)
-                    adj_mask = A_FILE >> ((63+9) - rix);
+                    adj_mask = A_FILE >> (63 - (rix-9));
                 if (file != 7)
-                    adj_mask |= A_FILE >> ((63+7) - rix);
-                adj_mask &= NOT_RANK_1;
+                    adj_mask |= A_FILE >> (63 - (rix-7));
                 if (!(pos.bitBoards[Piece.WRABBIT] & adj_mask))
                 {
                     score += NORABBIT_ADJ[Side.BLACK][rank];
-                    if (!(pos.placement[Side.WHITE] & adj_mask))
+                    adj_mask &= NOT_RANK_1;
+                    if (open_file && !(pos.placement[Side.WHITE] & adj_mask))
                     {
                         score += OPEN_ADJ[Side.BLACK][rank];
                     }
@@ -337,23 +355,18 @@ int rabbit_open(Position pos)
 
 int rabbit_home(Position pos)
 {
-    const static int[][] homeval = [[2, 1, 0, 0, 0, 0, 0, 0],
-          [0, 0, 0, 0, 0, 0, -1, -2]];
-
+    const static int[] side_mul = [1, -1];
+    const static ulong[][] side_rank = [[RANK_1, RANK_2], [RANK_8, RANK_7]];
+    
     int score = 0;
     for (Side side = Side.WHITE; side <= Side.BLACK; side++)
     {
         Piece rpiece = (side == Side.WHITE) ? Piece.WRABBIT : Piece.BRABBIT;
         ulong rabbits = pos.bitBoards[rpiece];
-        while (rabbits)
-        {
-            ulong rbit = rabbits & -rabbits;
-            rabbits ^= rbit;
-            bitix rix = bitindex(rbit);
-            
-            score += homeval[side][rix/8];
-        }
+        score += popcount(side_rank[side][0] & rabbits) * 2 * side_mul[side];
+        score += popcount(side_rank[side][1] & rabbits) * side_mul[side];
     }
+
     return score;
 }
 
