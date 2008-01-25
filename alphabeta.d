@@ -1,5 +1,6 @@
 
 import std.conv;
+import std.stdio;
 
 import position;
 
@@ -97,19 +98,19 @@ class TransTable
 
 class HistoryHeuristic
 {
-    int[64][64][2] score;
+    uint[64][64][2] score;
 
-    int get_score(Position pos, Step step)
+    uint get_score(Position pos, Step step)
     {
         return score[pos.side][step.fromix][step.toix];
     }
 
     void update(Position pos, Step step, int depth)
     {
-        score[pos.side][step.fromix][step.toix] += 1 << depth;
+        score[pos.side][step.fromix][step.toix] += depth + 1;
     }
 
-    void soften()
+    void age()
     {
         for (int s=0; s < 2; s++)
         {
@@ -124,40 +125,44 @@ class HistoryHeuristic
     }
 }
 
-
 class ABSearch
 {
     TransTable ttable;
-    // HistoryHeuristic cuthistory;
+    HistoryHeuristic cuthistory;
     Position nullmove;
 
     ulong nodes_searched;
     ulong tthits;
 
     bool tournament_rules;
+    bool use_history;
 
     this()
     {
         ttable = new TransTable(10);
-        // cuthistory = new HistoryHeuristic();
+        cuthistory = new HistoryHeuristic();
         nodes_searched = 0;
         tthits = 0;
         tournament_rules = true;
+        use_history = false;
     }
 
     bool set_option(char[] option, char[] value)
     {
-        bool handled = false;
+        bool handled = true;
         switch (option)
         {
             case "hash":
                 try
                 {
                     ttable.set_size(toInt(value));
-                    handled = true;
                 } catch (ConvError e) { }
                 break;
+            case "history":
+                use_history = cast(bool)(toInt(value));
+                break;
             default:
+                handled = false;
                 break;
         }
         return handled;
@@ -180,8 +185,8 @@ class ABSearch
                 steps.steps[bix].copy(steps.steps[0]);
                 steps.steps[0].copy(*best);
             }
-        } /* else if (0) {
-            int score = cuthistory.get_score(pos, steps.steps[num]);
+        } else if (use_history) {
+            uint score = cuthistory.get_score(pos, steps.steps[num]);
             int bix = num;
             for (int i = num+1; i < steps.numsteps; i++)
             {
@@ -196,7 +201,7 @@ class ABSearch
             Step tmp = steps.steps[num];
             steps.steps[num] = steps.steps[bix];
             steps.steps[bix] = tmp;
-        } */
+        }
     }
 
     int eval(Position pos, int alpha, int beta)
@@ -317,10 +322,10 @@ class ABSearch
             {
                 nodes_searched += steps.numsteps;
             }
-            /*if (0 && sflag != SType.ALPHA)
+            if (sflag != SType.ALPHA)
             {
                 cuthistory.update(pos, steps.steps[best_ix], depth);
-            }*/
+            }
             
             new_best = steps.steps[best_ix];
             StepList.free(steps);
@@ -340,6 +345,7 @@ class ABSearch
     void cleanup()
     {
         ttable.age();
+        cuthistory.age();
     }
 }
 
