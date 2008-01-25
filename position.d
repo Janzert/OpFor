@@ -898,6 +898,62 @@ class Position
         return boardstr;
     }
 
+    char[] to_placing_move(int side=-1)
+    {
+        const static char[] piece_char = " RCDHMErcdhme";
+
+	char[] mstr;
+        if (side == 0 || side == -1)
+        {
+            if (side == -1)
+            {
+                mstr ~= "w ";
+            }
+
+            for (Piece p = Piece.WRABBIT; p <= Piece.WELEPHANT; p++)
+            {
+                ulong pieces = bitBoards[p];
+                while (pieces)
+                {
+                    ulong pbit = pieces & -pieces;
+                    pieces ^= pbit;
+                    bitix pix = bitindex(pbit);
+                    
+                    mstr ~= piece_char[p];
+                    mstr ~= ix_to_alg(pix);
+                    mstr ~= " ";
+                }
+            }
+        }
+
+        if (side == 1 || side == -1)
+        {
+            if (side == -1)
+            {
+                mstr ~= "b ";
+            }
+
+            for (Piece p = Piece.BRABBIT; p <= Piece.WELEPHANT; p++)
+            {
+                ulong pieces = bitBoards[p];
+                while (pieces)
+                {
+                    ulong pbit = pieces & -pieces;
+                    pieces ^= pbit;
+                    bitix pix = bitindex(pbit);
+
+                    mstr ~= piece_char[p];
+                    mstr ~= ix_to_alg(pix);
+                    mstr ~= " ";
+                }
+            }
+        }
+
+        return mstr;
+    }
+
+
+
     private void updatefrozen(Side side, Piece piece, Step step)
     {
         Side oside = cast(Side)(side ^ 1);
@@ -1716,6 +1772,37 @@ Position parse_short_str(Side side, int steps, char[] boardstr)
         bitboards[piece] |= 1UL << (63-squareix);
     }
     return new Position(side, steps, bitboards);
+}
+
+char[] random_setup_move(Side side)
+{
+    char[] setup;
+
+    char[] piece_chars;
+    piece_chars = "RRRRRRRRCCDDHHME".dup;
+    char[] rank_chars = "12";
+    if (side == Side.BLACK)
+    {
+        piece_chars = "rrrrrrrrccddhhme".dup;
+        rank_chars = "87";
+    }
+
+    for (int i=0; i < 16; i++)
+    {
+        int pix = rand() % (piece_chars.length);
+        char piece = piece_chars[pix];
+        piece_chars[pix] = piece_chars[length-1];
+        piece_chars.length = piece_chars.length - 1;
+
+        int start = setup.length;
+        setup.length = setup.length + 4;
+        setup[start] = piece;
+        setup[start+1] = "abcdefgh"[i % 8];
+        setup[start+2] = rank_chars[i / 8];
+        setup[start+3] = ' ';
+    }
+
+    return setup;
 }
 
 struct PlayoutResult 

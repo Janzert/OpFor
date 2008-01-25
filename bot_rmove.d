@@ -96,6 +96,9 @@ int main(char[][] args)
                     engine.start_search();
                     server.clear_cmd();
                     break;
+		case ServerCmd.CmdType.STOP:
+		    server.clear_cmd();
+		    break;
                 case ServerCmd.CmdType.MAKEMOVE:
                     MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
                     writefln("received move %s", mcmd.move);
@@ -103,6 +106,9 @@ int main(char[][] args)
                     writefln(engine.position.to_long_str());
                     server.clear_cmd();
                     break;
+		case ServerCmd.CmdType.SETOPTION:
+		    server.clear_cmd();
+		    break;
                 default:
                     throw new Exception("Unhandled server command in main loop.");
             }

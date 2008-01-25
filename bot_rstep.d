@@ -24,16 +24,18 @@ class Engine : AEIEngine
     {
         if (past.length == 0) // white setup move
         {
-            bestmove = "Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Ha2 Db2 Cc2 Md2 Ee2 Cf2 Dg2 Hh2";
+            //bestmove = "Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Ha2 Db2 Cc2 Md2 Ee2 Cf2 Dg2 Hh2";
+            bestmove = random_setup_move(Side.WHITE);
             state = EngineState.MOVESET;
         } else if (past.length == 1)
         {
-            if (position.pieces[11] == Piece.WELEPHANT)
+            /*if (position.pieces[11] == Piece.WELEPHANT)
             {
                 bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ha7 db7 cc7 ed7 me7 cf7 dg7 hh7";
             } else {
                 bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ha7 db7 cc7 md7 ee7 cf7 dg7 hh7";
-            }
+            }*/
+            bestmove = random_setup_move(Side.BLACK);
             state = EngineState.MOVESET;
         } else {
             search_pos = position.dup;
@@ -125,6 +127,9 @@ int main(char[][] args)
                     engine.make_move(mcmd.move);
                     server.clear_cmd();
                     break;
+		case ServerCmd.CmdType.SETOPTION:
+		    server.clear_cmd();
+		    break;
                 default:
                     throw new Exception("Unhandled server command in main loop.");
             }
