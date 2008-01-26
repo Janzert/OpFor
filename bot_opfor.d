@@ -11,7 +11,6 @@ import alphabeta;
 import aeibot;
 import goalsearch;
 import position;
-import trapmoves;
 
 const char[] BOT_NAME = "OpFor";
 const char[] BOT_AUTHOR = "Janzert";
@@ -546,7 +545,6 @@ struct PositionRecord
 class FullSearch : ABSearch
 {
     GoalSearch goal_searcher;
-    TrapGenerator trap_search;
     FastFAME fame;
 
     ulong nodes_quiesced = 0;
@@ -571,7 +569,6 @@ class FullSearch : ABSearch
     {
         super();
         goal_searcher = new GoalSearch();
-        trap_search = new TrapGenerator();
         fame = new FastFAME(0.1716);
     }
 

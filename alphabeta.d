@@ -3,6 +3,7 @@ import std.conv;
 import std.stdio;
 
 import position;
+import trapmoves;
 
 static const int WIN_SCORE = 64000;
 static const int MAX_SCORE = 65000;
@@ -125,55 +126,77 @@ class HistoryHeuristic
     }
 }
 
-class ABSearch
+class StepSorter
 {
-    TransTable ttable;
-    HistoryHeuristic cuthistory;
-    Position nullmove;
+    private static StepSorter[] reserve;
+    private static int reservesize;
 
-    ulong nodes_searched;
-    ulong tthits;
-
-    bool tournament_rules;
-    bool use_history;
-
-    this()
+    static StepSorter allocate(Position p, Step* b)
     {
-        ttable = new TransTable(10);
-        cuthistory = new HistoryHeuristic();
-        nodes_searched = 0;
-        tthits = 0;
-        tournament_rules = true;
-        use_history = false;
-    }
-
-    bool set_option(char[] option, char[] value)
-    {
-        bool handled = true;
-        switch (option)
+        if (reservesize)
         {
-            case "hash":
-                try
-                {
-                    ttable.set_size(toInt(value));
-                } catch (ConvError e) { }
-                break;
-            case "history":
-                use_history = cast(bool)(toInt(value));
-                break;
-            default:
-                handled = false;
-                break;
+            reservesize--;
+            StepSorter ss = reserve[reservesize];
+            reserve[reservesize] = null;
+            ss.init(p, b);
+            return ss;
         }
-        return handled;
+
+        return new StepSorter(p, b);
     }
 
-    void sortstep(Position pos, StepList steps, Step* best, int num)
+    static void free(StepSorter s)
     {
-        if (num == 0 && best !is null && (best.frombit != 0 || best.tobit != 0))
+        if (reserve.length == reservesize)
+        {
+            reserve.length = (reserve.length+1) * 2;
+        }
+
+        StepList.free(s.steps);
+        s.steps = null;
+        reserve[reservesize++] = s;
+    }
+
+    static HistoryHeuristic cuthistory;
+    TrapGenerator trap_search;
+
+    static bool use_history = true;
+    static bool capture_first = false;
+
+    Position pos;
+    StepList steps;
+    Step best;
+    int num;
+
+    this(Position p, Step* b)
+    {
+        init(p, b);
+    }
+
+    void init(Position p, Step* b)
+    {
+        pos = p;
+        steps = StepList.allocate();
+        p.get_steps(steps);
+        if (b !is null)
+        {
+            best = *b;
+        } else {
+            best.clear();
+        }
+        num = 0;
+    }
+
+    Step* next_step()
+    {
+        Step* step;
+        if (num >= steps.numsteps)
+        {
+            step = null;
+        } else if (num == 0 && (best.frombit != 0 || best.tobit != 0))
         {
             int bix = 0;
-            while (bix < steps.numsteps && steps.steps[bix] != *best)
+            while (bix < steps.numsteps && steps.steps[bix] != best)
             {
                 bix++;
             }
@@ -183,9 +206,12 @@ class ABSearch
             if (bix < steps.numsteps)
             {
                 steps.steps[bix].copy(steps.steps[0]);
-                steps.steps[0].copy(*best);
+                steps.steps[0] = best;
             }
-        } else if (use_history) {
+            num++;
+            step = &best;
+        } else if (use_history)
+        {
             uint score = cuthistory.get_score(pos, steps.steps[num]);
             int bix = num;
             for (int i = num+1; i < steps.numsteps; i++)
@@ -201,7 +227,58 @@ class ABSearch
             Step tmp = steps.steps[num];
             steps.steps[num] = steps.steps[bix];
             steps.steps[bix] = tmp;
+
+            step = &steps.steps[num++];
+        } else {
+            step = &steps.steps[num++];
         }
+        
+        return step;
+    }
+}
+
+class ABSearch
+{
+    TransTable ttable;
+    HistoryHeuristic cuthistory;
+    TrapGenerator trap_search;
+
+    Position nullmove;
+
+    ulong nodes_searched;
+    ulong tthits;
+
+    bool tournament_rules = true;
+
+    this()
+    {
+        ttable = new TransTable(10);
+        cuthistory = new HistoryHeuristic();
+        StepSorter.cuthistory = cuthistory;
+        trap_search = new TrapGenerator();
+        nodes_searched = 0;
+        tthits = 0;
+    }
+
+    bool set_option(char[] option, char[] value)
+    {
+        bool handled = true;
+        switch (option)
+        {
+            case "hash":
+                try
+                {
+                    ttable.set_size(toInt(value));
+                } catch (ConvError e) { }
+                break;
+            case "history":
+                StepSorter.use_history = cast(bool)(toInt(value));
+                break;
+            default:
+                handled = false;
+                break;
+        }
+        return handled;
     }
 
     int eval(Position pos, int alpha, int beta)
@@ -263,21 +340,20 @@ class ABSearch
             
             new_best.clear();
         } else {
-            int best_ix;
-            StepList steps = StepList.allocate();
-            pos.get_steps(steps);
-            if (steps.numsteps == 0)
+            StepSorter sorted_steps = StepSorter.allocate(pos, prev_best);
+            if (sorted_steps.steps.numsteps == 0)
             {
                 // immobilized
                 return -WIN_SCORE;
             }
-            for (int six=0; six < steps.numsteps; six++)
+            Step* curstep;
+            while ((curstep = sorted_steps.next_step()) !is null)
             {
+                nodes_searched++;
                 int cal;
 
-                sortstep(pos, steps, prev_best, six);
                 Position npos = pos.dup;
-                npos.do_step(steps.steps[six]);
+                npos.do_step(*curstep);
 
                 if (npos == nullmove)
                 {
@@ -302,7 +378,7 @@ class ABSearch
                 if (cal > score)
                 {
                     score = cal;
-                    best_ix = six;
+                    new_best = *curstep;
 
                     if (cal > alpha)
                     {
@@ -312,23 +388,18 @@ class ABSearch
                         if (cal >= beta)
                         {
                             sflag = SType.BETA;
-                            nodes_searched += six;
                             break;
                         }
                     }
                 }
             }
-            if (sflag != SType.BETA)
-            {
-                nodes_searched += steps.numsteps;
-            }
+
             if (sflag != SType.ALPHA)
             {
-                cuthistory.update(pos, steps.steps[best_ix], depth);
+                cuthistory.update(pos, new_best, depth);
             }
             
-            new_best = steps.steps[best_ix];
-            StepList.free(steps);
+            StepSorter.free(sorted_steps);
         }
 
         node.set(pos, depth, score, sflag, new_best);

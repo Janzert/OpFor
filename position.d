@@ -194,7 +194,7 @@ struct Step
    }
 }
 
-static Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
+const static Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
 
 class StepList
 {
@@ -951,8 +951,6 @@ class Position
 
         return mstr;
     }
-
-
 
     private void updatefrozen(Side side, Piece piece, Step step)
     {
