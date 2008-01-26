@@ -1,4 +1,5 @@
 
+import std.conv;
 import std.math;
 import std.random;
 import std.stdio;
@@ -52,6 +53,7 @@ int FAME(Position pos)
 class Engine : AEIEngine
 {
     ScoreFunc score_pos;
+    bool random_setup = false;
 
     this(ScoreFunc s)
     {
@@ -59,11 +61,30 @@ class Engine : AEIEngine
         score_pos = s;
     }
 
+    bool set_option(char[] option, char[] value)
+    {
+        bool handled = true;
+        switch (option)
+        {
+            case "random_setup":
+                random_setup = cast(bool)(toInt(value));
+                break;
+            default:
+                handled = false;
+                break;
+        }
+        return handled;
+    }
+
     void start_search()
     {
         if (past.length == 0) // white setup move
         {
             bestmove = "Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Ha2 Db2 Cc2 Md2 Ee2 Cf2 Dg2 Hh2";
+            if (random_setup)
+            {
+                bestmove = random_setup_move(Side.WHITE);
+            }
             state = EngineState.MOVESET;
         } else if (past.length == 1)
         {
@@ -72,6 +93,10 @@ class Engine : AEIEngine
                 bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ha7 db7 cc7 ed7 me7 cf7 dg7 hh7";
             } else {
                 bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 ha7 db7 cc7 md7 ee7 cf7 dg7 hh7";
+            }
+            if (random_setup)
+            {
+                bestmove = random_setup_move(Side.BLACK);
             }
             state = EngineState.MOVESET;
         } else {
@@ -188,6 +213,8 @@ int main(char[][] args)
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.SETOPTION:
+                    OptionCmd scmd = cast(OptionCmd)server.current_cmd;
+                    engine.set_option(scmd.name, scmd.value);
                     server.clear_cmd();
                     break;
                 default:

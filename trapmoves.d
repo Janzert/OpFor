@@ -1305,6 +1305,20 @@ class TrapGenerator
             }
         }
 
+        for (int i=1; i < num_captures; i++)
+        {
+            CaptureInfo value = captures[i];
+            int j = i-1;
+            while (j >= 0 && (captures[j].victim < value.victim
+                                    || (captures[j].victim == value.victim
+                                            && captures[j].length > value.length)))
+            {
+                captures[j+1] = captures[j];
+                j--;
+            }
+            captures[j+1] = value;
+        }
+
         return num_captures;
     }
 }

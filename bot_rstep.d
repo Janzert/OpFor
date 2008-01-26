@@ -56,7 +56,7 @@ class Engine : AEIEngine
             search_steps.clear();
         } else {
             Step* nextstep = search_steps.newstep();
-            nextstep.copy(steps.steps[rand() % steps.numsteps]);
+            nextstep = steps.steps[rand() % steps.numsteps];
             search_pos.do_step(*nextstep);
             if (search_pos.side != position.side)
             {
