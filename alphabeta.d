@@ -158,7 +158,7 @@ class StepSorter
     }
 
     static HistoryHeuristic cuthistory;
-    TrapGenerator trap_search;
+    static TrapGenerator trap_search;
 
     static bool use_history = true;
     static bool capture_first = false;
@@ -166,7 +166,13 @@ class StepSorter
     Position pos;
     StepList steps;
     Step best;
+
+    StepList capture_steps;
+    bool captures_generated;
+    int capture_num;
+
     int num;
+    int stage;
 
     this(Position p, Step* b)
     {
@@ -185,52 +191,146 @@ class StepSorter
             best.clear();
         }
         num = 0;
+        stage = 0;
+        captures_generated = 0;
     }
 
     Step* next_step()
     {
-        Step* step;
         if (num >= steps.numsteps)
         {
-            step = null;
-        } else if (num == 0 && (best.frombit != 0 || best.tobit != 0))
-        {
-            int bix = 0;
-            while (bix < steps.numsteps && steps.steps[bix] != best)
-            {
-                bix++;
-            }
-            
-            assert (bix < steps.numsteps, "Did not find best step in step list");
+            return null;
+        }
 
-            if (bix < steps.numsteps)
-            {
-                steps.steps[bix].copy(steps.steps[0]);
-                steps.steps[0] = best;
-            }
-            num++;
-            step = &best;
-        } else if (use_history)
+        Step* step;
+        switch (stage)
         {
-            uint score = cuthistory.get_score(pos, steps.steps[num]);
-            int bix = num;
-            for (int i = num+1; i < steps.numsteps; i++)
-            {
-                int t = cuthistory.get_score(pos, steps.steps[i]);
-                if (t > score)
+            case 0:
+                if (num == 0 && (best.frombit != 0 || best.tobit != 0))
                 {
-                    score = t;
-                    bix = i;
+                    int bix = 0;
+                    while (bix < steps.numsteps && steps.steps[bix] != best)
+                    {
+                        bix++;
+                    }
+                    
+                    if (bix < steps.numsteps)
+                    {
+                        steps.steps[bix].copy(steps.steps[0]);
+                        steps.steps[0] = best;
+                    } else {
+                        assert(0, "Did not find best step in step list");
+                    }
+                    num++;
+                    step = &best;
+                    break;
                 }
-            }
+                stage++;
+            case 1:
+                if (capture_first && !pos.inpush)
+                {
+                    if (!captures_generated)
+                    {
+                        trap_search.find_captures(pos, pos.side);
+                        capture_steps = StepList.allocate();
+                        for (int i=0; i < trap_search.num_captures; i++)
+                        {
+                            if (trap_search.captures[i].length <= pos.stepsLeft
+                                        && trap_search.captures[i].first_step != best)
+                            {
+                                bool duplicate = false;
+                                for (int cix=0; cix < capture_steps.numsteps; cix++)
+                                {
+                                    if (trap_search.captures[i].first_step == capture_steps.steps[cix])
+                                    {
+                                        duplicate = true;
+                                        break;
+                                    }
+                                }
+                                if (!duplicate)
+                                {
+                                    Step* nstep = capture_steps.newstep();
+                                    nstep.set(trap_search.captures[i].first_step);
+                                }
+                            }
+                        }
+                        capture_num = 0;
+                        captures_generated = true;
+                    }
 
-            Step tmp = steps.steps[num];
-            steps.steps[num] = steps.steps[bix];
-            steps.steps[bix] = tmp;
+                    if (capture_num < capture_steps.numsteps)
+                    {
+                        int bix = num;
+                        while (bix < steps.numsteps && steps.steps[bix] != capture_steps.steps[capture_num])
+                        {
+                            bix++;
+                        }
+                        if (bix < steps.numsteps)
+                        {
+                            Step tmp = steps.steps[num];
+                            steps.steps[num] = steps.steps[bix];
+                            steps.steps[bix] = tmp;
+                        } else {
+                            debug (bad_step)
+                            {
+                                writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                                writefln("step %s, num %d, stepsleft %d", capture_steps.steps[capture_num].toString(),
+                                                capture_num,
+                                                pos.stepsLeft);
+                                bool already_used = false;
+                                for (int i=0; i < num; i++)
+                                {
+                                    if (steps.steps[num] == capture_steps.steps[capture_num])
+                                    {
+                                        already_used = true;
+                                        break;
+                                    }
+                                }
+                                if (already_used)
+                                {
+                                    writefln("Step already used");
+                                }
+                            }
+                            assert(0, "Did not find capture step in step list");
+                        }
+                        capture_num++;
+                        step = &steps.steps[num++];
+                    }
 
-            step = &steps.steps[num++];
-        } else {
-            step = &steps.steps[num++];
+                    if (capture_num >= capture_steps.numsteps)
+                    {
+                        StepList.free(capture_steps);
+                        stage++;
+                    }
+                } else
+                {
+                    stage++;
+                }
+            case 2:
+                if (use_history)
+                {
+                    uint score = cuthistory.get_score(pos, steps.steps[num]);
+                    int bix = num;
+                    for (int i = num+1; i < steps.numsteps; i++)
+                    {
+                        int t = cuthistory.get_score(pos, steps.steps[i]);
+                        if (t > score)
+                        {
+                            score = t;
+                            bix = i;
+                        }
+                    }
+
+                    Step tmp = steps.steps[num];
+                    steps.steps[num] = steps.steps[bix];
+                    steps.steps[bix] = tmp;
+
+                    step = &steps.steps[num++];
+                    break;
+                }
+                stage++;
+             default:
+                step = &steps.steps[num++];
         }
         
         return step;
@@ -256,6 +356,7 @@ class ABSearch
         cuthistory = new HistoryHeuristic();
         StepSorter.cuthistory = cuthistory;
         trap_search = new TrapGenerator();
+        StepSorter.trap_search = trap_search;
         nodes_searched = 0;
         tthits = 0;
     }
@@ -273,6 +374,9 @@ class ABSearch
                 break;
             case "history":
                 StepSorter.use_history = cast(bool)(toInt(value));
+                break;
+            case "capture_sort":
+                StepSorter.capture_first = cast(bool)(toInt(value));
                 break;
             default:
                 handled = false;
