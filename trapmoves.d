@@ -642,6 +642,15 @@ class TrapGenerator
                                 {
                                     min_clear_steps = 2;
                                 }
+                                bitix tnix = bitindex(tnbit);
+                                if ((pos.pieces[tnix] == Piece.WRABBIT
+                                            && tnnbit == tnbit >> 8)
+                                        || (pos.pieces[tnix] == Piece.BRABBIT
+                                                && tnnbit == tnbit << 8))
+                                {
+                                    continue;
+                                }
+
                                 clear_first_step[num_clears].set(tnbit, tnnbit);
                                 clear_length[num_clears] = 2;
                                 num_clears++;
