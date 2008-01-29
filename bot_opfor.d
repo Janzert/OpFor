@@ -554,7 +554,7 @@ class FullSearch : ABSearch
     real ontrap_w = 3;
     real frozen_w = 10;
     real rwall_w = 1;
-    real ropen_w = 1;
+    real ropen_w = 50;
     real rhome_w = 0;
     real rweak_w = 1;
     real rstrong_w = 0.1;
@@ -1640,4 +1640,5 @@ int main(char[][] args)
         }
     }
 }
+
 

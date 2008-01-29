@@ -171,6 +171,11 @@ struct Step
 
    char[] toString()
    {
+       return toString(false);
+   }
+
+   char[] toString(bool showpush=false)
+   {
         char[] str;
         str ~= ix_to_alg(fromix);
         switch (toix - fromix)
@@ -189,6 +194,10 @@ struct Step
                 break;
             default:
                 str ~= ix_to_alg(toix);
+        }
+        if (showpush && push)
+        {
+            str ~= "p";
         }
         return str;
    }

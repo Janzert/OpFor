@@ -1170,8 +1170,8 @@ class TrapGenerator
         ulong p1neighbors = neighbors_of(p1bit);
         ulong p2neighbors = neighbors_of(p2bit);
 
-        if ((pos.strongest[side][p1ix] >= pos.pieces[p1ix] + enemyoffset)
-                && (pos.strongest[side][p2ix] >= pos.pieces[p2ix] + enemyoffset)
+        if ((pos.strongest[side][p1ix] > pos.pieces[p1ix] + enemyoffset)
+                && (pos.strongest[side][p2ix] > pos.pieces[p2ix] + enemyoffset)
                 && (p1neighbors & pos.placement[side] & ~pos.frozen)
                 && (p2neighbors & pos.placement[side] & ~pos.frozen))
         {

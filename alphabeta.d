@@ -206,7 +206,7 @@ class StepSorter
         switch (stage)
         {
             case 0:
-                if (num == 0 && (best.frombit != 0 || best.tobit != 0))
+                if (best.frombit != 0 || best.tobit != 0)
                 {
                     int bix = 0;
                     while (bix < steps.numsteps && steps.steps[bix] != best)
@@ -223,6 +223,7 @@ class StepSorter
                     }
                     num++;
                     step = &best;
+                    stage++;
                     break;
                 }
                 stage++;
@@ -261,7 +262,8 @@ class StepSorter
                     if (capture_num < capture_steps.numsteps)
                     {
                         int bix = num;
-                        while (bix < steps.numsteps && steps.steps[bix] != capture_steps.steps[capture_num])
+                        while ((bix < steps.numsteps)
+                                && (steps.steps[bix] != capture_steps.steps[capture_num]))
                         {
                             bix++;
                         }
@@ -274,13 +276,17 @@ class StepSorter
                             debug (bad_step)
                             {
                                 writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                                writefln("step %s, num %d, stepsleft %d", capture_steps.steps[capture_num].toString(),
-                                                capture_num,
-                                                pos.stepsLeft);
+                                writefln("step %s, cnum %d, num %d, stepsleft %d", capture_steps.steps[capture_num].toString(true),
+                                                capture_num, num, pos.stepsLeft);
+                                if (best.frombit != 0 || best.tobit != 0)
+                                    writefln("Have previous best");
+                                else
+                                    writefln("No previous best");
+
                                 bool already_used = false;
                                 for (int i=0; i < num; i++)
                                 {
-                                    if (steps.steps[num] == capture_steps.steps[capture_num])
+                                    if (steps.steps[i] == capture_steps.steps[capture_num])
                                     {
                                         already_used = true;
                                         break;
@@ -290,22 +296,46 @@ class StepSorter
                                 {
                                     writefln("Step already used");
                                 }
+
+                                writefln("Move steps:");
+                                int sn = 0;
+                                while (sn < steps.numsteps)
+                                {
+                                    for (int i=0; i < 10; i++)
+                                    {
+                                        if (sn < steps.numsteps)
+                                            writef("%s ", steps.steps[sn++].toString(true));
+                                        else
+                                            break;
+                                    }
+                                    writef("\n");
+                                }
+
+                                writefln("Capture steps:");
+                                sn = 0;
+                                while (sn < capture_steps.numsteps)
+                                {
+                                    for (int i=0; i < 10; i++)
+                                    {
+                                        if (sn < capture_steps.numsteps)
+                                            writef("%s ", capture_steps.steps[sn++].toString(true));
+                                        else
+                                            break;
+                                    }
+                                    writef("\n");
+                                }
                             }
                             assert(0, "Did not find capture step in step list");
+                            num--;
                         }
                         capture_num++;
                         step = &steps.steps[num++];
-                    }
-
-                    if (capture_num >= capture_steps.numsteps)
-                    {
+                        break;
+                    } else {
                         StepList.free(capture_steps);
-                        stage++;
                     }
-                } else
-                {
-                    stage++;
                 }
+                stage++;
             case 2:
                 if (use_history)
                 {
