@@ -126,7 +126,7 @@ class TrapGenerator
                         possibles ^= pbit;
                         bitix pix = bitindex(pbit);
 
-                        if ((side == pos.side) && (nbit & pos.lastfrom) 
+                        if ((side == pos.side) && (nbit == (1UL << pos.lastfrom))
                                 && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
                         {
                             // can pull piece closer to trap
@@ -241,7 +241,7 @@ class TrapGenerator
         {
             ulong pneighbors = neighbors_of(pbit);
             if ((side == pos.side) && (pneighbors & lastbit)
-                    && (pos.lastfrom > pos.pieces[pix] + enemyoffset))
+                    && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
             {
                 add_capture(pos.pieces[tix], tbit, 1, tbit, pbit, lastbit);
                 if (!findall)
@@ -795,7 +795,7 @@ class TrapGenerator
                                         } else {
                                             rabbitsteps &= ~((ufbit & NOT_RANK_8) << 8);
                                         }
-                                        if (!(rabbitsteps & neighbors_of(pnbit)))
+                                        if (!(rabbitsteps & anbit))
                                         {
                                             continue;
                                         }

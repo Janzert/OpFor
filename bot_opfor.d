@@ -398,6 +398,19 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
     ulong allpieces = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
         & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
         & ~pos.frozen;
+    Piece[32] pieces;
+    bitix[32] pixs;
+    int num_pieces;
+    while (allpieces)
+    {
+	ulong pbit = allpieces & -allpieces;
+	allpieces ^= pbit;
+	bitix pix = bitindex(pbit);
+
+	pieces[num_pieces] = pos.pieces[pix];
+	pixs[num_pieces++] = pix;
+    }
+
     for (Side s = Side.WHITE; s <= Side.BLACK; s++)
     {
         ulong rabbits;
@@ -414,16 +427,10 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
             bitix rix = bitindex(rbit);
 
             int power = 0;
-            ulong piecebits = allpieces;
-            while (piecebits)
-            {
-                ulong pbit = piecebits & -piecebits;
-                piecebits ^= pbit;
-                bitix pix = bitindex(pbit);
-
-                power += pieceval[s][pos.pieces[pix]] * distval[taxicab_dist[pix][rix+rforward[s]]];
-            }
-
+	    for (int i=0; i < num_pieces; i++)
+	    {
+		power += pieceval[s][pieces[i]] * distval[taxicab_dist[pixs[i]][rix+rforward[s]]];
+	    }
             int goalsteps = goals.board_depth[rix];
             goalsteps = (goalsteps < 16) ? goalsteps : 16;
 
@@ -453,15 +460,31 @@ int piece_strength(Position pos)
     const static int[] distval = [100, 100, 100, 90, 70,
           30, 20, 15, 10, 5, 4, 3, 2, 1, 0, 0];
     
+    Piece[32] stronger;
+    int[32] sixs;
+
     int pieceoffset = 6;
     int score = 0;
-    ulong stronger = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
+    ulong stronger_bits = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
         & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
         & ~pos.frozen;
     for (int p = Piece.WCAT; p < Piece.WELEPHANT; p++)
     {
         int power = 0;
-        stronger &= ~pos.bitBoards[p] & ~pos.bitBoards[p+pieceoffset];
+        int num_stronger = 0;
+
+        stronger_bits &= ~pos.bitBoards[p] & ~pos.bitBoards[p+pieceoffset];
+        ulong sbits = stronger_bits;
+        while (sbits)
+        {
+            ulong sbit = sbits & -sbits;
+            sbits ^= sbit;
+            bitix pix = bitindex(sbit);
+
+            stronger[num_stronger] = pos.pieces[pix];
+            sixs[num_stronger++] = pix;
+        }
+
         ulong pieces = pos.bitBoards[p] | pos.bitBoards[p+pieceoffset];
         while (pieces)
         {
@@ -469,14 +492,9 @@ int piece_strength(Position pos)
             pieces ^= pbit;
             bitix pix = bitindex(pbit);
 
-            ulong sbits = stronger;
-            while (sbits)
+            for (int i=0; i < num_stronger; i++)
             {
-                ulong sbit = sbits & -sbits;
-                sbits ^= sbit;
-                bitix six = bitindex(sbit);
-
-                power += pieceval[pos.pieces[six]] * distval[taxicab_dist[pix][six]];
+                power += pieceval[stronger[i]] * distval[taxicab_dist[pix][sixs[i]]];
             }
         }
         score += power * pieceval[p];
@@ -1619,7 +1637,7 @@ int main(char[][] args)
                 {
                     int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
                     server.info(format("depth %d", depth));
-                    server.info(format("time %d", length/TicksPerSecond));
+                    server.info(format("time %d", (now-search_start)/TicksPerSecond));
                     server.info(format("nodes %d", engine.searcher.nodes_searched));
                     if (engine.in_step)
                     {

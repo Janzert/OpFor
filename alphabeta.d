@@ -161,7 +161,7 @@ class StepSorter
     static TrapGenerator trap_search;
 
     static bool use_history = true;
-    static bool capture_first = false;
+    static bool capture_first = true;
 
     Position pos;
     StepList steps;
@@ -261,72 +261,93 @@ class StepSorter
 
                     if (capture_num < capture_steps.numsteps)
                     {
-                        int bix = num;
-                        while ((bix < steps.numsteps)
-                                && (steps.steps[bix] != capture_steps.steps[capture_num]))
+                        while (capture_num < capture_steps.numsteps)
                         {
-                            bix++;
-                        }
-                        if (bix < steps.numsteps)
-                        {
-                            Step tmp = steps.steps[num];
-                            steps.steps[num] = steps.steps[bix];
-                            steps.steps[bix] = tmp;
-                        } else {
-                            debug (bad_step)
+                            int bix = num;
+                            while ((bix < steps.numsteps)
+                                    && (steps.steps[bix] != capture_steps.steps[capture_num]))
                             {
-                                writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                                writefln("step %s, cnum %d, num %d, stepsleft %d", capture_steps.steps[capture_num].toString(true),
-                                                capture_num, num, pos.stepsLeft);
-                                if (best.frombit != 0 || best.tobit != 0)
-                                    writefln("Have previous best");
-                                else
-                                    writefln("No previous best");
-
-                                bool already_used = false;
-                                for (int i=0; i < num; i++)
-                                {
-                                    if (steps.steps[i] == capture_steps.steps[capture_num])
-                                    {
-                                        already_used = true;
-                                        break;
-                                    }
-                                }
-                                if (already_used)
-                                {
-                                    writefln("Step already used");
-                                }
-
-                                writefln("Move steps:");
-                                int sn = 0;
-                                while (sn < steps.numsteps)
-                                {
-                                    for (int i=0; i < 10; i++)
-                                    {
-                                        if (sn < steps.numsteps)
-                                            writef("%s ", steps.steps[sn++].toString(true));
-                                        else
-                                            break;
-                                    }
-                                    writef("\n");
-                                }
-
-                                writefln("Capture steps:");
-                                sn = 0;
-                                while (sn < capture_steps.numsteps)
-                                {
-                                    for (int i=0; i < 10; i++)
-                                    {
-                                        if (sn < capture_steps.numsteps)
-                                            writef("%s ", capture_steps.steps[sn++].toString(true));
-                                        else
-                                            break;
-                                    }
-                                    writef("\n");
-                                }
+                                bix++;
                             }
-                            assert(0, "Did not find capture step in step list");
-                            num--;
+                            if (bix < steps.numsteps)
+                            {
+                                Step tmp = steps.steps[num];
+                                steps.steps[num] = steps.steps[bix];
+                                steps.steps[bix] = tmp;
+                                break;
+                            } else {
+                                debug
+                                {
+                                    bool had_pull = false;
+                                    for (int i=0; i < steps.numsteps; i++)
+                                    {
+                                        if (capture_steps.steps[capture_num].frombit == steps.steps[i].frombit
+                                                && (capture_steps.steps[capture_num].tobit == steps.steps[i].tobit)
+                                                && (capture_steps.steps[capture_num].push != steps.steps[i].push))
+                                        {
+                                            had_pull = true;
+                                            break;
+                                        }
+                                    }
+
+                                    if (!had_pull)
+                                    {
+                                        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                                        writefln("step %s, cnum %d, num %d, stepsleft %d lf %s%s",
+                                                        capture_steps.steps[capture_num].toString(true),
+                                                        capture_num, num, pos.stepsLeft,
+                                                        "xRCDHMErcdhme"[pos.lastpiece], ix_to_alg(pos.lastfrom));
+                                        if (best.frombit != 0 || best.tobit != 0)
+                                            writefln("Have previous best");
+                                        else
+                                            writefln("No previous best");
+
+                                        bool already_used = false;
+                                        for (int i=0; i < num; i++)
+                                        {
+                                            if (steps.steps[i] == capture_steps.steps[capture_num])
+                                            {
+                                                already_used = true;
+                                                break;
+                                            }
+                                        }
+                                        if (already_used)
+                                        {
+                                            writefln("Step already used");
+                                        }
+
+                                        writefln("Move steps:");
+                                        int sn = 0;
+                                        while (sn < steps.numsteps)
+                                        {
+                                            for (int i=0; i < 10; i++)
+                                            {
+                                                if (sn < steps.numsteps)
+                                                    writef("%s ", steps.steps[sn++].toString(true));
+                                                else
+                                                    break;
+                                            }
+                                            writef("\n");
+                                        }
+                                        writefln("Capture steps:");
+                                        sn = 0;
+                                        while (sn < capture_steps.numsteps)
+                                        {
+                                            for (int i=0; i < 10; i++)
+                                            {
+                                                if (sn < capture_steps.numsteps)
+                                                    writef("%s ", capture_steps.steps[sn++].toString(true));
+                                                else
+                                                    break;
+                                            }
+                                            writef("\n");
+                                        }
+                                        writefln("Did not find capture step in list");
+                                        assert (0);
+                                    }
+                                }
+                                capture_num++;
+                            }
                         }
                         capture_num++;
                         step = &steps.steps[num++];
