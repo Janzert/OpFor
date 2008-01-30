@@ -868,6 +868,14 @@ class TrapGenerator
                                             unfreezers ^= unfbit;
                                             bitix unfix = bitindex(unfbit);
 
+                                            if ((pos.pieces[unfix] == Piece.WRABBIT
+                                                        && unfbit >> 8 == tobit)
+                                                    || (pos.pieces[unfix] == Piece.BRABBIT
+                                                        && unfbit << 8 == tobit))
+                                            {
+                                                continue;
+                                            }
+
                                             if ((pos.pieces[unfix] > pos.strongest[side^1][toix] + enemyoffset)
                                                     || (neighbors_of(tobit) & pos.placement[side] & ~unfbit))
                                             {
@@ -1199,6 +1207,8 @@ class TrapGenerator
                     p2pushers |= pushbit;
                 }
             }
+            if (!p2pushers)
+                return;
 
             ulong p1pushers = 0;
             pospushers = p1neighbors & pos.placement[side] & ~pos.frozen;
@@ -1213,6 +1223,8 @@ class TrapGenerator
                     p1pushers |= pushbit;
                 }
             }
+            if (!p1pushers)
+                return;
 
             if (exclusive)
             {

@@ -51,8 +51,10 @@ class GoalSearch
         ulong expanded;
         expanded = (bits & NOT_A_FILE) << 1;
         expanded |= (bits & NOT_H_FILE) >> 1;
-        expanded |= (cur_side == Side.WHITE) ? 
-                    (bits & NOT_RANK_8) << 8 : (bits & NOT_RANK_1) >> 8;
+        expanded |= ((bits << 8) >> (cur_side << 4))
+            | (((bits & RANK_8) >> 8) << ((cur_side^1) << 5));
+        //expanded |= (cur_side == Side.WHITE) ?
+        //            (bits & NOT_RANK_8) << 8 : (bits & NOT_RANK_1) >> 8;
 
         return bits | expanded;
     }

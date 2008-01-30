@@ -562,6 +562,24 @@ class ABSearch
         return score;
     }
 
+    int mtdf(Position pos, int depth, int guess, int upperbound)
+    {
+        int lowerbound = MIN_SCORE;
+        while (lowerbound < upperbound)
+        {
+            int beta = guess;
+            if (guess == lowerbound)
+                beta = guess + 1;
+
+            guess = alphabeta(pos, depth, beta-1, beta);
+            if (guess < beta)
+                upperbound = guess;
+            else
+                lowerbound = guess;
+        }
+        return guess;
+    }
+
     void prepare()
     {
         nodes_searched = 0;

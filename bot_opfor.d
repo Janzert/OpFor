@@ -1115,6 +1115,7 @@ class Engine : AEIEngine
     PositionNode next_pos;
     int depth;
     int best_score;
+    int best_guess;
 
     bool in_step;
     int last_score;
@@ -1126,6 +1127,7 @@ class Engine : AEIEngine
     PositionRecord[] opening_book;
     bool position_record = false;
 
+    bool use_mtdf = false;
 
     this()
     {
@@ -1134,6 +1136,28 @@ class Engine : AEIEngine
         in_step = false;
         max_depth = -1;
         searcher.tournament_rules = false;
+    }
+
+    bool set_option(char[] option, char[] value)
+    {
+        bool handled = true;
+        switch (option)
+        {
+            case "opening_book":
+                position_record = cast(bool)toInt(value);
+                if (position_record)
+                {
+                    if (opening_book.length == 0)
+                        opening_book.length = BOOK_SIZE;
+                }
+                break;
+            case "use_mtdf":
+                use_mtdf = cast(bool)toInt(value);
+                break;
+            default:
+                handled = searcher.set_option(option, value);
+        }
+        return handled;
     }
 
     void new_game()
@@ -1156,25 +1180,6 @@ class Engine : AEIEngine
             }
         }
         super.new_game();
-    }
-
-    bool set_option(char[] option, char[] value)
-    {
-        bool handled = true;
-        switch (option)
-        {
-            case "opening_book":
-                position_record = cast(bool)toInt(value);
-                if (position_record)
-                {
-                    if (opening_book.length == 0)
-                        opening_book.length = BOOK_SIZE;
-                }
-                break;
-            default:
-                handled = searcher.set_option(option, value);
-        }
-        return handled;
     }
 
     void start_search()
@@ -1237,6 +1242,7 @@ class Engine : AEIEngine
             }
             next_pos = pos_list;
             best_score = MIN_SCORE;
+            best_guess = MIN_SCORE;
             depth = 0;
             searcher.prepare();
             state = EngineState.SEARCHING;
@@ -1252,7 +1258,13 @@ class Engine : AEIEngine
             Position pos = next_pos.pos;
             searcher.nullmove = pos.dup;
             searcher.nullmove.do_step(NULL_STEP);
-            int score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
+            int score;
+            if (use_mtdf)
+            {
+                score = -searcher.mtdf(pos, depth, -best_guess, -best_score);
+            } else {
+                score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
+            }
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
 
@@ -1274,6 +1286,7 @@ class Engine : AEIEngine
             if (score > best_score)
             {
                 best_score = score;
+                best_guess = score;
                 
                 if (next_pos !is pos_list)
                 {
