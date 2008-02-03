@@ -577,7 +577,7 @@ class FullSearch : ABSearch
     real rweak_w = 1;
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
-    real goal_w = 1;
+    real goal_w = 10;
     real static_trap_w = 1;
     real random_w = 0;
     int max_qdepth = -40;
@@ -1015,7 +1015,7 @@ class FullSearch : ABSearch
 
         if (static_trap_w != 0)
         {
-            score = static_trap_eval(pos, cast(Side)(pos.side^1), score) * static_trap_w;
+            score += static_trap_eval(pos, cast(Side)(pos.side^1), score) * static_trap_w;
         }
 
         goal_searcher.set_start(pos);
