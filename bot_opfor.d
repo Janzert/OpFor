@@ -1015,7 +1015,7 @@ class FullSearch : ABSearch
 
         if (static_trap_w != 0)
         {
-            score = static_trap_eval(pos, cast(Side)(pos.side^1), score);
+            score = static_trap_eval(pos, cast(Side)(pos.side^1), score) * static_trap_w;
         }
 
         goal_searcher.set_start(pos);
