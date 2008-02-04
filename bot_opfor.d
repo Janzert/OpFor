@@ -1007,62 +1007,66 @@ class FullSearch : ABSearch
         return score;
     }
 
+    int goal_threat(Position pos)
+    {
+        // this.goal_searcher must already be setup for the position passed in
+
+        const int[17] GOAL_THREAT = [30000, 20000, 20000, 15000, 10000,
+              8000, 6000, 4000, 2000,
+              1000, 500, 200, 50,
+              20, 10, 7, 5];
+
+        int score = 0;
+        if (goal_searcher.goals_found[pos.side])
+        {
+            int extrasteps = (goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft)+8;
+            extrasteps = (extrasteps < 16) ? extrasteps : 16;
+            score += GOAL_THREAT[extrasteps] * goal_w;
+        }
+        if (goal_searcher.goals_found[pos.side^1])
+        {
+            int togoal = goal_searcher.goal_depth[pos.side^1][0] + (pos.stepsLeft << 1);
+            togoal = (togoal < 16) ? togoal : 16;
+            score -= GOAL_THREAT[togoal] * goal_w;
+        }
+
+        return score;
+    }
+
     int static_eval(Position pos)
     {
+        goal_searcher.set_start(pos);
+        goal_searcher.find_goals(16);
+        if (goal_searcher.goals_found[pos.side]
+                && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
+        {
+            return WIN_SCORE - goal_searcher.goal_depth[pos.side][0];
+        }
+
         int pop = population(pos);
         int score = fame.score(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
+        score += static_trap_eval(pos, cast(Side)(pos.side^1), score) * static_trap_w;
 
-        if (static_trap_w != 0)
-        {
-            score += static_trap_eval(pos, cast(Side)(pos.side^1), score) * static_trap_w;
-        }
-
-        goal_searcher.set_start(pos);
-        goal_searcher.find_goals(16);
-
-        score += map_elephant(pos) * map_e_w;
-
-        //score += trap_safety(pos) * tsafety_w; No weight tested showed improvement
-        score += on_trap(pos) * ontrap_w;
-        score += frozen_pieces(pos) * frozen_w;
+        score += piece_strength(pos) * pstrength_w;
+        score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
         // score += rabbit_home(pos) * rhome_w; No improvement
-        score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
-        score += piece_strength(pos) * pstrength_w;
+        score += frozen_pieces(pos) * frozen_w;
+        score += map_elephant(pos) * map_e_w;
+        //score += trap_safety(pos) * tsafety_w; No weight tested showed improvement
+        score += on_trap(pos) * ontrap_w;
         if (random_w)
             score += (rand()%100) * random_w;
 
         if (pos.side == Side.BLACK)
             score = -score;
 
-        const int[17] GOAL_THREAT = [30000, 20000, 20000, 15000, 10000,
-              8000, 6000, 4000, 2000,
-              1000, 500, 200, 50,
-              20, 10, 7, 5];
-        if (goal_searcher.goals_found[pos.side]
-                && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
-        {
-                //score = (WIN_SCORE-10) - goal_searcher.goal_depth[pos.side][0];
-                score = WIN_SCORE;
-        } else { 
-            if (goal_searcher.goals_found[pos.side])
-            {
-                int extrasteps = (goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft)+8;
-                extrasteps = (extrasteps < 16) ? extrasteps : 16;
-                score += GOAL_THREAT[extrasteps] * goal_w;
-            }
-            if (goal_searcher.goals_found[pos.side^1])
-            {
-                int togoal = goal_searcher.goal_depth[pos.side^1][0] + (pos.stepsLeft << 1);
-                togoal = (togoal < 16) ? togoal : 16;
-                score -= GOAL_THREAT[togoal] * goal_w;
-            }
-            // clamp the evaluation to be less than a win
-            score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
-        }
+        score += goal_threat(pos);
 
+        // clamp the evaluation to be less than a win
+        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         return score;
     }
 }
