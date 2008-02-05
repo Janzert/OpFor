@@ -377,8 +377,8 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           0, 45, 60, 150, 200, 300]];
     const static int[] distval = [100, 100, 100, 90, 70,
           30, 20, 15, 10, 5, 4, 3, 2, 1, 0, 0];
-    const static real[][] rankval = [[0, 0, 0, 0, 0.5, 1.0, 1.5, 0],
-          [0, -1.5, -1.0, -0.5, 0, 0, 0, 0]];
+    const static real[][] rankval = [[0, 0, 0, 0.2, 0.5, 1.0, 1.2, 0],
+          [0, -1.2, -1.0, -0.5, -0.2, 0, 0, 0]];
     const static real[] goalval = [1.0,
           1.0, 1.0, 1.0, 1.0,
           1.0, 1.0, 0.9, 0.9,
@@ -416,9 +416,9 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
         ulong rabbits;
         if (s == Side.WHITE)
         {
-            rabbits = pos.bitBoards[Piece.WRABBIT];
+            rabbits = pos.bitBoards[Piece.WRABBIT] & ~(RANK_1 & RANK_2);
         } else {
-            rabbits = pos.bitBoards[Piece.BRABBIT];
+            rabbits = pos.bitBoards[Piece.BRABBIT] & ~(RANK_8 & RANK_7);
         }
         while (rabbits)
         {
@@ -427,10 +427,11 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
             bitix rix = bitindex(rbit);
 
             int power = 0;
-	    for (int i=0; i < num_pieces; i++)
-	    {
-		power += pieceval[s][pieces[i]] * distval[taxicab_dist[pixs[i]][rix+rforward[s]]];
-	    }
+            for (int i=0; i < num_pieces; i++)
+            {
+                power += pieceval[s][pieces[i]] * distval[taxicab_dist[pixs[i]][rix+rforward[s]]];
+            }
+
             int goalsteps = goals.board_depth[rix];
             goalsteps = (goalsteps < 16) ? goalsteps : 16;
 
@@ -439,13 +440,10 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
                 wscore += weakval[s][rix/8] * weakgoal[goalsteps];
             } else {
                 real rv = rankval[s][rix/8];
-                if (rv)
-                {
-                    real rval = power * rv * goalval[goalsteps];
-                    if (rbit & TRAPS)
-                        rval /= 2;
-                    sscore += rval;
-                }
+                real rval = power * rv * goalval[goalsteps];
+                if (rbit & TRAPS)
+                    rval /= 2;
+                sscore += rval;
             }
         }
     }
