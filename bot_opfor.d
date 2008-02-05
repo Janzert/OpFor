@@ -385,10 +385,10 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           0.8, 0.8, 0.8, 0.8,
           0.7, 0.7, 0.7, 0.7];
     const static real[] weakgoal = [0,
-          0, 0, 0, 0,
-          0.1, 0.1, 0.2, 0.2,
-          0.4, 0.4, 0.6, 0.6,
-          0.8, 0.8, 0.9, 1];
+          0.1, 0.2, 0.2, 0.4,
+          0.5, 0.5, 0.6, 0.6,
+          0.8, 0.8, 0.9, 0.9,
+          1, 1, 1, 1];
     const static int[][] weakval = [[0, 0, -15, -30, -30, -30, -30, 0], 
          [0, 30, 30, 30, 30, 15, 0, 0]];
     const static int[] rforward = [8, -8];
