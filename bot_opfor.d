@@ -168,10 +168,12 @@ int on_trap(Position pos)
                         break;
                     }
                     Piece epiece;
-                    if (tpiece + pieceoffset > pos.pieces[eix])
+                    /* This can double count strong framing pieces
+                    if (tpiece + pieceoffset > pos.pieces[eix]
+                            && pos.strongest[tside^1][eix] > pos.pieces[eix])
                         epiece = pos.strongest[tside^1][eix];
-                    else
-                        epiece = pos.pieces[eix];
+                    else */
+                    epiece = pos.pieces[eix];
                     framing_score += FRAMER[epiece];
                 }
                 if (framed)
