@@ -190,10 +190,10 @@ int map_elephant(Position pos)
     const int[] CENTRAL_MAP =
         [0, 1, 1, 2, 2, 1, 1, 0,
          1, 2, 2, 4, 4, 2, 2, 1,
-         2, 3, 3, 5, 5, 3, 3, 2,
-         3, 4, 5, 5, 5, 5, 4, 3,
-         3, 4, 5, 5, 5, 5, 4, 3,
-         2, 3, 3, 5, 5, 3, 3, 2,
+         2, 3, 3, 6, 6, 3, 3, 2,
+         3, 4, 6, 6, 6, 6, 4, 3,
+         3, 4, 6, 6, 6, 6, 4, 3,
+         2, 3, 3, 6, 6, 3, 3, 2,
          1, 2, 2, 4, 4, 2, 2, 1,
          0, 1, 1, 2, 2, 1, 1, 0];
 
@@ -1050,10 +1050,10 @@ class FullSearch : ABSearch
         score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
-        // score += rabbit_home(pos) * rhome_w; No improvement
+        score += rabbit_home(pos) * rhome_w;
         score += frozen_pieces(pos) * frozen_w;
-        score += map_elephant(pos) * map_e_w;
-        //score += trap_safety(pos) * tsafety_w; No weight tested showed improvement
+        //score += map_elephant(pos) * map_e_w;
+        score += trap_safety(pos) * tsafety_w;
         score += on_trap(pos) * ontrap_w;
         if (random_w)
             score += (rand()%100) * random_w;
