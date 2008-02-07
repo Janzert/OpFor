@@ -616,14 +616,14 @@ class FullSearch : ABSearch
     ulong nodes_quiesced = 0;
     
     real map_e_w = 0;
-    real tsafety_w = 0;
+    real tsafety_w = 5;
     real ontrap_w = 1;
     real frozen_w = 1;
     real rwall_w = 2;
-    real ropen_w = 90;
+    real ropen_w = 80;
     real rhome_w = 0;
-    real rweak_w = 0;
-    real rstrong_w = 0.001;
+    real rweak_w = 3;
+    real rstrong_w = 0.005;
     real pstrength_w = 0.00001;
     real goal_w = 1;
     real static_trap_w = 0.1;
