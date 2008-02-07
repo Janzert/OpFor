@@ -393,6 +393,8 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           1, 1, 1, 1];
     const static int[][] weakval = [[0, 0, -15, -30, -30, -30, -30, 0], 
          [0, 30, 30, 30, 30, 15, 0, 0]];
+    const static int power_balance = 1000;
+    const static real full_weak = 60000;
     const static int[] rforward = [8, -8];
 
     int wscore = 0;
@@ -433,13 +435,16 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
             {
                 power += pieceval[s][pieces[i]] * distval[taxicab_dist[pixs[i]][rix+rforward[s]]];
             }
+            power -= power_balance;
 
             int goalsteps = goals.board_depth[rix];
             goalsteps = (goalsteps < 16) ? goalsteps : 16;
 
             if (power <= 0)
             {
-                wscore += weakval[s][rix/8] * weakgoal[goalsteps];
+                real sfactor = -power / full_weak;
+                sfactor = (sfactor < 1) ? sfactor : 1;
+                wscore += weakval[s][rix/8] * weakgoal[goalsteps] * sfactor;
             } else {
                 real rv = rankval[s][rix/8];
                 real rval = power * rv * goalval[goalsteps];
