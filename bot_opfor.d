@@ -446,6 +446,7 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
                 sfactor = (sfactor < 1) ? sfactor : 1;
                 wscore += weakval[s][rix/8] * weakgoal[goalsteps] * sfactor;
             } else {
+                power = (power < 170000) ? power : 170000;
                 real rv = rankval[s][rix/8];
                 real rval = power * rv * goalval[goalsteps];
                 if (rbit & TRAPS)
@@ -518,23 +519,33 @@ int mobility(Position pos, real coverage_w, real reachable_w)
         int pieceoffset = 0;
         if (side == Side.BLACK)
             pieceoffset = 6;
-        int stepsleft = pos.stepsLeft;
-        if (side != pos.side)
-            stepsleft = 4;
 
-        ulong unsafe = TRAPS & ~neighbors_of(pos.placement[side]);
-        ulong coverage = pos.placement[side] & ~pos.pieces[Piece.WRABBIT+pieceoffset] & ~pos.frozen;
-        for (int steps = 0; steps < stepsleft; steps++)
+        ulong unsafe = 0;
+        ulong tbits = TRAPS;
+        while (tbits)
         {
-            coverage |= neighbors_of(coverage) & pos.pieces[Piece.EMPTY] & ~unsafe;
+            ulong tbit = tbits & -tbits;
+            tbits ^= tbit;
+
+            if (popcount(neighbors_of(tbit) & pos.placement[side]) < 2)
+            {
+                unsafe |= tbit;
+            }
+        }
+
+        ulong coverage = pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen;
+        for (int steps = 0; steps < 4; steps++)
+        {
+            coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
         }
         ulong reachable = coverage;
-        ulong nreach = reachable | (neighbors_of(reachable) & pos.pieces[Piece.EMPTY] & ~unsafe);
+        ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         while (reachable != nreach)
         {
             reachable = nreach;
-            nreach = reachable | (neighbors_of(reachable) & pos.pieces[Piece.EMPTY] & ~unsafe);
+            nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         }
+
         score += ((popcount(coverage) * coverage_w) + (popcount(reachable) * reachable_w)) * SIDE_MUL[side];
     }
 
