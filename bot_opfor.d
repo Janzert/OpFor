@@ -20,7 +20,7 @@ const int START_SEARCH_NODES = 100000;
 int trap_safety(Position pos)
 {
     const int BOTH_SAFE = 1;
-    const int HOME_CONTROL = 5;
+    const int HOME_CONTROL = 3;
     const int AWAY_CONTROL = 5;
 
     int score = 0;
@@ -503,6 +503,38 @@ int piece_strength(Position pos)
     return score;
 }
 
+int mobility(Position pos, real coverage_w, real reachable_w)
+{
+    int[] SIDE_MUL = [1, -1];
+
+    real score = 0;
+    for (Side side = Side.WHITE; side <= Side.BLACK; side++)
+    {
+        int pieceoffset = 0;
+        if (side == Side.BLACK)
+            pieceoffset = 6;
+        int stepsleft = pos.stepsLeft;
+        if (side != pos.side)
+            stepsleft = 4;
+
+        ulong unsafe = TRAPS & ~neighbors_of(pos.placement[side]);
+        ulong coverage = pos.placement[side] & ~pos.pieces[Piece.WRABBIT+pieceoffset] & ~pos.frozen;
+        for (int steps = 0; steps < stepsleft; steps++)
+        {
+            coverage |= neighbors_of(coverage) & pos.pieces[Piece.EMPTY] & ~unsafe;
+        }
+        ulong reachable = coverage;
+        ulong nreach = reachable | (neighbors_of(reachable) & pos.pieces[Piece.EMPTY] & ~unsafe);
+        while (reachable != nreach)
+        {
+            reachable = nreach;
+            nreach = reachable | (neighbors_of(reachable) & pos.pieces[Piece.EMPTY] & ~unsafe);
+        }
+        score += ((popcount(coverage) * coverage_w) + (popcount(reachable) * reachable_w)) * SIDE_MUL[side];
+    }
+
+    return cast(int)score;
+}
 
 class ScoreSearch : ABSearch
 {
@@ -567,19 +599,20 @@ class FullSearch : ABSearch
 
     ulong nodes_quiesced = 0;
     
-    real map_e_w = 10;
+    real map_e_w = 0;
     real tsafety_w = 0;
-    real ontrap_w = 3;
-    real frozen_w = 10;
-    real rwall_w = 1;
-    real ropen_w = 50;
+    real ontrap_w = 1;
+    real frozen_w = 1;
+    real rwall_w = 2;
+    real ropen_w = 90;
     real rhome_w = 0;
-    real rweak_w = 1;
-    real rstrong_w = 0.1;
+    real rweak_w = 0;
+    real rstrong_w = 0.001;
     real pstrength_w = 0.00001;
-    real goal_w = 10;
-    real static_trap_w = 1;
-    real random_w = 0;
+    real goal_w = 1;
+    real static_trap_w = 0.1;
+    real coverage_w = 0;
+    real reachable_w = 0;
     int max_qdepth = -40;
     int do_qsearch = 1;
     
@@ -634,9 +667,6 @@ class FullSearch : ABSearch
             case "eval_goal":
                 goal_w = toReal(value);
                 break;
-            case "eval_random":
-                random_w = toReal(value);
-                break;
             case "eval_quiesce":
                 do_qsearch = toInt(value);
                 break;
@@ -645,6 +675,12 @@ class FullSearch : ABSearch
                 break;
             case "eval_static_trap":
                 static_trap_w = toReal(value);
+                break;
+            case "eval_coverage":
+                coverage_w = toReal(value);
+                break;
+            case "eval_reachable":
+                reachable_w = toReal(value);
                 break;
             default:
                 handled = super.set_option(option, value);
@@ -1057,8 +1093,7 @@ class FullSearch : ABSearch
         //score += map_elephant(pos) * map_e_w;
         score += trap_safety(pos) * tsafety_w;
         score += on_trap(pos) * ontrap_w;
-        if (random_w)
-            score += (rand()%100) * random_w;
+        score += mobility(pos, coverage_w, reachable_w);
 
         if (pos.side == Side.BLACK)
             score = -score;
