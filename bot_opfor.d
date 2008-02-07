@@ -1104,7 +1104,7 @@ class FullSearch : ABSearch
         score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
-        score += rabbit_home(pos) * rhome_w;
+        //score += rabbit_home(pos) * rhome_w;
         score += frozen_pieces(pos) * frozen_w;
         //score += map_elephant(pos) * map_e_w;
         score += trap_safety(pos) * tsafety_w;
