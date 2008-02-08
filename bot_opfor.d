@@ -1168,6 +1168,7 @@ class Engine : AEIEngine
 {
     ABSearch searcher;
     PositionNode pos_list;
+    PositionNode loss_list;
     PositionNode next_pos;
     int depth;
     int best_score;
@@ -1339,6 +1340,24 @@ class Engine : AEIEngine
                 }
             }
 
+            if (score == -WIN_SCORE
+                    && next_pos !is pos_list)
+            {
+                PositionNode n = next_pos;
+
+                if (next_pos.next !is null)
+                    next_pos.next.prev = next_pos.prev;
+
+                next_pos.prev.next = next_pos.next;
+                next_pos = next_pos.prev;
+
+                n.prev = null;
+                n.next = loss_list;
+                if (loss_list !is null)
+                    loss_list.prev = n;
+                loss_list = n;
+            }
+
             if (score > best_score)
             {
                 best_score = score;
@@ -1410,6 +1429,14 @@ class Engine : AEIEngine
             StepList.free(pos_list.move);
             PositionNode n = pos_list;
             pos_list = n.next;
+            PositionNode.free(n);
+        }
+        while (loss_list !is null)
+        {
+            Position.free(loss_list.pos);
+            StepList.free(loss_list.move);
+            PositionNode n = loss_list;
+            loss_list = n.next;
             PositionNode.free(n);
         }
         next_pos = null;
@@ -1669,6 +1696,7 @@ int main(char[][] args)
                 {
                     if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                         || (engine.best_score >= WIN_SCORE)
+                        || (engine.pos_list.next is null)
                         || (tc_permove && (next_end >= ((tc_max_search * TicksPerSecond) + move_start))))
                     {
                         engine.set_bestmove();
