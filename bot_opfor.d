@@ -1650,6 +1650,7 @@ int main(char[][] args)
                 break;
             case EngineState.SEARCHING:
                 PositionNode cur_best = engine.pos_list;
+                d_time start_run = getUTCtime();
                 if (engine.searcher.nodes_searched && (length > (TicksPerSecond/2)))
                 {
                     int chunk = engine.searcher.nodes_searched / (length / (TicksPerSecond /2));
@@ -1659,6 +1660,7 @@ int main(char[][] args)
                 }
                 check_num += 1;
                 d_time now = getUTCtime();
+                d_time next_end = now + (now-start_run); // estimated time to end of next search call
                 if (cur_best != engine.pos_list)
                 {
                     last_decision_change = now;
@@ -1667,7 +1669,7 @@ int main(char[][] args)
                 {
                     if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                         || (engine.best_score >= WIN_SCORE)
-                        || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start))))
+                        || (tc_permove && (next_end >= ((tc_max_search * TicksPerSecond) + move_start))))
                     {
                         engine.set_bestmove();
                         engine.state = EngineState.MOVESET;
