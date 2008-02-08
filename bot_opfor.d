@@ -374,10 +374,10 @@ int rabbit_home(Position pos)
 
 real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
 {
-    const static int[][] pieceval = [[0, 0, 45, 60, 150, 200, 300,
-          0, -45, -60, -150, -200, -300],
-          [0, 0, -45, -60, -150, -200, -300,
-          0, 45, 60, 150, 200, 300]];
+    const static int[][] pieceval = [[0, 0, 45, 60, 100, 150, 200,
+          0, -45, -60, -100, -150, -200],
+          [0, 0, -45, -60, -100, -150, -200,
+          0, 45, 60, 100, 150, 200]];
     const static int[] distval = [100, 100, 100, 90, 70,
           30, 20, 15, 10, 5, 4, 3, 2, 1, 0, 0];
     const static real[][] rankval = [[0, 0, 0, 0.2, 0.5, 1.0, 1.2, 0],
@@ -510,16 +510,25 @@ int piece_strength(Position pos)
     return score;
 }
 
-int mobility(Position pos, real coverage_w, real reachable_w)
+int mobility(Position pos, real blockade_w, real hostage_w)
 {
+    int[] BLOCKADE_VAL = [0, 0, -10, -30, -70, -120, -200,
+                0, 10, 30, 70, 120, 200];
+    int[] HOSTAGE_VAL = [0, 0, -2, -4, -5, -10, -25, -40,
+                0, 2, 4, 5, 10, 25, 40];
     int[] SIDE_MUL = [1, -1];
 
-    real score = 0;
+    real bscore = 0;
+    real hscore = 0;
     for (Side side = Side.WHITE; side <= Side.BLACK; side++)
     {
         int pieceoffset = 0;
+        int enemyoffset = -6;
         if (side == Side.BLACK)
+        {
             pieceoffset = 6;
+            enemyoffset = 6;
+        }
 
         ulong unsafe = 0;
         ulong tbits = TRAPS;
@@ -539,6 +548,7 @@ int mobility(Position pos, real coverage_w, real reachable_w)
         {
             coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
         }
+
         ulong reachable = coverage;
         ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         while (reachable != nreach)
@@ -547,10 +557,65 @@ int mobility(Position pos, real coverage_w, real reachable_w)
             nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         }
 
-        score += ((popcount(coverage) * coverage_w) + (popcount(reachable) * reachable_w)) * SIDE_MUL[side];
+        ulong empty_neighbors = neighbors_of(pos.bitBoards[Piece.EMPTY]);
+
+        ulong bcheck = (pos.bitBoards[Piece.WELEPHANT+pieceoffset] | pos.bitBoards[Piece.WCAMEL+pieceoffset]
+            | pos.bitBoards[Piece.WHORSE+pieceoffset]) & ~pos.frozen & ~neighbors_of(coverage);
+        while (bcheck)
+        {
+            ulong pbit = bcheck & -bcheck;
+            bcheck ^= pbit;
+
+            ulong pneighbors = neighbors_of(pbit);
+            if ((pneighbors & pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset])
+                & empty_neighbors & ~unsafe)
+            {
+                continue;
+            }
+
+            if (rabbit_steps(side, pneighbors & pos.bitBoards[Piece.WRABBIT+pieceoffset])
+                        & pos.bitBoards[Piece.EMPTY])
+            {
+                continue;
+            }
+
+            bitix pix = bitindex(pbit);
+
+            ulong oneighbors = pneighbors & pos.placement[side^1];
+            while (oneighbors)
+            {
+                ulong obit = oneighbors & -oneighbors;
+                oneighbors ^= obit;
+
+                if (obit & empty_neighbors)
+                {
+                    bitix oix = bitindex(obit);
+                    if (pos.pieces[pix] > pos.pieces[oix] + enemyoffset)
+                        continue;
+                }
+            }
+
+            // the piece is blockaded
+            bscore += BLOCKADE_VAL[pos.pieces[pix]];
+        }
+
+        ulong hcheck = (pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset]) & pos.frozen;
+        while (hcheck)
+        {
+            ulong pbit = hcheck & -hcheck;
+            hcheck ^= pbit;
+
+            ulong pneighbors = neighbors_of(pbit);
+            if ((popcount(pneighbors & coverage) < 2)
+                    && (popcount(pneighbors & reachable) < 2))
+            {
+                bitix pix = bitindex(pbit);
+                hscore += HOSTAGE_VAL[pos.pieces[pix]];
+            }
+        }
     }
 
-    return cast(int)score;
+    return cast(int)((bscore * blockade_w) + (hscore * hostage_w));
 }
 
 class ScoreSearch : ABSearch
@@ -617,21 +682,25 @@ class FullSearch : ABSearch
     ulong nodes_quiesced = 0;
     
     real map_e_w = 1;
-    real tsafety_w = 5;
-    real ontrap_w = 1;
-    real frozen_w = 1;
-    real rwall_w = 2;
-    real ropen_w = 50;
-    real rhome_w = 2;
+    real tsafety_w = 1;
+    real ontrap_w = 2;
+    real frozen_w = 5;
+    real rwall_w = 1;
+    real ropen_w = 30;
+    real rhome_w = 1;
     real rweak_w = 3;
-    real rstrong_w = 0.005;
+    real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
-    real goal_w = 1;
-    real static_trap_w = 0.1;
-    real coverage_w = 0;
-    real reachable_w = 0;
+    real goal_w = 5;
+    real static_otrap_w = 1;
+    real static_strap_w = 0.4;
+    real blockade_w = 0;
+    real hostage_w = 0;
     int max_qdepth = -40;
     int do_qsearch = 1;
+    int expand_qdepth = true;
+
+    int qdepth;
     
     this()
     {
@@ -689,20 +758,36 @@ class FullSearch : ABSearch
                 break;
             case "eval_qdepth":
                 max_qdepth = 0 - toInt(value);
+                qdepth = max_qdepth;
                 break;
-            case "eval_static_trap":
-                static_trap_w = toReal(value);
+            case "expand_qdepth":
+                expand_qdepth = cast(bool)toInt(value);
                 break;
-            case "eval_coverage":
-                coverage_w = toReal(value);
+            case "eval_static_otrap":
+                static_otrap_w = toReal(value);
                 break;
-            case "eval_reachable":
-                reachable_w = toReal(value);
+            case "eval_static_strap":
+                static_strap_w = toReal(value);
+                break;
+            case "eval_blockade":
+                blockade_w = toReal(value);
+                break;
+            case "eval_hostage":
+                hostage_w = toReal(value);
                 break;
             default:
                 handled = super.set_option(option, value);
         }
         return handled;
+    }
+
+    void set_depth(int depth)
+    {
+        if (expand_qdepth)
+        {
+            qdepth = (-(depth/2) * 4) + (depth % 4);
+            qdepth = (qdepth > max_qdepth) ? qdepth : max_qdepth;
+        }
     }
 
     int eval(Position pos, int alpha, int beta)
@@ -770,7 +855,7 @@ class FullSearch : ABSearch
             Position.free(reversed);
         }
 
-        if (depth < max_qdepth)
+        if (depth < qdepth)
             return score;
 
         if (score >= beta)
@@ -869,12 +954,11 @@ class FullSearch : ABSearch
         return score;
     }
 
-    int static_trap_eval(Position pos, Side side, int score)
+    int static_trap_eval(Position pos, Side side, int pop, int fscore)
     {
+        int score = 0;
         if (trap_search.find_captures(pos, side))
         {
-            int pop = population(pos);
-            
             int[3] valuable_vid;
             Piece[3] valuable_victim;
             int[3] valuable_length;
@@ -1015,7 +1099,7 @@ class FullSearch : ABSearch
                     int vcnt = pop2count(pop, valuable_victim[i]) - 1;
                     int vpop = pop & ~(pop_mask[valuable_victim[i]] << pop_offset[valuable_victim[i]]);
                     vpop |= vcnt << pop_offset[valuable_victim[i]];
-                    valuable_value[i] = score - fame.score(vpop);
+                    valuable_value[i] = fscore - fame.score(vpop);
                 }
             }
 
@@ -1097,9 +1181,11 @@ class FullSearch : ABSearch
         }
 
         int pop = population(pos);
-        int score = fame.score(pop); // first pawn worth ~196
+        int fscore = fame.score(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
-        score += static_trap_eval(pos, cast(Side)(pos.side^1), score) * static_trap_w;
+        int score = fscore;
+        score += static_trap_eval(pos, cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
+        score += static_trap_eval(pos, pos.side, pop, fscore) * static_strap_w;
 
         score += piece_strength(pos) * pstrength_w;
         score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
@@ -1110,7 +1196,7 @@ class FullSearch : ABSearch
         //score += map_elephant(pos) * map_e_w;
         score += trap_safety(pos) * tsafety_w;
         score += on_trap(pos) * ontrap_w;
-        score += mobility(pos, coverage_w, reachable_w);
+        score += mobility(pos, blockade_w, hostage_w);
 
         if (pos.side == Side.BLACK)
             score = -score;
@@ -1301,6 +1387,7 @@ class Engine : AEIEngine
             best_score = MIN_SCORE;
             best_guess = MIN_SCORE;
             depth = 0;
+            searcher.set_depth(4);
             searcher.prepare();
             state = EngineState.SEARCHING;
         }
@@ -1388,6 +1475,7 @@ class Engine : AEIEngine
                 next_pos = next_pos.next;
             } else {
                 depth++;
+                searcher.set_depth(depth+4);
                 last_score = best_score;
                 last_best = pos_list;
                 best_score = MIN_SCORE;
@@ -1729,27 +1817,27 @@ int main(char[][] args)
                             engine.state = EngineState.MOVESET;
                         }
                     }
-                }
-                if (now > nextreport 
-                        || engine.depth > report_depth 
-                        || cur_best !is engine.pos_list)
-                {
-                    int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
-                    server.info(format("depth %d", depth));
-                    server.info(format("time %d", (now-search_start)/TicksPerSecond));
-                    server.info(format("nodes %d", engine.searcher.nodes_searched));
-                    if (engine.in_step)
+                    if (now > nextreport 
+                            || engine.depth > report_depth 
+                            || cur_best !is engine.pos_list)
                     {
-                        server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
-                    } else {
-                        server.info(format("score cr %d", cast(int)(engine.last_score / 1.96)));
+                        int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
+                        server.info(format("depth %d", depth));
+                        server.info(format("time %d", (now-search_start)/TicksPerSecond));
+                        server.info(format("nodes %d", engine.searcher.nodes_searched));
+                        if (engine.in_step)
+                        {
+                            server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
+                        } else {
+                            server.info(format("score cr %d", cast(int)(engine.last_score / 1.96)));
+                        }
+                        StepList bestline = engine.get_bestline();
+                        server.info(format("pv %s", bestline.to_move_str(engine.position)));
+                        StepList.free(bestline);
+                        check_num = 0;
+                        nextreport = now + report_interval;
+                        report_depth = engine.depth;
                     }
-                    StepList bestline = engine.get_bestline();
-                    server.info(format("pv %s", bestline.to_move_str(engine.position)));
-                    StepList.free(bestline);
-                    check_num = 0;
-                    nextreport = now + report_interval;
-                    report_depth = engine.depth;
                 }
                 break;
             default:

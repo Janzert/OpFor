@@ -580,6 +580,8 @@ class ABSearch
         return guess;
     }
 
+    void set_depth(int depth) { };
+
     void prepare()
     {
         nodes_searched = 0;

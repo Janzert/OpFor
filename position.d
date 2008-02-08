@@ -83,6 +83,19 @@ ulong neighbors_of(ulong value)
     return value;
 }
 
+ulong rabbit_steps(Side side, ulong bits)
+{
+    ulong expanded;
+    expanded = (bits & NOT_A_FILE) << 1;
+    expanded |= (bits & NOT_H_FILE) >> 1;
+    expanded |= ((bits << 8) >> (side << 4))
+        | (((bits & RANK_8) >> 8) << ((side^1) << 5));
+    //expanded |= (cur_side == Side.WHITE) ?
+    //            (bits & NOT_RANK_8) << 8 : (bits & NOT_RANK_1) >> 8;
+
+    return expanded;
+}
+
 char[] ix_to_alg(bitix index)
 {
     char[] alg;
