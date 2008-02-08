@@ -20,7 +20,7 @@ const int START_SEARCH_NODES = 100000;
 int trap_safety(Position pos)
 {
     const int BOTH_SAFE = 1;
-    const int HOME_CONTROL = 3;
+    const int HOME_CONTROL = 2;
     const int AWAY_CONTROL = 5;
 
     int score = 0;
@@ -278,8 +278,8 @@ int rabbit_open(Position pos)
 {
     const int[8][2] NORABBIT_FILE = [[1, 1, 1, 2, 3, 5, 7, 0], [0, -7, -5, -3, -2, -1, -1, -1]];
     const int[8][2] NORABBIT_ADJ = [[1, 1, 1, 2, 2, 4, 4, 0], [0, -4, -4, -2, -2, -1, -1, -1]];
-    const int[8][2] OPEN_FILE = [[2, 2, 2, 3, 5, 10, 20, 0], [0, -20, -10, -5, -3, -2, -2, -2]];
-    const int[8][2] OPEN_ADJ = [[2, 2, 3, 20, 30, 40, 60, 0], [0, -60, -40, -30, -20, -3, -2, -2]];
+    const int[8][2] OPEN_FILE = [[2, 2, 2, 3, 10, 20, 40, 0], [0, -40, -20, -10, -3, -2, -2, -2]];
+    const int[8][2] OPEN_ADJ = [[2, 2, 3, 20, 40, 80, 120, 0], [0, -120, -80, -40, -20, -3, -2, -2]];
 
     int score = 0;
 
@@ -698,16 +698,16 @@ class FullSearch : ABSearch
     real map_e_w = 1;
     real tsafety_w = 1;
     real ontrap_w = 2;
-    real frozen_w = 5;
+    real frozen_w = 3;
     real rwall_w = 1;
-    real ropen_w = 30;
+    real ropen_w = 5;
     real rhome_w = 1;
     real rweak_w = 3;
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
     real goal_w = 5;
     real static_otrap_w = 1;
-    real static_strap_w = 0.4;
+    real static_strap_w = 0.5;
     real blockade_w = 1;
     real hostage_w = 5;
     int max_qdepth = -40;
