@@ -549,6 +549,7 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
         }
 
+        /*
         ulong reachable = coverage;
         ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         while (reachable != nreach)
@@ -556,6 +557,7 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             reachable = nreach;
             nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         }
+        */
 
         ulong empty_neighbors = neighbors_of(pos.bitBoards[Piece.EMPTY]);
 
@@ -606,8 +608,7 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             hcheck ^= pbit;
 
             ulong pneighbors = neighbors_of(pbit);
-            if ((popcount(pneighbors & coverage) < 2)
-                    && (popcount(pneighbors & reachable) < 2))
+            if (popcount(pneighbors & coverage) < 2)
             {
                 bitix pix = bitindex(pbit);
                 hscore += HOSTAGE_VAL[pos.pieces[pix]];
