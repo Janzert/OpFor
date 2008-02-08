@@ -218,13 +218,13 @@ class StepSorter
                     {
                         steps.steps[bix].copy(steps.steps[0]);
                         steps.steps[0] = best;
+                        num++;
+                        step = &best;
+                        stage++;
+                        break;
                     } else {
-                        assert(0, "Did not find best step in step list");
+                        assert(0, "Did not find hash step in step list");
                     }
-                    num++;
-                    step = &best;
-                    stage++;
-                    break;
                 }
                 stage++;
             case 1:

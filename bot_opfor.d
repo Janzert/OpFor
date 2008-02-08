@@ -123,7 +123,7 @@ int trap_safety(Position pos)
 // penalty for piece on trap, pinned or framed
 int on_trap(Position pos)
 {
-    const int ON_TRAP[13] = [0, -10, -15, -19, -31, -56, -132, 10, 15, 19, 31, 56, 132];
+    const int ON_TRAP[13] = [0, -6, -10, -13, -20, -37, -88, 6, 10, 13, 20, 37, 88];
     const int PINNED[13] = [0, 0, -4, -8, -14, -25, -59, 0, 4, 8, 14, 25, 59];
     const int FRAMER[13] = [0, 0, -1, -2, -4, -8, -19, 0, 1, 2, 4, 8, 19];
 
@@ -358,13 +358,14 @@ int rabbit_home(Position pos)
 {
     const static int[] side_mul = [1, -1];
     const static ulong[][] side_rank = [[RANK_1, RANK_2], [RANK_8, RANK_7]];
+    const static int FIRST_ROW = 4;
     
     int score = 0;
     for (Side side = Side.WHITE; side <= Side.BLACK; side++)
     {
         Piece rpiece = (side == Side.WHITE) ? Piece.WRABBIT : Piece.BRABBIT;
         ulong rabbits = pos.bitBoards[rpiece];
-        score += popcount(side_rank[side][0] & rabbits) * 2 * side_mul[side];
+        score += popcount(side_rank[side][0] & rabbits) * FIRST_ROW * side_mul[side];
         score += popcount(side_rank[side][1] & rabbits) * side_mul[side];
     }
 
@@ -615,13 +616,13 @@ class FullSearch : ABSearch
 
     ulong nodes_quiesced = 0;
     
-    real map_e_w = 0;
+    real map_e_w = 1;
     real tsafety_w = 5;
     real ontrap_w = 1;
     real frozen_w = 1;
     real rwall_w = 2;
-    real ropen_w = 80;
-    real rhome_w = 0;
+    real ropen_w = 50;
+    real rhome_w = 2;
     real rweak_w = 3;
     real rstrong_w = 0.005;
     real pstrength_w = 0.00001;
@@ -1104,7 +1105,7 @@ class FullSearch : ABSearch
         score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
-        //score += rabbit_home(pos) * rhome_w;
+        score += rabbit_home(pos) * rhome_w;
         score += frozen_pieces(pos) * frozen_w;
         //score += map_elephant(pos) * map_e_w;
         score += trap_safety(pos) * tsafety_w;
