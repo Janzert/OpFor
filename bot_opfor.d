@@ -514,8 +514,8 @@ int mobility(Position pos, real blockade_w, real hostage_w)
 {
     int[] BLOCKADE_VAL = [0, 0, -10, -30, -70, -120, -200,
                 0, 10, 30, 70, 120, 200];
-    int[] HOSTAGE_VAL = [0, 0, -2, -4, -5, -10, -25, -40,
-                0, 2, 4, 5, 10, 25, 40];
+    int[] HOSTAGE_VAL = [0, -2, -4, -5, -10, -25, -40,
+                2, 4, 5, 10, 25, 40];
     int[] SIDE_MUL = [1, -1];
 
     real bscore = 0;
@@ -549,7 +549,6 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
         }
 
-        /*
         ulong reachable = coverage;
         ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         while (reachable != nreach)
@@ -557,7 +556,6 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             reachable = nreach;
             nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
         }
-        */
 
         ulong empty_neighbors = neighbors_of(pos.bitBoards[Piece.EMPTY]);
 
@@ -583,6 +581,7 @@ int mobility(Position pos, real blockade_w, real hostage_w)
 
             bitix pix = bitindex(pbit);
 
+            bool can_push = false;
             ulong oneighbors = pneighbors & pos.placement[side^1];
             while (oneighbors)
             {
@@ -593,9 +592,14 @@ int mobility(Position pos, real blockade_w, real hostage_w)
                 {
                     bitix oix = bitindex(obit);
                     if (pos.pieces[pix] > pos.pieces[oix] + enemyoffset)
-                        continue;
+                    {
+                        can_push = true;
+                        break;
+                    }
                 }
             }
+            if (can_push)
+                continue;
 
             // the piece is blockaded
             bscore += BLOCKADE_VAL[pos.pieces[pix]];
@@ -608,13 +612,22 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             hcheck ^= pbit;
 
             ulong pneighbors = neighbors_of(pbit);
-            if (popcount(pneighbors & coverage) < 2)
+            if ((popcount(pneighbors & coverage) < 1)
+                    || (popcount(pneighbors & reachable) < 2))
             {
                 bitix pix = bitindex(pbit);
                 hscore += HOSTAGE_VAL[pos.pieces[pix]];
             }
         }
     }
+
+    /*
+    if (hscore)
+    {
+        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+        writefln("bscore %.2f, hscore %.2f", bscore, hscore);
+    }
+    */
 
     return cast(int)((bscore * blockade_w) + (hscore * hostage_w));
 }
@@ -695,8 +708,8 @@ class FullSearch : ABSearch
     real goal_w = 5;
     real static_otrap_w = 1;
     real static_strap_w = 0.4;
-    real blockade_w = 0;
-    real hostage_w = 0;
+    real blockade_w = 1;
+    real hostage_w = 5;
     int max_qdepth = -40;
     int do_qsearch = 1;
     int expand_qdepth = true;
