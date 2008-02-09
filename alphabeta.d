@@ -176,6 +176,7 @@ class StepSorter
 
     int num;
     int stage;
+    int history_num;
 
     this(Position p, Step* b)
     {
@@ -196,6 +197,7 @@ class StepSorter
         num = 0;
         stage = 0;
         captures_generated = 0;
+        history_num = 0;
     }
 
     Step* next_step()
@@ -378,6 +380,7 @@ class StepSorter
                     steps.steps[num] = steps.steps[bix];
                     steps.steps[bix] = tmp;
 
+                    history_num++;
                     step = &steps.steps[num++];
                     break;
                 }
@@ -403,6 +406,7 @@ class ABSearch
     ulong tthits;
 
     bool tournament_rules = true;
+    bool use_lmr = false;
 
     this(Logger l)
     {
@@ -433,6 +437,9 @@ class ABSearch
                 break;
             case "capture_sort":
                 StepSorter.capture_first = cast(bool)(toInt(value));
+                break;
+            case "use_lmr":
+                use_lmr = cast(bool)toInt(value);
                 break;
             default:
                 handled = false;
@@ -519,18 +526,46 @@ class ABSearch
                 {
                     cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                             // loss since it's actually an illegal move
-                } else if (npos.stepsLeft == 4)
-                {
-                    Position mynull = nullmove;
-                    nullmove = npos.dup;
-                    nullmove.do_step(NULL_STEP);
-
-                    cal = -alphabeta(npos, depth-1, -beta, -alpha);
-
-                    Position.free(nullmove);
-                    nullmove = mynull;
                 } else {
-                    cal = alphabeta(npos, depth-1, alpha, beta);
+                    int first_val;
+                    if (use_lmr && depth > 3
+                            && sorted_steps.history_num > 3)
+                    {
+                        if (npos.stepsLeft == 4)
+                        {
+                            Position mynull = nullmove;
+                            nullmove = npos.dup;
+                            nullmove.do_step(NULL_STEP);
+
+                            cal = -alphabeta(npos, depth-2, -(alpha+1), -alpha);
+
+                            Position.free(nullmove);
+                            nullmove = mynull;
+                        } else {
+                            cal = alphabeta(npos, depth-2, alpha, alpha+1);
+                        }
+                    } else {
+                        first_val = alpha + 1;
+                    }
+
+                    if (first_val > alpha)
+                    {
+                        if (npos.stepsLeft == 4)
+                        {
+                            Position mynull = nullmove;
+                            nullmove = npos.dup;
+                            nullmove.do_step(NULL_STEP);
+
+                            cal = -alphabeta(npos, depth-1, -beta, -alpha);
+
+                            Position.free(nullmove);
+                            nullmove = mynull;
+                        } else {
+                            cal = alphabeta(npos, depth-1, alpha, beta);
+                        }
+                    } else {
+                        cal = first_val;
+                    }
                 }
 
                 Position.free(npos);
