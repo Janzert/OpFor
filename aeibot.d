@@ -4,9 +4,12 @@
  */
 
 import std.conv;
+import std.format;
 import std.string;
 import std.socket;
+import std.utf;
 
+import logging;
 import position;
 
 pragma(lib, "ws2_32.lib");
@@ -180,7 +183,7 @@ class OptionCmd : ServerCmd
     }
 }
 
-class ServerInterface
+class ServerInterface : LogConsumer
 {
     ServerConnection con;
     char[] partial;
@@ -309,9 +312,19 @@ class ServerInterface
         con.send(format("bestmove %s\n", move));
     }
 
-    void info(char[] msg)
+    void info(char[] message)
     {
-        con.send(format("info %s\n", msg));
+        con.send(format("info %s\n", message));
+    }
+
+    void log(char[] message)
+    {
+        con.send(format("log %s\n", message));
+    }
+
+    void warn(char[] message)
+    {
+        con.send(format("log Warning: %s\n", message));
     }
 
     ServerCmd current_cmd()
@@ -339,6 +352,8 @@ enum EngineState { UNINITIALIZED, IDLE, SEARCHING, MOVESET };
 
 class AEIEngine
 {
+    Logger logger;
+
     EngineState state;
     char[] bestmove;
 
@@ -347,8 +362,9 @@ class AEIEngine
     Position[] past;
     char[][] moves;
 
-    this()
+    this(Logger l)
     {
+        logger = l;
         state = EngineState.UNINITIALIZED;
     }
 

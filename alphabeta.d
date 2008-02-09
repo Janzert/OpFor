@@ -2,6 +2,7 @@
 import std.conv;
 import std.stdio;
 
+import logging;
 import position;
 import trapmoves;
 
@@ -157,6 +158,8 @@ class StepSorter
         reserve[reservesize++] = s;
     }
 
+    static Logger logger;
+
     static HistoryHeuristic cuthistory;
     static TrapGenerator trap_search;
 
@@ -222,9 +225,8 @@ class StepSorter
                         step = &best;
                         stage++;
                         break;
-                    } else {
-                        assert(0, "Did not find hash step in step list");
                     }
+                    logger.warn("Did not find hash step in step list");
                 }
                 stage++;
             case 1:
@@ -390,6 +392,7 @@ class StepSorter
 
 class ABSearch
 {
+    Logger logger;
     TransTable ttable;
     HistoryHeuristic cuthistory;
     TrapGenerator trap_search;
@@ -401,8 +404,10 @@ class ABSearch
 
     bool tournament_rules = true;
 
-    this()
+    this(Logger l)
     {
+        logger = l;
+        StepSorter.logger = l;
         ttable = new TransTable(10);
         cuthistory = new HistoryHeuristic();
         StepSorter.cuthistory = cuthistory;

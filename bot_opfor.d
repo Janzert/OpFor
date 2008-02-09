@@ -10,6 +10,7 @@ import std.string;
 import alphabeta;
 import aeibot;
 import goalsearch;
+import logging;
 import position;
 
 const char[] BOT_NAME = "OpFor";
@@ -634,9 +635,9 @@ int mobility(Position pos, real blockade_w, real hostage_w)
 
 class ScoreSearch : ABSearch
 {
-    this()
+    this(Logger l)
     {
-        super();
+        super(l);
     }
 
     int eval(Position pos)
@@ -716,9 +717,9 @@ class FullSearch : ABSearch
 
     int qdepth;
     
-    this()
+    this(Logger l)
     {
-        super();
+        super(l);
         goal_searcher = new GoalSearch();
         fame = new FastFAME(0.1716);
     }
@@ -1286,9 +1287,10 @@ class Engine : AEIEngine
 
     bool use_mtdf = false;
 
-    this()
+    this(Logger l)
     {
-        searcher = new FullSearch();
+        super(l);
+        searcher = new FullSearch(l);
         //searcher = new ScoreSearch();
         in_step = false;
         max_depth = -1;
@@ -1437,7 +1439,7 @@ class Engine : AEIEngine
                     if (pos.side == Side.BLACK)
                         val = -val;
                     score += val;
-                    writefln("Saw position in book added %d to %d score.", val, score);
+                    logger.console("Saw position in book added %d to %d score.", val, score);
                 }
             }
 
@@ -1560,10 +1562,12 @@ int main(char[][] args)
     d_time nextreport = 0;
     int report_depth = 0;
 
+    Logger logger = new Logger();
     ServerInterface server = new ServerInterface(new SocketServer(ip, port),
             BOT_NAME, BOT_AUTHOR);
+    logger.register(server);
     writefln("Connected to server %s:%d", ip, port);
-    Engine engine = new Engine();
+    Engine engine = new Engine(logger);
 
     int tc_permove = 0;         // time given per move
     int tc_maxreserve = 0;      // maximum reserve size
@@ -1700,11 +1704,11 @@ int main(char[][] args)
                             if (scmd.value == "infinite")
                             {
                                 engine.max_depth = -1;
-                                server.info("log Search depth set to infinite");
+                                logger.log("Search depth set to infinite");
                             } else {
                                 int depth = toInt(scmd.value);
                                 engine.max_depth = (depth > 3) ? depth - 4 : 0;
-                                server.info(format("log Search depth set to %d", engine.max_depth+4));
+                                logger.log("Search depth set to %d", engine.max_depth+4);
                             }
                             break;
                         case "tcmove":
@@ -1727,6 +1731,9 @@ int main(char[][] args)
                             break;
                         case "tcmoveused":
                             move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
+                            break;
+                        case "log_console":
+                            logger.to_console = cast(bool)toInt(scmd.value);
                             break;
                         default:
                             engine.set_option(scmd.name, scmd.value);
@@ -1754,7 +1761,7 @@ int main(char[][] args)
                     search_num += 1;
                     if (engine.best_score >= WIN_SCORE)
                     {
-                        server.info(format("log Sending forced win move in %.2f seconds.", seconds));
+                        logger.log("Sending forced win move in %.2f seconds.", seconds);
                     }
                 }
                 real average = 0;
@@ -1763,18 +1770,18 @@ int main(char[][] args)
                     average = (cast(real)search_time / TicksPerSecond) / search_num;
                 }
                 real max_seconds = cast(real)search_max / TicksPerSecond;
-                server.info(format("log Searched %d nodes, %.0f nps, %d tthits.",
-                        engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits));
-                writefln("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
-                writefln("Sending move %s", engine.bestmove);
+                logger.log("Searched %d nodes, %.0f nps, %d tthits.",
+                        engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits);
+                logger.log("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
+                logger.console("Sending move %s", engine.bestmove);
                 if (!pondering)
                 {
                     server.bestmove(engine.bestmove);
                 }
                 engine.cleanup_search();
-                writefln("Positions allocated %d, in reserve %d (%.0fMB).",
+                logger.log("Positions allocated %d, in reserve %d (%.0fMB).",
                         Position.allocated, Position.reserved, Position.reserve_size);
-                writefln("PNodes allocated %d, in reserve %d.", PositionNode.allocated, PositionNode.reserved);
+                logger.log("PNodes allocated %d, in reserve %d.", PositionNode.allocated, PositionNode.reserved);
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
@@ -1805,17 +1812,17 @@ int main(char[][] args)
                         engine.state = EngineState.MOVESET;
                     } else if (tc_permove && (now > ((tc_min_search * TicksPerSecond) + move_start)))
                     {
-                        server.info("log Min search time reached");
+                        logger.log("Min search time reached");
                         d_time decision_length = now - last_decision_change;
                         d_time move_length = now - move_start;
                         d_time time_left = (move_start + (tc_max_search * TicksPerSecond)) - now;
                         if (decision_length < move_length * (1.0/tc_confidence_denom)
                                 && decision_length < time_left * (1.0/tc_time_left_denom))
                         {
-                            server.info(format("log move_length %d, decision_length %d, time_left %d", 
+                            logger.log("move_length %d, decision_length %d, time_left %d", 
                                         (move_length / TicksPerSecond),
                                         (decision_length / TicksPerSecond),
-                                        (time_left / TicksPerSecond)));
+                                        (time_left / TicksPerSecond));
                             real tc_cd = 1.0 / (tc_confidence_denom-1);
                             real tc_tld = 1.0 / (tc_time_left_denom-1);
                             d_time length_cutoff = cast(d_time)((last_decision_change - move_start) * tc_cd) + last_decision_change;
@@ -1824,9 +1831,9 @@ int main(char[][] args)
                             d_time end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
                             end_search += cast(d_time)(0.1 * TicksPerSecond);
                             tc_min_search = (end_search - move_start) / TicksPerSecond;
-                            server.info(format("log next min_search set to %d", tc_min_search));
+                            logger.log("next min_search set to %d", tc_min_search);
                         } else {
-                            server.info(format("log last decision change %d seconds ago", decision_length / TicksPerSecond));
+                            logger.log("last decision change %d seconds ago", decision_length / TicksPerSecond);
                             engine.set_bestmove();
                             engine.state = EngineState.MOVESET;
                         }
@@ -1836,17 +1843,17 @@ int main(char[][] args)
                             || cur_best !is engine.pos_list)
                     {
                         int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
-                        server.info(format("depth %d", depth));
-                        server.info(format("time %d", (now-search_start)/TicksPerSecond));
-                        server.info(format("nodes %d", engine.searcher.nodes_searched));
+                        logger.info("depth %d", depth);
+                        logger.info("time %d", (now-search_start)/TicksPerSecond);
+                        logger.info("nodes %d", engine.searcher.nodes_searched);
                         if (engine.in_step)
                         {
-                            server.info(format("score cr %d", cast(int)(engine.best_score / 1.96)));
+                            logger.info("score cr %d", cast(int)(engine.best_score / 1.96));
                         } else {
-                            server.info(format("score cr %d", cast(int)(engine.last_score / 1.96)));
+                            logger.info("score cr %d", cast(int)(engine.last_score / 1.96));
                         }
                         StepList bestline = engine.get_bestline();
-                        server.info(format("pv %s", bestline.to_move_str(engine.position)));
+                        logger.info("pv %s", bestline.to_move_str(engine.position));
                         StepList.free(bestline);
                         check_num = 0;
                         nextreport = now + report_interval;
