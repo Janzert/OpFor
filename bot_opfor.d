@@ -1298,7 +1298,6 @@ class Engine : AEIEngine
         //searcher = new ScoreSearch();
         in_step = false;
         max_depth = -1;
-        searcher.tournament_rules = false;
     }
 
     bool set_option(char[] option, char[] value)

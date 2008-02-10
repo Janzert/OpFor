@@ -432,6 +432,9 @@ class ABSearch
                     ttable.set_size(toInt(value));
                 } catch (ConvError e) { }
                 break;
+            case "tournament_rules":
+                tournament_rules = cast(bool)toInt(value);
+                break;
             case "history":
                 StepSorter.use_history = cast(bool)(toInt(value));
                 break;
