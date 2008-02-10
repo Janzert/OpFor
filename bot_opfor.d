@@ -1235,6 +1235,7 @@ class PositionNode
 
     Position pos;
     StepList move;
+    int last_score;
 
     this()
     {
@@ -1271,9 +1272,12 @@ class Engine : AEIEngine
     PositionNode pos_list;
     PositionNode loss_list;
     PositionNode next_pos;
+    int num_moves;
+    int checked_moves;
+    int num_best;
+
     int depth;
     int best_score;
-    int best_guess;
 
     bool in_step;
     int last_score;
@@ -1285,7 +1289,7 @@ class Engine : AEIEngine
     PositionRecord[] opening_book;
     bool position_record = false;
 
-    bool use_mtdf = false;
+    bool root_lmr = true;
 
     this(Logger l)
     {
@@ -1310,8 +1314,8 @@ class Engine : AEIEngine
                         opening_book.length = BOOK_SIZE;
                 }
                 break;
-            case "use_mtdf":
-                use_mtdf = cast(bool)toInt(value);
+            case "root_lmr":
+                root_lmr = cast(bool)toInt(value);
                 break;
             default:
                 handled = searcher.set_option(option, value);
@@ -1370,6 +1374,7 @@ class Engine : AEIEngine
                 PositionNode n = PositionNode.allocate();
                 n.pos = pos;
                 n.move = pstore.getpos(pos);
+                n.last_score = MAX_SCORE;
 
                 if ((pos.zobrist in repetitions) && (repetitions[pos.zobrist] > 1))
                 {
@@ -1382,6 +1387,8 @@ class Engine : AEIEngine
                     repeated = n;
                     continue;
                 }
+
+                num_moves++;
 
                 n.prev = last_pos;
                 if (last_pos !is null)
@@ -1398,11 +1405,13 @@ class Engine : AEIEngine
             {
                 // only repetition moves available
                 pos_list = repeated;
+                num_moves = 1;
             }
             next_pos = pos_list;
             best_score = MIN_SCORE;
-            best_guess = MIN_SCORE;
             depth = 0;
+            checked_moves = 0;
+            num_best = 0;
             searcher.set_depth(4);
             searcher.prepare();
             state = EngineState.SEARCHING;
@@ -1419,14 +1428,22 @@ class Engine : AEIEngine
             searcher.nullmove = pos.dup;
             searcher.nullmove.do_step(NULL_STEP);
             int score;
-            if (use_mtdf)
+            if (root_lmr && depth > 2
+                    && checked_moves > num_best)
             {
-                score = -searcher.mtdf(pos, depth, -best_guess, -best_score);
+                score = -searcher.alphabeta(pos, depth-1, -(best_score+1), -best_score);
             } else {
+                score = best_score +1;
+            }
+
+            if (score > best_score)
+            {
                 score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
             }
+            next_pos.last_score = score;
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
+            checked_moves++;
 
             if (position_record)
             {
@@ -1464,7 +1481,6 @@ class Engine : AEIEngine
             if (score > best_score)
             {
                 best_score = score;
-                best_guess = score;
                 
                 if (next_pos !is pos_list)
                 {
@@ -1484,13 +1500,17 @@ class Engine : AEIEngine
                 {
                     break;
                 }
+
+                if (checked_moves > num_best)
+                {
+                    num_best++;
+                }
             }
 
-            if (next_pos.next !is null)
+            if (next_pos.next is null)
             {
-                next_pos = next_pos.next;
-            } else {
                 depth++;
+                checked_moves = 0;
                 searcher.set_depth(depth+4);
                 last_score = best_score;
                 last_best = pos_list;
@@ -1499,6 +1519,8 @@ class Engine : AEIEngine
                 in_step = false;
                 break;
             }
+
+            next_pos = next_pos.next;
         }
     }
 
@@ -1546,6 +1568,7 @@ class Engine : AEIEngine
         next_pos = null;
         pos_list = null;
         last_best = null;
+        num_moves = 0;
         last_score = MIN_SCORE;
         best_score = MIN_SCORE;
         searcher.cleanup();

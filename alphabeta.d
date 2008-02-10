@@ -406,7 +406,7 @@ class ABSearch
     ulong tthits;
 
     bool tournament_rules = true;
-    bool use_lmr = false;
+    bool use_lmr = true;
 
     this(Logger l)
     {
@@ -528,9 +528,11 @@ class ABSearch
                                             // loss since it's actually an illegal move
                 } else {
                     int first_val;
-                    if (use_lmr && depth > 3
-                            && sorted_steps.history_num > 3)
+                    if (use_lmr && depth > 2
+                            && sorted_steps.num > 3
+                            && sorted_steps.history_num > 1)
                     {
+                        use_lmr = false;
                         if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
@@ -544,6 +546,7 @@ class ABSearch
                         } else {
                             cal = alphabeta(npos, depth-2, alpha, alpha+1);
                         }
+                        use_lmr = true;
                     } else {
                         first_val = alpha + 1;
                     }
@@ -593,7 +596,7 @@ class ABSearch
             {
                 cuthistory.update(pos, new_best, depth);
             }
-            
+
             StepSorter.free(sorted_steps);
         }
 
@@ -620,7 +623,7 @@ class ABSearch
         return guess;
     }
 
-    void set_depth(int depth) { };
+    void set_depth(int depth) { }
 
     void prepare()
     {
