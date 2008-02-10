@@ -544,8 +544,9 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             }
         }
 
-        ulong coverage = pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen;
-        for (int steps = 0; steps < 4; steps++)
+        ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
+            & pos.bitBoards[Piece.EMPTY] & ~unsafe;
+        for (int steps = 0; steps < 3; steps++)
         {
             coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
         }
@@ -566,21 +567,24 @@ int mobility(Position pos, real blockade_w, real hostage_w)
         {
             ulong pbit = bcheck & -bcheck;
             bcheck ^= pbit;
+            bitix pix = bitindex(pbit);
 
             ulong pneighbors = neighbors_of(pbit);
-            if ((pneighbors & pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset])
-                & empty_neighbors & ~unsafe)
+            if ((pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
+                    || (popcount(pneighbors & pos.placement[side]) >= 2))
             {
-                continue;
-            }
+                if ((pneighbors & pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset])
+                    & empty_neighbors & ~unsafe)
+                {
+                    continue;
+                }
 
-            if (rabbit_steps(side, pneighbors & pos.bitBoards[Piece.WRABBIT+pieceoffset])
-                        & pos.bitBoards[Piece.EMPTY])
-            {
-                continue;
+                if (rabbit_steps(side, pneighbors & pos.bitBoards[Piece.WRABBIT+pieceoffset])
+                            & pos.bitBoards[Piece.EMPTY])
+                {
+                    continue;
+                }
             }
-
-            bitix pix = bitindex(pbit);
 
             bool can_push = false;
             ulong oneighbors = pneighbors & pos.placement[side^1];
@@ -602,8 +606,14 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             if (can_push)
                 continue;
 
-            // the piece is blockaded
-            bscore += BLOCKADE_VAL[pos.pieces[pix]];
+            if (pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
+            {
+                // the piece is blockaded
+                bscore += BLOCKADE_VAL[pos.pieces[pix]];
+            } else {
+                // the piece is blockaded but actually a hostage
+                hscore += HOSTAGE_VAL[pos.pieces[pix]];
+            }
         }
 
         ulong hcheck = (pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset]) & pos.frozen;
@@ -621,14 +631,6 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             }
         }
     }
-
-    /*
-    if (hscore)
-    {
-        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-        writefln("bscore %.2f, hscore %.2f", bscore, hscore);
-    }
-    */
 
     return cast(int)((bscore * blockade_w) + (hscore * hostage_w));
 }
