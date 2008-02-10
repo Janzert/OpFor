@@ -542,12 +542,12 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            cal = -alphabeta(npos, depth-2, -(alpha+1), -alpha);
+                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            cal = alphabeta(npos, depth-2, alpha, alpha+1);
+                            first_val = alphabeta(npos, depth-2, alpha, alpha+1);
                         }
                         use_lmr = true;
                     } else {
