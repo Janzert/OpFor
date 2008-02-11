@@ -1,5 +1,6 @@
 
 import std.conv;
+import std.date;
 import std.stdio;
 
 import logging;
@@ -9,6 +10,7 @@ import trapmoves;
 static const int WIN_SCORE = 64000;
 static const int MAX_SCORE = 65000;
 static const int MIN_SCORE = -MAX_SCORE;
+static const int ABORT_SCORE = MAX_SCORE+100;
 
 enum SType { EXACT, ALPHA, BETA }
 
@@ -280,21 +282,21 @@ class StepSorter
                                 steps.steps[bix] = tmp;
                                 break;
                             } else {
-                                debug
+                                bool had_pull = false;
+                                for (int i=0; i < steps.numsteps; i++)
                                 {
-                                    bool had_pull = false;
-                                    for (int i=0; i < steps.numsteps; i++)
+                                    if (capture_steps.steps[capture_num].frombit == steps.steps[i].frombit
+                                            && (capture_steps.steps[capture_num].tobit == steps.steps[i].tobit)
+                                            && (capture_steps.steps[capture_num].push != steps.steps[i].push))
                                     {
-                                        if (capture_steps.steps[capture_num].frombit == steps.steps[i].frombit
-                                                && (capture_steps.steps[capture_num].tobit == steps.steps[i].tobit)
-                                                && (capture_steps.steps[capture_num].push != steps.steps[i].push))
-                                        {
-                                            had_pull = true;
-                                            break;
-                                        }
+                                        had_pull = true;
+                                        break;
                                     }
+                                }
 
-                                    if (!had_pull)
+                                if (!had_pull)
+                                {
+                                    debug
                                     {
                                         writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
                                         writefln("step %s, cnum %d, num %d, stepsleft %d lf %s%s",
@@ -349,7 +351,9 @@ class StepSorter
                                         writefln("Did not find capture step in list");
                                         assert (0);
                                     }
+                                    logger.warn("Did not find capture step in legal step list.");
                                 }
+
                                 capture_num++;
                             }
                         }
@@ -404,6 +408,10 @@ class ABSearch
 
     ulong nodes_searched;
     ulong tthits;
+
+    ulong check_nodes;
+    int check_interval = 100000;
+    d_time abort_time = 0;
 
     bool tournament_rules = true;
     bool use_lmr = true;
@@ -576,6 +584,13 @@ class ABSearch
 
                 Position.free(npos);
 
+                if (cal == ABORT_SCORE
+                        || cal == -ABORT_SCORE)
+                {
+                    score = ABORT_SCORE;
+                    break;
+                }
+
                 if (cal > score)
                 {
                     score = cal;
@@ -601,9 +616,22 @@ class ABSearch
             }
 
             StepSorter.free(sorted_steps);
+
+            if (score == ABORT_SCORE)
+                return ABORT_SCORE;
         }
 
         node.set(pos, depth, score, sflag, new_best);
+
+        if (nodes_searched > check_nodes)
+        {
+            if (abort_time && getUTCtime() > abort_time)
+            {
+                return ABORT_SCORE;
+            }
+
+            check_nodes += check_interval;
+        }
 
         return score;
     }

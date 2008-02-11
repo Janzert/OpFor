@@ -1419,11 +1419,11 @@ class Engine : AEIEngine
         }
     }
 
-    void search(int num_nodes)
+    void search(d_time stop_time)
     {
         in_step = true;
-        ulong stop_node = searcher.nodes_searched + num_nodes;
-        while (searcher.nodes_searched < stop_node)
+        d_time start_time = getUTCtime();
+        while (getUTCtime() < stop_time)
         {
             Position pos = next_pos.pos;
             searcher.nullmove = pos.dup;
@@ -1437,7 +1437,7 @@ class Engine : AEIEngine
                 score = best_score +1;
             }
 
-            if (score > best_score)
+            if (score > best_score && score != -ABORT_SCORE)
             {
                 score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
             }
@@ -1445,6 +1445,14 @@ class Engine : AEIEngine
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
             checked_moves++;
+
+            if (score == ABORT_SCORE
+                    || score == -ABORT_SCORE)
+            {
+                d_time now = getUTCtime();
+                logger.log("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
+                break;
+            }
 
             if (position_record)
             {
@@ -1810,17 +1818,29 @@ int main(char[][] args)
                 break;
             case EngineState.SEARCHING:
                 PositionNode cur_best = engine.pos_list;
-                d_time start_run = getUTCtime();
                 if (engine.searcher.nodes_searched && (length > (TicksPerSecond/2)))
                 {
-                    int chunk = engine.searcher.nodes_searched / (length / (TicksPerSecond /2));
-                    engine.search(chunk);
+                    engine.searcher.check_interval = engine.searcher.nodes_searched / (length / TicksPerSecond);
                 } else {
-                    engine.search(START_SEARCH_NODES);
+                    engine.searcher.check_interval = START_SEARCH_NODES;
                 }
+                if (tc_max_search)
+                {
+                    d_time abort_time = ((tc_min_search + 30) * TicksPerSecond) + move_start;
+                    d_time max_time_limit = (tc_max_search * TicksPerSecond) + move_start;
+                    if (abort_time > max_time_limit)
+                        abort_time = max_time_limit;
+                    engine.searcher.abort_time = abort_time;
+                }
+                d_time start_run = getUTCtime();
+                engine.search(start_run + TicksPerSecond);
                 check_num += 1;
                 d_time now = getUTCtime();
                 d_time next_end = now + (now-start_run); // estimated time to end of next search call
+                if ((now - start_run) > (TicksPerSecond * 5))
+                {
+                    logger.warn("Long search run %.2f seconds", cast(real)(now-start_run) / TicksPerSecond);
+                }
                 if (cur_best != engine.pos_list)
                 {
                     last_decision_change = now;
