@@ -1818,7 +1818,7 @@ int main(char[][] args)
                 break;
             case EngineState.SEARCHING:
                 PositionNode cur_best = engine.pos_list;
-                if (engine.searcher.nodes_searched && (length > (TicksPerSecond/2)))
+                if (engine.searcher.nodes_searched && (length > (TicksPerSecond * 2)))
                 {
                     engine.searcher.check_interval = engine.searcher.nodes_searched / (length / TicksPerSecond);
                 } else {
@@ -1836,7 +1836,6 @@ int main(char[][] args)
                 engine.search(start_run + TicksPerSecond);
                 check_num += 1;
                 d_time now = getUTCtime();
-                d_time next_end = now + (now-start_run); // estimated time to end of next search call
                 if ((now - start_run) > (TicksPerSecond * 5))
                 {
                     logger.warn("Long search run %.2f seconds", cast(real)(now-start_run) / TicksPerSecond);
@@ -1850,7 +1849,7 @@ int main(char[][] args)
                     if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                         || (engine.best_score >= WIN_SCORE)
                         || (engine.pos_list.next is null)
-                        || (tc_permove && (next_end >= ((tc_max_search * TicksPerSecond) + move_start))))
+                        || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start))))
                     {
                         engine.set_bestmove();
                         engine.state = EngineState.MOVESET;
