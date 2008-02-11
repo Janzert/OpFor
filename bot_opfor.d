@@ -134,13 +134,20 @@ int on_trap(Position pos)
     {
         ulong tbit = occupied_traps & -occupied_traps;
         occupied_traps ^= tbit;
+        ulong tneighbors = neighbors_of(tbit);
         bitix tix = bitindex(tbit);
         Piece tpiece = pos.pieces[tix];
-        score += ON_TRAP[tpiece];
-
         Side tside = (tpiece > Piece.WELEPHANT) ? Side.BLACK : Side.WHITE;
         int pieceoffset = (tside == Side.WHITE) ? 6 : -6;
-        ulong tneighbors = neighbors_of(tbit);
+        
+        if (pos.strongest[tside][tix] == Piece.WELEPHANT+pieceoffset
+                || popcount(pos.placement[tside] & tneighbors) > 1)
+        {
+            score += ON_TRAP[tpiece] / 2;
+        } else {
+            score += ON_TRAP[tpiece];
+        }
+
         ulong fneighbors = tneighbors & pos.placement[tside];
         if (popcount(fneighbors) == 1)
         {
@@ -708,7 +715,7 @@ class FullSearch : ABSearch
     real rweak_w = 3;
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
-    real goal_w = 5;
+    real goal_w = 1;
     real static_otrap_w = 1;
     real static_strap_w = 0.5;
     real blockade_w = 1;
@@ -1210,7 +1217,7 @@ class FullSearch : ABSearch
         score += rabbit_open(pos) * ropen_w;
         score += rabbit_home(pos) * rhome_w;
         score += frozen_pieces(pos) * frozen_w;
-        //score += map_elephant(pos) * map_e_w;
+        score += map_elephant(pos) * map_e_w;
         score += trap_safety(pos) * tsafety_w;
         score += on_trap(pos) * ontrap_w;
         score += mobility(pos, blockade_w, hostage_w);
