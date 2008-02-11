@@ -1450,7 +1450,7 @@ class Engine : AEIEngine
                     || score == -ABORT_SCORE)
             {
                 d_time now = getUTCtime();
-                logger.log("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
+                logger.warn("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
                 break;
             }
 
@@ -1836,7 +1836,7 @@ int main(char[][] args)
                 engine.search(start_run + TicksPerSecond);
                 check_num += 1;
                 d_time now = getUTCtime();
-                if ((now - start_run) > (TicksPerSecond * 5))
+                if ((now - start_run) > (TicksPerSecond * 15))
                 {
                     logger.warn("Long search run %.2f seconds", cast(real)(now-start_run) / TicksPerSecond);
                 }
