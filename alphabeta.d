@@ -122,7 +122,7 @@ class HistoryHeuristic
             {
                 for (int t=0; t < 64; t++)
                 {
-                    score[s][f][t] /= 2;
+                    score[s][f][t] /= 4;
                 }
             }
         }

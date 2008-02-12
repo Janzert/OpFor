@@ -522,8 +522,8 @@ int mobility(Position pos, real blockade_w, real hostage_w)
 {
     int[] BLOCKADE_VAL = [0, 0, -10, -30, -70, -120, -200,
                 0, 10, 30, 70, 120, 200];
-    int[] HOSTAGE_VAL = [0, -2, -4, -5, -10, -25, -40,
-                2, 4, 5, 10, 25, 40];
+    int[] HOSTAGE_VAL = [0, -2, -4, -5, -8, -20, -30,
+                2, 4, 5, 8, 20, 30];
     int[] SIDE_MUL = [1, -1];
 
     real bscore = 0;
@@ -720,9 +720,9 @@ class FullSearch : ABSearch
     real pstrength_w = 0.00001;
     real goal_w = 1;
     real static_otrap_w = 1;
-    real static_strap_w = 0.5;
+    real static_strap_w = 1;
     real blockade_w = 1;
-    real hostage_w = 5;
+    real hostage_w = 6;
     int max_qdepth = -16;
     int do_qsearch = 1;
     int expand_qdepth = true;
@@ -1127,21 +1127,23 @@ class FullSearch : ABSearch
                     int vpop = pop & ~(pop_mask[valuable_victim[i]] << pop_offset[valuable_victim[i]]);
                     vpop |= vcnt << pop_offset[valuable_victim[i]];
                     valuable_value[i] = fscore - fame.score(vpop);
+                    valuable_length[i] = (valuable_length[i] < 12) ? valuable_length[i] : 12;
                 }
             }
 
-            const static real[] victim_per = [0.5, 0.7, 0.9];
+            const static real[] victim_per = [0.4, 0.6, 1.0];
             const static real[] length_per = [1.0,
                 1.0, 1.0, 0.9, 0.9,
                 0.6, 0.5, 0.4, 0.3,
                 0.1, 0.1, 0.05, 0.05];
-            const static real[] steps_per = [1.0, 0.75, 0.56, 0.42, 0.31];
+            const static real[] defense_per = [1.0, 0.80, 0.66, 0.50, 0.33];
+            real defense_mul = (side == pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
             for (int i=0; i < 3; i++)
             {
                 if (valuable_length[i] != 0)
                 {
                     int len = (valuable_length[i] < 12) ? valuable_length[i] : 12;
-                    int val = cast(int)(((valuable_value[i] * victim_per[i]) * length_per[len]) * steps_per[pos.stepsLeft]);
+                    int val = cast(int)(((valuable_value[i] * victim_per[i]) * length_per[valuable_length[i]]) * defense_mul);
                     score -= val;
                 }
             }
@@ -1175,23 +1177,23 @@ class FullSearch : ABSearch
     {
         // this.goal_searcher must already be setup for the position passed in
 
-        const int[17] GOAL_THREAT = [30000, 20000, 20000, 15000, 10000,
-              8000, 6000, 4000, 2000,
-              1000, 500, 200, 50,
-              20, 10, 7, 5];
-
+        const int[17] GOAL_THREAT = [10000, 10000, 10000, 8000, 6000,
+              1000, 1000, 800, 600,
+              100, 100, 80, 60,
+              10, 10, 8, 6];
+        const real[] DEFENSE_PER = [1.0, 0.75, 0.6, 0.4, 0.2];
         int score = 0;
         if (goal_searcher.goals_found[pos.side])
         {
-            int extrasteps = (goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft)+8;
+            int extrasteps = goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft;
             extrasteps = (extrasteps < 16) ? extrasteps : 16;
-            score += GOAL_THREAT[extrasteps] * goal_w;
+            score += GOAL_THREAT[extrasteps] * DEFENSE_PER[4] * goal_w;
         }
         if (goal_searcher.goals_found[pos.side^1])
         {
-            int togoal = goal_searcher.goal_depth[pos.side^1][0] + (pos.stepsLeft << 1);
+            int togoal = goal_searcher.goal_depth[pos.side^1][0];
             togoal = (togoal < 16) ? togoal : 16;
-            score -= GOAL_THREAT[togoal] * goal_w;
+            score -= GOAL_THREAT[togoal] * DEFENSE_PER[pos.stepsLeft] * goal_w;
         }
 
         return score;
@@ -1447,9 +1449,9 @@ class Engine : AEIEngine
                     && checked_moves > num_best)
             {
                 int firstdepth = depth - 1;
-                if ((firstdepth > 2) && (next_pos.move.numsteps < 3))
+                if ((firstdepth > 2) && (next_pos.move.numsteps < 4))
                     firstdepth--;
-                if ((firstdepth > 3) && (next_pos.move.numsteps < 4))
+                if ((firstdepth > 3) && (next_pos.move.steps[next_pos.move.numsteps-1] == NULL_STEP))
                     firstdepth--;
                 if ((firstdepth > 3) && (next_pos.last_score < (best_score - last_search_margin)))
                     firstdepth--;
