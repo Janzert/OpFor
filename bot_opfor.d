@@ -569,14 +569,17 @@ int mobility(Position pos, real blockade_w, real hostage_w)
         ulong empty_neighbors = neighbors_of(pos.bitBoards[Piece.EMPTY]);
 
         ulong bcheck = (pos.bitBoards[Piece.WELEPHANT+pieceoffset] | pos.bitBoards[Piece.WCAMEL+pieceoffset]
-            | pos.bitBoards[Piece.WHORSE+pieceoffset]) & ~pos.frozen & ~neighbors_of(coverage);
+            | pos.bitBoards[Piece.WHORSE+pieceoffset]) & ~pos.frozen;
         while (bcheck)
         {
             ulong pbit = bcheck & -bcheck;
             bcheck ^= pbit;
             bitix pix = bitindex(pbit);
-
             ulong pneighbors = neighbors_of(pbit);
+
+            if (popcount(pneighbors & coverage) > 2)
+                continue;
+
             if ((pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
                     || (popcount(pneighbors & pos.placement[side]) >= 2))
             {
@@ -720,7 +723,7 @@ class FullSearch : ABSearch
     real static_strap_w = 0.5;
     real blockade_w = 1;
     real hostage_w = 5;
-    int max_qdepth = -40;
+    int max_qdepth = -16;
     int do_qsearch = 1;
     int expand_qdepth = true;
 
@@ -1299,6 +1302,7 @@ class Engine : AEIEngine
     bool position_record = false;
 
     bool root_lmr = true;
+    int last_search_margin = 350; // between a cat and a dog
 
     this(Logger l)
     {
@@ -1324,6 +1328,9 @@ class Engine : AEIEngine
                 break;
             case "root_lmr":
                 root_lmr = cast(bool)toInt(value);
+                break;
+            case "reduce_search_margin":
+                last_search_margin = toInt(value);
                 break;
             default:
                 handled = searcher.set_option(option, value);
@@ -1439,7 +1446,14 @@ class Engine : AEIEngine
             if (root_lmr && depth > 2
                     && checked_moves > num_best)
             {
-                score = -searcher.alphabeta(pos, depth-1, -(best_score+1), -best_score);
+                int firstdepth = depth - 1;
+                if ((firstdepth > 2) && (next_pos.move.numsteps < 3))
+                    firstdepth--;
+                if ((firstdepth > 3) && (next_pos.move.numsteps < 4))
+                    firstdepth--;
+                if ((firstdepth > 3) && (next_pos.last_score < (best_score - last_search_margin)))
+                    firstdepth--;
+                score = -searcher.alphabeta(pos, firstdepth, -(best_score+1), -best_score);
             } else {
                 score = best_score +1;
             }
