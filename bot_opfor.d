@@ -124,9 +124,9 @@ int trap_safety(Position pos)
 // penalty for piece on trap, pinned or framed
 int on_trap(Position pos)
 {
-    const int ON_TRAP[13] = [0, -6, -10, -13, -20, -37, -88, 6, 10, 13, 20, 37, 88];
-    const int PINNED[13] = [0, 0, -4, -8, -14, -25, -59, 0, 4, 8, 14, 25, 59];
-    const int FRAMER[13] = [0, 0, -1, -2, -4, -8, -19, 0, 1, 2, 4, 8, 19];
+    const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+    const int PINNED[13] = [0, 0, -5, -8, -14, -25, -59, 0, 5, 8, 14, 25, 59];
+    const int FRAMER[13] = [0, 0, -1, -2, -3, -5, -12, 0, 1, 2, 3, 5, 12];
 
     int score = 0;
     ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
@@ -176,17 +176,12 @@ int on_trap(Position pos)
                         break;
                     }
                     Piece epiece;
-                    /* This can double count strong framing pieces
-                    if (tpiece + pieceoffset > pos.pieces[eix]
-                            && pos.strongest[tside^1][eix] > pos.pieces[eix])
-                        epiece = pos.strongest[tside^1][eix];
-                    else */
                     epiece = pos.pieces[eix];
                     framing_score += FRAMER[epiece];
                 }
                 if (framed)
                 {
-                    score += ON_TRAP[tpiece];
+                    score += ON_TRAP[tpiece] * 4;
                     score += framing_score;
                 }
             }
@@ -472,8 +467,10 @@ int piece_strength(Position pos)
 {
     const static int[] pieceval = [0, 0, 4, 6, 15, 20, 30,
           0, -4, -6, -15, -20, -30];
-    const static int[] distval = [100, 100, 100, 90, 70,
-          30, 20, 15, 10, 5, 4, 3, 2, 1, 0, 0];
+    const static int[] distval = [100, 100, 100, 90, 60,
+          30, 15, 7, 4, 2, 2, 1, 1, 1, 0, 0];
+    const static int MAX_POWER = pieceval[Piece.WELEPHANT] * distval[0];
+    const static int MIN_POWER = pieceval[Piece.BELEPHANT] * distval[0];
     
     Piece[32] stronger;
     int[32] sixs;
@@ -507,10 +504,14 @@ int piece_strength(Position pos)
             pieces ^= pbit;
             bitix pix = bitindex(pbit);
 
+            int ppower = 0;
             for (int i=0; i < num_stronger; i++)
             {
-                power += pieceval[stronger[i]] * distval[taxicab_dist[pix][sixs[i]]];
+                ppower += pieceval[stronger[i]] * distval[taxicab_dist[pix][sixs[i]]];
             }
+            ppower = (ppower < MAX_POWER) ? ppower : MAX_POWER;
+            ppower = (ppower > MIN_POWER) ? ppower : MIN_POWER;
+            power += ppower;
         }
         score += power * pieceval[p];
     }
@@ -718,7 +719,7 @@ class FullSearch : ABSearch
     real rweak_w = 3;
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
-    real goal_w = 1;
+    real goal_w = 0.3;
     real static_otrap_w = 1;
     real static_strap_w = 1;
     real blockade_w = 1;
@@ -989,8 +990,10 @@ class FullSearch : ABSearch
             int[3] valuable_vid;
             Piece[3] valuable_victim;
             int[3] valuable_length;
+            ulong[3] valuable_traps;
             for (int i=0; i < trap_search.num_captures; i++)
             {
+                /*
                 int tid;
                 version (trap_switch)
                 {
@@ -1025,81 +1028,40 @@ class FullSearch : ABSearch
                     else
                         throw new Exception(format("trap_bit not a trap %X", trap_search.captures[i].trap_bit));
                 }
+                */
 
-                int vid = bitindex(trap_search.captures[i].victim_bit) | (tid << 8);
+                int vid = bitindex(trap_search.captures[i].victim_bit); // | (tid << 8);
+                ulong tbit = trap_search.captures[i].trap_bit;
                 Piece vic = trap_search.captures[i].victim;
                 int len = trap_search.captures[i].length;
-                if (vid != valuable_vid[0]
-                        && (vic > valuable_victim[0]
-                            || (vic == valuable_victim[0]
-                                && len < valuable_length[0])))
+                for (int v=0; v < valuable_vid.length; v++)
                 {
-                    int tvid = valuable_vid[0];
-                    Piece tvic = valuable_victim[0];
-                    int tlen = valuable_length[0];
-                    valuable_vid[0] = vid;
-                    valuable_victim[0] = vic;
-                    valuable_length[0] = len;
-                    vid = tvid;
-                    vic = tvic;
-                    len = tlen;
-                } else if (vid == valuable_vid[0])
-                {
-                    if (valuable_length[0] > len)
+                    if (vid != valuable_vid[v]
+                            && (vic > valuable_victim[v]
+                                || (vic == valuable_victim[v]
+                                    && len < valuable_length[v])))
                     {
-                        valuable_length[0] = len;
-                    }
-                    vid = 0;
-                    vic = Piece.EMPTY;
-                    len = 0;
-                }
-                if (vid != valuable_vid[1]
-                        && (vic > valuable_victim[1]
-                            || (vic == valuable_victim[1]
-                                && len < valuable_length[1])))
-                {
-                    int tvid = valuable_vid[1];
-                    Piece tvic = valuable_victim[1];
-                    int tlen = valuable_length[1];
-                    valuable_vid[1] = vid;
-                    valuable_victim[1] = vic;
-                    valuable_length[1] = len;
-                    vid = tvid;
-                    vic = tvic;
-                    len = tlen;
-                } else if (vid == valuable_vid[1])
-                {
-                    if (valuable_length[1] > len)
+                        int tvid = valuable_vid[v];
+                        Piece tvic = valuable_victim[v];
+                        int tlen = valuable_length[v];
+                        ulong ttbits = valuable_traps[v];
+                        valuable_vid[v] = vid;
+                        valuable_victim[v] = vic;
+                        valuable_length[v] = len;
+                        valuable_traps[v] = tbit;
+                        vid = tvid;
+                        vic = tvic;
+                        tbit = ttbits;
+                        len = tlen;
+                    } else if (vid == valuable_vid[v])
                     {
-                        valuable_length[1] = len;
+                        if (valuable_length[v] > len)
+                        {
+                            valuable_length[v] = len;
+                        }
+                        valuable_traps[v] |= tbit;
+                        break;
                     }
-                    vid = 0;
-                    vic = Piece.EMPTY;
-                    len = 0;
-                }
-                if (vid != valuable_vid[0]
-                        && (vic > valuable_victim[0]
-                            || (vic == valuable_victim[0]
-                                && len < valuable_length[0])))
-                {
-                    int tvid = valuable_vid[2];
-                    Piece tvic = valuable_victim[2];
-                    int tlen = valuable_length[2];
-                    valuable_vid[2] = vid;
-                    valuable_victim[2] = vic;
-                    valuable_length[2] = len;
-                    vid = tvid;
-                    vic = tvic;
-                    len = tlen;
-                } else if (vid == valuable_vid[2])
-                {
-                    if (valuable_length[2] > len)
-                    {
-                        valuable_length[2] = len;
-                    }
-                    vid = 0;
-                    vic = Piece.EMPTY;
-                    len = 0;
                 }
             }
 
@@ -1118,8 +1080,12 @@ class FullSearch : ABSearch
                 valuable_length[2] = l;
             }
 
+            int attacksteps = 0;
+            if (side == pos.side)
+                attacksteps = pos.stepsLeft;
+
             int[3] valuable_value;
-            for (int i=0; i < 3; i++)
+            for (int i=0; i < valuable_victim.length; i++)
             {
                 if (valuable_length[i] != 0)
                 {
@@ -1127,23 +1093,38 @@ class FullSearch : ABSearch
                     int vpop = pop & ~(pop_mask[valuable_victim[i]] << pop_offset[valuable_victim[i]]);
                     vpop |= vcnt << pop_offset[valuable_victim[i]];
                     valuable_value[i] = fscore - fame.score(vpop);
+                    if (attacksteps)
+                    {
+                        if (valuable_length[i] <= attacksteps)
+                        {
+                            attacksteps -= valuable_length[i];
+                            valuable_length[i] = 0;
+                        } else {
+                            valuable_length[i] -= attacksteps;
+                            attacksteps = 0;
+                        }
+                    }
                     valuable_length[i] = (valuable_length[i] < 12) ? valuable_length[i] : 12;
                 }
             }
 
-            const static real[] victim_per = [0.4, 0.6, 1.0];
+            const static real[] victim_per = [0.5, 0.6, 0.8];
+            const static real[] trap_num = [0, 1.0, 1.5, 1.5, 1.5];
             const static real[] length_per = [1.0,
                 1.0, 1.0, 0.9, 0.9,
                 0.6, 0.5, 0.4, 0.3,
                 0.1, 0.1, 0.05, 0.05];
             const static real[] defense_per = [1.0, 0.80, 0.66, 0.50, 0.33];
-            real defense_mul = (side == pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
+            real defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
             for (int i=0; i < 3; i++)
             {
                 if (valuable_length[i] != 0)
                 {
-                    int len = (valuable_length[i] < 12) ? valuable_length[i] : 12;
-                    int val = cast(int)(((valuable_value[i] * victim_per[i]) * length_per[valuable_length[i]]) * defense_mul);
+                    real val = valuable_value[i] * victim_per[i]
+                        * length_per[valuable_length[i]]
+                        * trap_num[popcount(valuable_traps[i])];
+                    if (valuable_length[i])
+                       val *= defense_mul;
                     score -= val;
                 }
             }
@@ -1177,22 +1158,22 @@ class FullSearch : ABSearch
     {
         // this.goal_searcher must already be setup for the position passed in
 
-        const int[17] GOAL_THREAT = [10000, 10000, 10000, 8000, 6000,
+        const int[18] GOAL_THREAT = [10000, 10000, 10000, 8000, 6000,
               1000, 1000, 800, 600,
               100, 100, 80, 60,
-              10, 10, 8, 6];
-        const real[] DEFENSE_PER = [1.0, 0.75, 0.6, 0.4, 0.2];
+              10, 10, 8, 6, 0];
+        const real[] DEFENSE_PER = [1.0, 0.8, 0.66, 0.5, 0.33];
         int score = 0;
         if (goal_searcher.goals_found[pos.side])
         {
             int extrasteps = goal_searcher.goal_depth[pos.side][0] - pos.stepsLeft;
-            extrasteps = (extrasteps < 16) ? extrasteps : 16;
+            extrasteps = (extrasteps < 17) ? extrasteps : 17;
             score += GOAL_THREAT[extrasteps] * DEFENSE_PER[4] * goal_w;
         }
         if (goal_searcher.goals_found[pos.side^1])
         {
             int togoal = goal_searcher.goal_depth[pos.side^1][0];
-            togoal = (togoal < 16) ? togoal : 16;
+            togoal = (togoal < 17) ? togoal : 17;
             score -= GOAL_THREAT[togoal] * DEFENSE_PER[pos.stepsLeft] * goal_w;
         }
 
