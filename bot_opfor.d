@@ -720,8 +720,8 @@ class FullSearch : ABSearch
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
     real goal_w = 0.3;
-    real static_otrap_w = 1;
-    real static_strap_w = 1;
+    real static_otrap_w = 0.8;
+    real static_strap_w = 0.8;
     real blockade_w = 1;
     real hostage_w = 6;
     int max_qdepth = -16;
@@ -1108,7 +1108,7 @@ class FullSearch : ABSearch
                 }
             }
 
-            const static real[] victim_per = [0.5, 0.6, 0.8];
+            const static real[] victim_per = [0.5, 0.6, 0.7];
             const static real[] trap_num = [0, 1.0, 1.5, 1.5, 1.5];
             const static real[] length_per = [1.0,
                 1.0, 1.0, 0.9, 0.9,
