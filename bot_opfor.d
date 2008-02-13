@@ -634,8 +634,8 @@ int mobility(Position pos, real blockade_w, real hostage_w)
             hcheck ^= pbit;
 
             ulong pneighbors = neighbors_of(pbit);
-            if ((popcount(pneighbors & coverage) < 1)
-                    || (popcount(pneighbors & reachable) < 2))
+            if ((popcount(pneighbors & reachable) < 2)
+                    || (popcount(pneighbors & coverage) == 0))
             {
                 bitix pix = bitindex(pbit);
                 hscore += HOSTAGE_VAL[pos.pieces[pix]];
@@ -720,7 +720,7 @@ class FullSearch : ABSearch
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
     real goal_w = 0.3;
-    real static_otrap_w = 0.8;
+    real static_otrap_w = 0.9;
     real static_strap_w = 0.8;
     real blockade_w = 1;
     real hostage_w = 6;
@@ -1416,11 +1416,13 @@ class Engine : AEIEngine
         }
     }
 
-    void search(d_time stop_time)
+    void search(int check_nodes)
     {
         in_step = true;
         d_time start_time = getUTCtime();
-        while (getUTCtime() < stop_time)
+        searcher.check_interval = check_nodes;
+        int stop_nodes = searcher.nodes_searched + check_nodes;
+        while (searcher.nodes_searched < stop_nodes)
         {
             Position pos = next_pos.pos;
             searcher.nullmove = pos.dup;
@@ -1822,11 +1824,12 @@ int main(char[][] args)
                 break;
             case EngineState.SEARCHING:
                 PositionNode cur_best = engine.pos_list;
+                int check_nodes;
                 if (engine.searcher.nodes_searched && (length > (TicksPerSecond * 2)))
                 {
-                    engine.searcher.check_interval = engine.searcher.nodes_searched / (length / TicksPerSecond);
+                    check_nodes = engine.searcher.nodes_searched / (length / TicksPerSecond);
                 } else {
-                    engine.searcher.check_interval = START_SEARCH_NODES;
+                    check_nodes = START_SEARCH_NODES;
                 }
                 if (tc_max_search)
                 {
@@ -1837,7 +1840,7 @@ int main(char[][] args)
                     engine.searcher.abort_time = abort_time;
                 }
                 d_time start_run = getUTCtime();
-                engine.search(start_run + TicksPerSecond);
+                engine.search(check_nodes);
                 check_num += 1;
                 d_time now = getUTCtime();
                 if ((now - start_run) > (TicksPerSecond * 15))
