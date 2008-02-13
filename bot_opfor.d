@@ -361,7 +361,7 @@ int rabbit_home(Position pos)
 {
     const static int[] side_mul = [1, -1];
     const static ulong[][] side_rank = [[RANK_1, RANK_2], [RANK_8, RANK_7]];
-    const static int FIRST_ROW = 4;
+    const static int FIRST_ROW = 3;
     
     int score = 0;
     for (Side side = Side.WHITE; side <= Side.BLACK; side++)
@@ -392,11 +392,11 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           0.7, 0.7, 0.7, 0.7];
     const static real[] weakgoal = [0,
           0.1, 0.2, 0.2, 0.4,
-          0.5, 0.5, 0.6, 0.6,
-          0.8, 0.8, 0.9, 0.9,
+          0.5, 0.6, 0.7, 0.8,
+          1, 1, 1, 1,
           1, 1, 1, 1];
-    const static int[][] weakval = [[0, 0, -15, -30, -30, -30, -30, 0], 
-         [0, 30, 30, 30, 30, 15, 0, 0]];
+    const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0], 
+         [0, 30, 40, 35, 30, 15, 0, 0]];
     const static int power_balance = 4500;
     const static real full_weak = 8000;
     const static int[] rforward = [8, -8];
@@ -523,8 +523,8 @@ int mobility(Position pos, real blockade_w, real hostage_w)
 {
     int[] BLOCKADE_VAL = [0, 0, -10, -30, -70, -120, -200,
                 0, 10, 30, 70, 120, 200];
-    int[] HOSTAGE_VAL = [0, -2, -4, -5, -8, -20, -30,
-                2, 4, 5, 8, 20, 30];
+    int[] HOSTAGE_VAL = [0, -20, -50, -78, -122, -221, -519,
+                20, 50, 78, 122, 221, 519];
     int[] SIDE_MUL = [1, -1];
 
     real bscore = 0;
@@ -709,24 +709,25 @@ class FullSearch : ABSearch
 
     ulong nodes_quiesced = 0;
     
-    real map_e_w = 1;
+    real map_e_w = 2;
     real tsafety_w = 1;
     real ontrap_w = 2;
     real frozen_w = 3;
     real rwall_w = 1;
-    real ropen_w = 5;
-    real rhome_w = 1;
+    real ropen_w = 4;
+    real rhome_w = 4;
     real rweak_w = 3;
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
     real goal_w = 0.3;
-    real static_otrap_w = 0.5;
-    real static_strap_w = 0.5;
+    real static_otrap_w = 0.8;
+    real static_strap_w = 0.8;
     real blockade_w = 1;
-    real hostage_w = 6;
+    real hostage_w = 1;
     int max_qdepth = -16;
     int do_qsearch = 1;
     int expand_qdepth = true;
+    bool prealpha_quiesce = true;
 
     int qdepth;
     
@@ -803,6 +804,9 @@ class FullSearch : ABSearch
             case "eval_hostage":
                 hostage_w = toReal(value);
                 break;
+            case "eval_prealpha":
+                prealpha_quiesce = cast(bool)toInt(value);
+                break;
             default:
                 handled = super.set_option(option, value);
         }
@@ -832,7 +836,7 @@ class FullSearch : ABSearch
 
     int quiesce(Position pos, int depth, int alpha, int beta)
     {
-        int score;
+        int score = MIN_SCORE;
         if (pos.is_endstate())
         {
             if (tournament_rules || pos.is_goal())
@@ -867,7 +871,6 @@ class FullSearch : ABSearch
             prev_best = &node.beststep;
         }
 
-        //writefln("%s %d\n%s", "wb"[pos.side], depth, pos.to_long_str());
         score = static_eval(pos);
 
         debug (eval_bias)
@@ -888,11 +891,15 @@ class FullSearch : ABSearch
 
         if (score >= beta)
             return score;
-        if (score > alpha)
+        if (prealpha_quiesce && score > alpha)
         {
             alpha = score;
             sflag = SType.EXACT;
+        } else if (!prealpha_quiesce)
+        {
+            score = MIN_SCORE;
         }
+    
         
         StepList steps = StepList.allocate();
         if (!pos.inpush)
