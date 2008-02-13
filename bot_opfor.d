@@ -871,35 +871,37 @@ class FullSearch : ABSearch
             prev_best = &node.beststep;
         }
 
-        score = static_eval(pos);
-
-        debug (eval_bias)
+        if (!pos.inpush)
         {
-            Position reversed = pos.reverse();
-            int rscore = static_eval(reversed);
-            if ((score < rscore-2) || (score > rscore+2))
+            score = static_eval(pos);
+
+            debug (eval_bias)
             {
-                writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                writefln("reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
-                throw new Exception(format("Biased eval, %d != %d", score, rscore));
+                Position reversed = pos.reverse();
+                int rscore = static_eval(reversed);
+                if ((score < rscore-2) || (score > rscore+2))
+                {
+                    writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                    writefln("reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
+                    throw new Exception(format("Biased eval, %d != %d", score, rscore));
+                }
+                Position.free(reversed);
             }
-            Position.free(reversed);
-        }
 
-        if (depth < qdepth)
-            return score;
+            if (depth < qdepth)
+                return score;
 
-        if (score >= beta)
-            return score;
-        if (prealpha_quiesce && score > alpha)
-        {
-            alpha = score;
-            sflag = SType.EXACT;
-        } else if (!prealpha_quiesce)
-        {
-            score = MIN_SCORE;
+            if (score >= beta)
+                return score;
+            if (prealpha_quiesce && score > alpha)
+            {
+                alpha = score;
+                sflag = SType.EXACT;
+            } else if (!prealpha_quiesce)
+            {
+                score = MIN_SCORE;
+            }
         }
-    
         
         StepList steps = StepList.allocate();
         if (!pos.inpush)
