@@ -871,9 +871,10 @@ class FullSearch : ABSearch
             prev_best = &node.beststep;
         }
 
+        int prescore = MIN_SCORE;
         if (!pos.inpush)
         {
-            score = static_eval(pos);
+            prescore = static_eval(pos);
 
             debug (eval_bias)
             {
@@ -889,17 +890,18 @@ class FullSearch : ABSearch
             }
 
             if (depth < qdepth)
-                return score;
+                return prescore;
 
-            if (score >= beta)
-                return score;
-            if (prealpha_quiesce && score > alpha)
+            if (prescore >= beta)
+                return prescore;
+
+            if (prealpha_quiesce)
+                score = prescore;
+
+            if (score > alpha)
             {
                 alpha = score;
                 sflag = SType.EXACT;
-            } else if (!prealpha_quiesce)
-            {
-                score = MIN_SCORE;
             }
         }
         
@@ -930,6 +932,10 @@ class FullSearch : ABSearch
         } else {
             pos.get_steps(steps);
         }
+
+        if (steps.numsteps == 0)
+            score = prescore;
+
         int best_ix = -1;
         for (int six = 0; six < steps.numsteps; six++)
         {
