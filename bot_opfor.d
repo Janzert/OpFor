@@ -720,8 +720,8 @@ class FullSearch : ABSearch
     real rstrong_w = 0.1;
     real pstrength_w = 0.00001;
     real goal_w = 0.3;
-    real static_otrap_w = 0.9;
-    real static_strap_w = 0.8;
+    real static_otrap_w = 0.5;
+    real static_strap_w = 0.5;
     real blockade_w = 1;
     real hostage_w = 6;
     int max_qdepth = -16;
@@ -1120,11 +1120,9 @@ class FullSearch : ABSearch
             {
                 if (valuable_length[i] != 0)
                 {
-                    real val = valuable_value[i] * victim_per[i]
-                        * length_per[valuable_length[i]]
-                        * trap_num[popcount(valuable_traps[i])];
+                    real val = valuable_value[i] * length_per[valuable_length[i]];
                     if (valuable_length[i])
-                       val *= defense_mul;
+                       val *= defense_mul * victim_per[i] * trap_num[popcount(valuable_traps[i])];
                     score -= val;
                 }
             }
