@@ -464,6 +464,11 @@ class ABSearch
         throw new Exception("eval must be implemented");
     }
 
+    int logged_eval(Position pos)
+    {
+        throw new Exception("eval must be implemented");
+    }
+
     int alphabeta(Position pos, int depth, int alpha, int beta)
     {
         int score = MIN_SCORE;

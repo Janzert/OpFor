@@ -463,7 +463,7 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
     return (wscore * weak_w) + (sscore * strong_w);
 }
 
-int piece_strength(Position pos, int[64] pstrengths)
+int old_piece_strength(Position pos, int[64] pstrengths)
 {
     const static int[] pieceval = [0, 0, 4, 6, 15, 20, 30,
           0, -4, -6, -15, -20, -30];
@@ -517,6 +517,53 @@ int piece_strength(Position pos, int[64] pstrengths)
         score += power * pieceval[p];
     }
 
+    return score;
+}
+
+int piece_strength(Position pos, int[64] pstrengths)
+{
+    const static int[] pieceval = [0, 0, 4, 6, 15, 20, 30,
+          0, -4, -6, -15, -20, -30];
+    const static int[] distval = [100, 100, 100, 90, 60,
+          30, 15, 7, 4, 2, 2, 1, 1, 1, 0, 0];
+    const static int MAX_POWER = 3000; // == pieceval[Piece.WELEPHANT] * distval[0];
+    const static int MIN_POWER = -3000; // == pieceval[Piece.BELEPHANT] * distval[0];
+    
+    int[16] ixs;
+    int value[16];
+
+    int num_pieces = 0;
+
+    int score = 0;
+    ulong piece_bits = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
+        & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT];
+    ulong pbits = piece_bits;
+    while (pbits)
+    {
+        ulong pbit = pbits & -pbits;
+        pbits ^= pbit;
+        bitix pix = bitindex(pbit);
+
+        value[num_pieces] = pieceval[pos.pieces[pix]];
+        if (pbit & pos.frozen)
+            value[num_pieces] >>= 3;
+        ixs[num_pieces++] = pix;
+    }
+
+    for (int p = num_pieces; p--;)
+    {
+        int ppower = 0;
+        int pix = ixs[p];
+        for (int s = num_pieces; s--;)
+        {
+            if (s != p)
+                ppower += value[s] * distval[taxicab_dist[pix][ixs[s]]];
+        }
+        ppower = (ppower < MAX_POWER) ? ppower : MAX_POWER;
+        ppower = (ppower > MIN_POWER) ? ppower : MIN_POWER;
+        pstrengths[pix] = ppower;
+        score += ppower;
+    }
     return score;
 }
 
@@ -1232,6 +1279,75 @@ class FullSearch : ABSearch
         score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         return score;
     }
+
+    int logged_eval(Position pos)
+    {
+        goal_searcher.set_start(pos);
+        goal_searcher.find_goals(16);
+        if (goal_searcher.goals_found[pos.side]
+                && goal_searcher.goal_depth[pos.side][0] <= pos.stepsLeft)
+        {
+            logger.log("Found goal in %d steps", goal_searcher.goal_depth[pos.side][0]);
+            return WIN_SCORE - goal_searcher.goal_depth[pos.side][0];
+        }
+
+        int pop = population(pos);
+        int fscore = fame.score(pop); // first pawn worth ~196
+                                     // only a pawn left ~31883
+        logger.log("Fame %d", fscore);
+        int score = fscore;
+        int pscore = fscore;
+        score += static_trap_eval(pos, cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
+        logger.log("static otrap %d", score-pscore);
+        pscore = score;
+        score += static_trap_eval(pos, pos.side, pop, fscore) * static_strap_w;
+        logger.log("static strap %d", score-pscore);
+        pscore = score;
+
+        int[64] pstrengths;
+        score += piece_strength(pos, pstrengths) * pstrength_w;
+        logger.log("piece strength %d", score-pscore);
+        pscore = score;
+        score += mobility(pos, pstrengths, blockade_w, hostage_w);
+        logger.log("mobility %d", score-pscore);
+        pscore = score;
+        score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
+        logger.log("rabbit strength %d", score-pscore);
+        pscore = score;
+        score += rabbit_wall(pos) * rwall_w;
+        logger.log("rabbit wall %d", score-pscore);
+        pscore = score;
+        score += rabbit_open(pos) * ropen_w;
+        logger.log("rabbit open %d", score-pscore);
+        pscore = score;
+        score += rabbit_home(pos) * rhome_w;
+        logger.log("rabbit home %d", score-pscore);
+        pscore = score;
+        score += frozen_pieces(pos) * frozen_w;
+        logger.log("frozen pieces %d", score-pscore);
+        pscore = score;
+        score += map_elephant(pos) * map_e_w;
+        logger.log("map elephant %d", score-pscore);
+        pscore = score;
+        score += trap_safety(pos) * tsafety_w;
+        logger.log("trap safety %d", score-pscore);
+        pscore = score;
+        score += on_trap(pos) * ontrap_w;
+        logger.log("on trap %d", score-pscore);
+
+        if (pos.side == Side.BLACK)
+            score = -score;
+
+        pscore = score;
+        score += goal_threat(pos);
+        logger.log("goal threat (side to move) %d", score-pscore);
+        pscore = score;
+
+        // clamp the evaluation to be less than a win
+        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
+        logger.log("Final (clamped) score %d", score);
+        return score;
+    }
 }
 
 class PositionNode
@@ -1748,6 +1864,13 @@ int main(char[][] args)
                             "wb"[engine.position.side], 
                             engine.position.to_long_str());
                     server.clear_cmd();
+                    break;
+                case ServerCmd.CmdType.CHECKEVAL:
+                    CheckCmd chkcmd = cast(CheckCmd)server.current_cmd;
+                    Position pos = parse_short_str(chkcmd.side, 4, chkcmd.pos_str);
+                    server.clear_cmd();
+                    engine.searcher.logged_eval(pos);
+                    Position.free(pos);
                     break;
                 case ServerCmd.CmdType.SETOPTION:
                     OptionCmd scmd = cast(OptionCmd)server.current_cmd;
