@@ -463,14 +463,14 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
     return (wscore * weak_w) + (sscore * strong_w);
 }
 
-int piece_strength(Position pos)
+int piece_strength(Position pos, int[64] pstrengths)
 {
     const static int[] pieceval = [0, 0, 4, 6, 15, 20, 30,
           0, -4, -6, -15, -20, -30];
     const static int[] distval = [100, 100, 100, 90, 60,
           30, 15, 7, 4, 2, 2, 1, 1, 1, 0, 0];
-    const static int MAX_POWER = pieceval[Piece.WELEPHANT] * distval[0];
-    const static int MIN_POWER = pieceval[Piece.BELEPHANT] * distval[0];
+    const static int MAX_POWER = 3000; // == pieceval[Piece.WELEPHANT] * distval[0];
+    const static int MIN_POWER = -3000; // == pieceval[Piece.BELEPHANT] * distval[0];
     
     Piece[32] stronger;
     int[32] sixs;
@@ -511,6 +511,7 @@ int piece_strength(Position pos)
             }
             ppower = (ppower < MAX_POWER) ? ppower : MAX_POWER;
             ppower = (ppower > MIN_POWER) ? ppower : MIN_POWER;
+            pstrengths[pix] = ppower;
             power += ppower;
         }
         score += power * pieceval[p];
@@ -519,12 +520,12 @@ int piece_strength(Position pos)
     return score;
 }
 
-int mobility(Position pos, real blockade_w, real hostage_w)
+int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
 {
     int[] BLOCKADE_VAL = [0, 0, -10, -30, -70, -120, -200,
                 0, 10, 30, 70, 120, 200];
-    int[] HOSTAGE_VAL = [0, -20, -50, -78, -122, -221, -519,
-                20, 50, 78, 122, 221, 519];
+    int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
+                10, 25, 39, 61, 110, 264];
     int[] SIDE_MUL = [1, -1];
 
     real bscore = 0;
@@ -623,6 +624,13 @@ int mobility(Position pos, real blockade_w, real hostage_w)
                 bscore += BLOCKADE_VAL[pos.pieces[pix]];
             } else {
                 // the piece is blockaded but actually a hostage
+                real power_mul = pstrengths[pix] / 6000.0; // Should restrict the range -.5 to .5
+                if (side)
+                    power_mul = (power_mul < 0) ? 1+power_mul : 0.5;
+                else
+                    power_mul = (power_mul > 0) ? 1-power_mul : 0.5;
+                // power_mul should now be .5 to 1
+                hscore += HOSTAGE_VAL[pos.pieces[pix]];
                 hscore += HOSTAGE_VAL[pos.pieces[pix]];
             }
         }
@@ -638,6 +646,12 @@ int mobility(Position pos, real blockade_w, real hostage_w)
                     || (popcount(pneighbors & coverage) == 0))
             {
                 bitix pix = bitindex(pbit);
+                real power_mul = pstrengths[pix] / 6000.0; // Should restrict the range -.5 to .5
+                if (side)
+                    power_mul = (power_mul < 0) ? 1+power_mul : 0.5;
+                else
+                    power_mul = (power_mul > 0) ? 1-power_mul : 0.5;
+                // power_mul should now be .5 to 1
                 hscore += HOSTAGE_VAL[pos.pieces[pix]];
             }
         }
@@ -727,7 +741,6 @@ class FullSearch : ABSearch
     int max_qdepth = -16;
     int do_qsearch = 1;
     int expand_qdepth = true;
-    bool prealpha_quiesce = true;
 
     int qdepth;
     
@@ -804,9 +817,6 @@ class FullSearch : ABSearch
             case "eval_hostage":
                 hostage_w = toReal(value);
                 break;
-            case "eval_prealpha":
-                prealpha_quiesce = cast(bool)toInt(value);
-                break;
             default:
                 handled = super.set_option(option, value);
         }
@@ -871,10 +881,9 @@ class FullSearch : ABSearch
             prev_best = &node.beststep;
         }
 
-        int prescore = MIN_SCORE;
         if (!pos.inpush)
         {
-            prescore = static_eval(pos);
+            score = static_eval(pos);
 
             debug (eval_bias)
             {
@@ -890,14 +899,10 @@ class FullSearch : ABSearch
             }
 
             if (depth < qdepth)
-                return prescore;
+                return score;
 
-            if (prescore >= beta)
-                return prescore;
-
-            if (prealpha_quiesce)
-                score = prescore;
-
+            if (score >= beta)
+                return score;
             if (score > alpha)
             {
                 alpha = score;
@@ -932,10 +937,6 @@ class FullSearch : ABSearch
         } else {
             pos.get_steps(steps);
         }
-
-        if (steps.numsteps == 0)
-            score = prescore;
-
         int best_ix = -1;
         for (int six = 0; six < steps.numsteps; six++)
         {
@@ -1210,7 +1211,9 @@ class FullSearch : ABSearch
         score += static_trap_eval(pos, cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
         score += static_trap_eval(pos, pos.side, pop, fscore) * static_strap_w;
 
-        score += piece_strength(pos) * pstrength_w;
+        int[64] pstrengths;
+        score += piece_strength(pos, pstrengths) * pstrength_w;
+        score += mobility(pos, pstrengths, blockade_w, hostage_w);
         score += rabbit_strength(pos, goal_searcher, rweak_w, rstrong_w);
         score += rabbit_wall(pos) * rwall_w;
         score += rabbit_open(pos) * ropen_w;
@@ -1219,7 +1222,6 @@ class FullSearch : ABSearch
         score += map_elephant(pos) * map_e_w;
         score += trap_safety(pos) * tsafety_w;
         score += on_trap(pos) * ontrap_w;
-        score += mobility(pos, blockade_w, hostage_w);
 
         if (pos.side == Side.BLACK)
             score = -score;
