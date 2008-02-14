@@ -522,14 +522,14 @@ int old_piece_strength(Position pos, int[64] pstrengths)
 
 int piece_strength(Position pos, int[64] pstrengths)
 {
-    const static int[] pieceval = [0, 0, 4, 6, 15, 20, 30,
-          0, -4, -6, -15, -20, -30];
+    const static int[] pieceval = [0, 0, 8, 12, 24, 36, 44,
+          0, -8, -12, -24, -36, -44];
     const static int[] distval = [100, 100, 100, 90, 60,
           30, 15, 7, 4, 2, 2, 1, 1, 1, 0, 0];
-    const static int MAX_POWER = 3000; // == pieceval[Piece.WELEPHANT] * distval[0];
-    const static int MIN_POWER = -3000; // == pieceval[Piece.BELEPHANT] * distval[0];
+    const static int MAX_POWER = 4400; // == pieceval[Piece.WELEPHANT] * distval[0];
+    const static int MIN_POWER = -4400; // == pieceval[Piece.BELEPHANT] * distval[0];
     
-    int[16] ixs;
+    bitix[16] ixs;
     int value[16];
 
     int num_pieces = 0;
@@ -550,10 +550,14 @@ int piece_strength(Position pos, int[64] pstrengths)
         ixs[num_pieces++] = pix;
     }
 
+    debug (piece_strength)
+    {
+        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+    }
     for (int p = num_pieces; p--;)
     {
         int ppower = 0;
-        int pix = ixs[p];
+        bitix pix = ixs[p];
         for (int s = num_pieces; s--;)
         {
             if (s != p)
@@ -563,6 +567,14 @@ int piece_strength(Position pos, int[64] pstrengths)
         ppower = (ppower > MIN_POWER) ? ppower : MIN_POWER;
         pstrengths[pix] = ppower;
         score += ppower;
+        debug (piece_strength)
+        {
+            writefln("piece %d at %s has %d power", pos.pieces[pix], ix_to_alg(pix), ppower);
+        }
+    }
+    debug (piece_strength)
+    {
+        writefln("overall board piece strength %d", score);
     }
     return score;
 }
@@ -573,7 +585,6 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                 0, 10, 30, 70, 120, 200];
     int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
                 10, 25, 39, 61, 110, 264];
-    int[] SIDE_MUL = [1, -1];
 
     real bscore = 0;
     real hscore = 0;
@@ -626,7 +637,7 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             bitix pix = bitindex(pbit);
             ulong pneighbors = neighbors_of(pbit);
 
-            if (popcount(pneighbors & coverage) > 2)
+            if (popcount(pneighbors & coverage) > 1)
                 continue;
 
             if ((pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
@@ -668,17 +679,24 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             if (pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
             {
                 // the piece is blockaded
+                debug (mobility)
+                {
+                    writefln("b piece %d", pos.pieces[pix]);
+                }
                 bscore += BLOCKADE_VAL[pos.pieces[pix]];
             } else {
                 // the piece is blockaded but actually a hostage
-                real power_mul = pstrengths[pix] / 6000.0; // Should restrict the range -.5 to .5
+                real power_mul = pstrengths[pix] / 8800.0; // Should restrict the range -.5 to .5
                 if (side)
                     power_mul = (power_mul < 0) ? 1+power_mul : 0.5;
                 else
                     power_mul = (power_mul > 0) ? 1-power_mul : 0.5;
                 // power_mul should now be .5 to 1
-                hscore += HOSTAGE_VAL[pos.pieces[pix]];
-                hscore += HOSTAGE_VAL[pos.pieces[pix]];
+                debug (mobility)
+                {
+                    writefln("fb piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
+                }
+                hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
             }
         }
 
@@ -693,13 +711,17 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                     || (popcount(pneighbors & coverage) == 0))
             {
                 bitix pix = bitindex(pbit);
-                real power_mul = pstrengths[pix] / 6000.0; // Should restrict the range -.5 to .5
+                real power_mul = pstrengths[pix] / 12000.0; // Should restrict the range -.5 to .5
                 if (side)
                     power_mul = (power_mul < 0) ? 1+power_mul : 0.5;
                 else
                     power_mul = (power_mul > 0) ? 1-power_mul : 0.5;
                 // power_mul should now be .5 to 1
-                hscore += HOSTAGE_VAL[pos.pieces[pix]];
+                debug (mobility)
+                {
+                    writefln("h piece %d, pp %.2f", pos.pieces[pix], power_mul);
+                }
+                hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
             }
         }
     }
@@ -777,9 +799,9 @@ class FullSearch : ABSearch
     real rwall_w = 1;
     real ropen_w = 4;
     real rhome_w = 4;
-    real rweak_w = 3;
+    real rweak_w = 1;
     real rstrong_w = 0.1;
-    real pstrength_w = 0.00001;
+    real pstrength_w = 0.0001;
     real goal_w = 0.3;
     real static_otrap_w = 0.8;
     real static_strap_w = 0.8;
@@ -1150,7 +1172,7 @@ class FullSearch : ABSearch
             int[3] valuable_value;
             for (int i=0; i < valuable_victim.length; i++)
             {
-                if (valuable_length[i] != 0)
+                if (valuable_victim[i] != 0)
                 {
                     int vcnt = pop2count(pop, valuable_victim[i]) - 1;
                     int vpop = pop & ~(pop_mask[valuable_victim[i]] << pop_offset[valuable_victim[i]]);
@@ -1178,14 +1200,18 @@ class FullSearch : ABSearch
                 0.6, 0.5, 0.4, 0.3,
                 0.1, 0.1, 0.05, 0.05];
             const static real[] defense_per = [1.0, 0.80, 0.66, 0.50, 0.33];
+            const static real max_victim_per = 0.9;
             real defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
             for (int i=0; i < 3; i++)
             {
-                if (valuable_length[i] != 0)
+                if (valuable_victim[i] != 0)
                 {
                     real val = valuable_value[i] * length_per[valuable_length[i]];
                     if (valuable_length[i])
-                       val *= defense_mul * victim_per[i] * trap_num[popcount(valuable_traps[i])];
+                        val *= defense_mul * victim_per[i] * trap_num[popcount(valuable_traps[i])];
+                    else
+                        val *= max_victim_per;
+                        
                     score -= val;
                 }
             }
