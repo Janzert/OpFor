@@ -1731,9 +1731,13 @@ class Engine : AEIEngine
         StepList bestline = pos_list.move.dup;
         Position pos = pos_list.pos.dup;
         TTNode* n = searcher.ttable.get(pos);
-        while (n.zobrist == pos.zobrist 
-                && (n.beststep.frombit != 0 || n.beststep.tobit != 0))
+        for (int pvdepth = 0; pvdepth < depth * 2; pvdepth++)
         {
+            if (n.zobrist != pos.zobrist 
+                || (n.beststep.frombit == 0 && n.beststep.tobit == 0))
+            {
+                break;
+            }
             Step* next_step = bestline.newstep();
             next_step.copy(n.beststep);
             pos.do_step(n.beststep);
