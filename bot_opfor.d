@@ -125,8 +125,8 @@ int trap_safety(Position pos)
 int on_trap(Position pos)
 {
     const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
-    const int PINNED[13] = [0, 0, -5, -8, -14, -25, -59, 0, 5, 8, 14, 25, 59];
-    const int FRAMER[13] = [0, 0, -1, -2, -3, -5, -12, 0, 1, 2, 3, 5, 12];
+    const int PINNED[13] = [0, 0, -2, -3, -5, -8, -22, 0, 2, 3, 5, 8, 22];
+    const int FRAMER[13] = [0, 0, -1, -2, -3, -4, -11, 0, 1, 2, 3, 4, 11];
 
     int score = 0;
     ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
@@ -181,7 +181,7 @@ int on_trap(Position pos)
                 }
                 if (framed)
                 {
-                    score += ON_TRAP[tpiece] * 4;
+                    score += ON_TRAP[tpiece];
                     score += framing_score;
                 }
             }
@@ -214,8 +214,7 @@ int map_elephant(Position pos)
 
 int frozen_pieces(Position pos)
 {
-    const int[13] frozen_penalty = [0, -2, -4, -5, -10, -25, 0,
-                              2, 4, 5, 10, 25, 0];
+    const int[13] frozen_penalty = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
     int score = 0;
     for (int p=1; p < 12; p++)
     {
@@ -381,8 +380,8 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           0, -45, -60, -100, -150, -200],
           [0, 0, -45, -60, -100, -150, -200,
           0, 45, 60, 100, 150, 200]];
-    const static int[] distval = [100, 100, 100, 90, 70,
-          30, 20, 15, 10, 5, 4, 3, 2, 1, 0, 0];
+    const static int[] distval = [100, 100, 95, 85, 75,
+          70, 40, 30, 20, 10, 1, 1, 1, 1, 0, 0];
     const static real[][] rankval = [[0, 0, 0, 0.2, 0.5, 1.0, 1.2, 0],
           [0, -1.2, -1.0, -0.5, -0.2, 0, 0, 0]];
     const static real[] goalval = [1.0,
@@ -397,8 +396,8 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           1, 1, 1, 1];
     const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0], 
          [0, 30, 40, 35, 30, 15, 0, 0]];
-    const static int power_balance = 4500;
-    const static real full_weak = 8000;
+    const static int power_balance = 8000;
+    const static real full_weak = 14000;
     const static int[] rforward = [8, -8];
 
     int wscore = 0;
@@ -448,6 +447,10 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
             {
                 real sfactor = -power / full_weak;
                 sfactor = (sfactor < 1) ? sfactor : 1;
+                debug (rabbit_strength)
+                {
+                    writefln("weak r at %s, gs %d, pf %.2f", ix_to_alg(rix), goalsteps, sfactor);
+                }
                 wscore += weakval[s][rix/8] * weakgoal[goalsteps] * sfactor;
             } else {
                 power = (power < 170000) ? power : 170000;
@@ -455,6 +458,10 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
                 real rval = power * rv * goalval[goalsteps];
                 if (rbit & TRAPS)
                     rval /= 2;
+                debug (rabbit_strength)
+                {
+                    writefln("strong r at %s, val %.2f", ix_to_alg(rix), rval);
+                }
                 sscore += rval;
             }
         }
@@ -524,13 +531,27 @@ int piece_strength(Position pos, int[64] pstrengths)
 {
     const static int[] pieceval = [0, 0, 8, 12, 24, 36, 44,
           0, -8, -12, -24, -36, -44];
-    const static int[] distval = [100, 100, 100, 90, 60,
-          30, 15, 7, 4, 2, 2, 1, 1, 1, 0, 0];
-    const static int MAX_POWER = 4400; // == pieceval[Piece.WELEPHANT] * distval[0];
-    const static int MIN_POWER = -4400; // == pieceval[Piece.BELEPHANT] * distval[0];
+    const static int[] distval = [100, 100, 95, 90, 85,
+          80, 40, 35, 30, 20, 1, 1, 1, 1, 0, 0];
+    const static int[][] pmul = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2],
+          [0, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2],
+          [0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 2, 2],
+          [0, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2],
+          [0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2],
+          [0, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 2, 2],
+          [0, 1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 2, 2],
+          [0, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2],
+          [0, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
+    const static int MAX_POWER = 4400; // == pieceval[Piece.WELEPHANT] * distval[0] * pmul;
+    const static int MIN_POWER = -4400; // == pieceval[Piece.BELEPHANT] * distval[0] * pmul;
     
     bitix[16] ixs;
     int value[16];
+    Piece piece[16];
 
     int num_pieces = 0;
 
@@ -544,6 +565,7 @@ int piece_strength(Position pos, int[64] pstrengths)
         pbits ^= pbit;
         bitix pix = bitindex(pbit);
 
+        piece[num_pieces] = pos.pieces[pix];
         value[num_pieces] = pieceval[pos.pieces[pix]];
         if (pbit & pos.frozen)
             value[num_pieces] >>= 3;
@@ -561,7 +583,9 @@ int piece_strength(Position pos, int[64] pstrengths)
         for (int s = num_pieces; s--;)
         {
             if (s != p)
-                ppower += value[s] * distval[taxicab_dist[pix][ixs[s]]];
+            {
+                ppower += value[s] * distval[taxicab_dist[pix][ixs[s]]] * pmul[piece[p]][piece[s]];
+            }
         }
         ppower = (ppower < MAX_POWER) ? ppower : MAX_POWER;
         ppower = (ppower > MIN_POWER) ? ppower : MIN_POWER;
@@ -581,10 +605,10 @@ int piece_strength(Position pos, int[64] pstrengths)
 
 int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
 {
-    int[] BLOCKADE_VAL = [0, 0, -10, -30, -70, -120, -200,
-                0, 10, 30, 70, 120, 200];
-    int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
-                10, 25, 39, 61, 110, 264];
+    static const int[] BLOCKADE_VAL = [0, -5, -12, -16, -30, -55, -132,
+                                5, 12, 16, 30, 55, 132];
+    static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
+                                10, 25, 39, 61, 110, 264];
 
     real bscore = 0;
     real hscore = 0;
@@ -611,21 +635,6 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             }
         }
 
-        ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
-            & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-        for (int steps = 0; steps < 3; steps++)
-        {
-            coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-        }
-
-        ulong reachable = coverage;
-        ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
-        while (reachable != nreach)
-        {
-            reachable = nreach;
-            nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
-        }
-
         ulong empty_neighbors = neighbors_of(pos.bitBoards[Piece.EMPTY]);
 
         ulong bcheck = (pos.bitBoards[Piece.WELEPHANT+pieceoffset] | pos.bitBoards[Piece.WCAMEL+pieceoffset]
@@ -637,7 +646,7 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             bitix pix = bitindex(pbit);
             ulong pneighbors = neighbors_of(pbit);
 
-            if (popcount(pneighbors & coverage) > 1)
+            if (popcount(pneighbors & pos.bitBoards[Piece.EMPTY]) > 1)
                 continue;
 
             if ((pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
@@ -686,11 +695,11 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                 bscore += BLOCKADE_VAL[pos.pieces[pix]];
             } else {
                 // the piece is blockaded but actually a hostage
-                real power_mul = pstrengths[pix] / 8800.0; // Should restrict the range -.5 to .5
+                real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.8 to .8
                 if (side)
-                    power_mul = (power_mul < 0) ? 1+power_mul : 0.5;
+                    power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
                 else
-                    power_mul = (power_mul > 0) ? 1-power_mul : 0.5;
+                    power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
                 // power_mul should now be .5 to 1
                 debug (mobility)
                 {
@@ -700,6 +709,23 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             }
         }
 
+        ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
+            & pos.bitBoards[Piece.EMPTY] & ~unsafe;
+        for (int steps = 0; steps < 3; steps++)
+        {
+            coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
+        }
+
+        /*
+        ulong reachable = coverage;
+        ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
+        while (reachable != nreach)
+        {
+            reachable = nreach;
+            nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
+        }
+        */
+
         ulong hcheck = (pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset]) & pos.frozen;
         while (hcheck)
         {
@@ -707,19 +733,18 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             hcheck ^= pbit;
 
             ulong pneighbors = neighbors_of(pbit);
-            if ((popcount(pneighbors & reachable) < 2)
-                    || (popcount(pneighbors & coverage) == 0))
+            if (popcount(pneighbors & coverage) < 2)
             {
                 bitix pix = bitindex(pbit);
-                real power_mul = pstrengths[pix] / 12000.0; // Should restrict the range -.5 to .5
+                real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.2 to .2
                 if (side)
-                    power_mul = (power_mul < 0) ? 1+power_mul : 0.5;
+                    power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
                 else
-                    power_mul = (power_mul > 0) ? 1-power_mul : 0.5;
-                // power_mul should now be .5 to 1
+                    power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
+                // power_mul should now be .8 to 1
                 debug (mobility)
                 {
-                    writefln("h piece %d, pp %.2f", pos.pieces[pix], power_mul);
+                    writefln("h piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
                 }
                 hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
             }
@@ -800,7 +825,7 @@ class FullSearch : ABSearch
     real ropen_w = 4;
     real rhome_w = 4;
     real rweak_w = 1;
-    real rstrong_w = 0.1;
+    real rstrong_w = 0.05;
     real pstrength_w = 0.0001;
     real goal_w = 0.3;
     real static_otrap_w = 0.8;
