@@ -1829,7 +1829,7 @@ int main(char[][] args)
             }
         } catch (UnknownCommand e)
         {
-            writefln("Received unknown command: %s", e.command);
+            logger.warn("Received unknown command: %s", e.command);
         }
 
         while (server.current_cmd !is null)
@@ -1841,10 +1841,10 @@ int main(char[][] args)
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.QUIT:
-                    writefln("Exiting by server command.");
+                    logger.log("Exiting by server command.");
                     return 0;
                 case ServerCmd.CmdType.NEWGAME:
-                    writefln("Starting new game.");
+                    logger.log("Starting new game.");
                     if (engine.state != EngineState.IDLE)
                     {
                         engine.cleanup_search();
@@ -1860,8 +1860,8 @@ int main(char[][] args)
                         engine.cleanup_search();
                         engine.state = EngineState.IDLE;
                     }
-                    writefln("Starting search.");
-                    writefln("%s\n%s", "wb"[engine.position.side], engine.position.to_long_str);
+                    logger.log("Starting search");
+                    logger.console("%s\n%s", "wb"[engine.position.side], engine.position.to_long_str);
                     search_start = getUTCtime();
                     engine.start_search();
                     last_decision_change = search_start;
@@ -1888,6 +1888,7 @@ int main(char[][] args)
                             tc_max_search = tc_maxmove;
                         }
                         tc_max_search -= tc_safety_margin;
+                        logger.log("Min search: %d Max: %d", tc_min_search, tc_max_search);
                     } else {
                         tc_min_search = 0;
                         tc_max_search = 0;
@@ -1915,7 +1916,7 @@ int main(char[][] args)
                 case ServerCmd.CmdType.SETPOSITION:
                     PositionCmd pcmd = cast(PositionCmd)server.current_cmd;
                     engine.set_position(pcmd.side, pcmd.pos_str);
-                    writefln("set position\n%s\n%s", 
+                    logger.console("set position\n%s\n%s", 
                             "wb"[engine.position.side], 
                             engine.position.to_long_str());
                     server.clear_cmd();
