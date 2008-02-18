@@ -16,7 +16,7 @@ import position;
 const char[] BOT_NAME = "OpFor";
 const char[] BOT_AUTHOR = "Janzert";
 
-const int START_SEARCH_NODES = 100000;
+const int START_SEARCH_NODES = 30000;
 
 int trap_safety(Position pos)
 {
@@ -1782,15 +1782,27 @@ int main(char[][] args)
     char[] ip = "127.0.0.1";
     ushort port = 40007;
 
+    if (args.length > 1)
+        ip = args[1].dup;
+    if (args.length > 2)
+        port = toUshort(args[2]);
+
     d_time report_interval = 60 * std.date.TicksPerSecond;
     d_time nextreport = 0;
     int report_depth = 0;
 
     Logger logger = new Logger();
-    ServerInterface server = new ServerInterface(new SocketServer(ip, port),
+    ServerInterface server;
+    try
+    {
+        server = new ServerInterface(new SocketServer(ip, port),
             BOT_NAME, BOT_AUTHOR);
+    } catch (ConnectException e)
+    {
+        writefln("Error connecting to server: %s", e.msg);
+        return 1;
+    }
     logger.register(server);
-    writefln("Connected to server %s:%d", ip, port);
     Engine engine = new Engine(logger);
 
     int tc_permove = 0;         // time given per move

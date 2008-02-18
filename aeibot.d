@@ -6,6 +6,7 @@
 import std.conv;
 import std.format;
 import std.string;
+import std.stdio;
 import std.socket;
 import std.utf;
 
@@ -15,6 +16,14 @@ import position;
 pragma(lib, "ws2_32.lib");
 
 class NotImplementedException : Exception
+{
+    this(char[] msg)
+    {
+        super(msg);
+    }
+}
+
+class ConnectException : Exception
 {
     this(char[] msg)
     {
@@ -54,7 +63,13 @@ class SocketServer : ServerConnection
 
     this(char[] ip, ushort port)
     {
-        sock = new TcpSocket(new InternetAddress(ip, port));
+        try
+        {
+            sock = new TcpSocket(new InternetAddress(ip, port));
+        } catch (SocketException e)
+        {
+            throw new ConnectException(e.msg);
+        }
         sock.blocking(false);
     }
 
@@ -86,20 +101,33 @@ class SocketServer : ServerConnection
             ready_sockets = Socket.select(sset, null, null, cast(int)(timeout*1000*1000));
         }
         if (!ready_sockets)
-            throw new TimeoutException("No data received.");
+        {
+            if (sock.isAlive())
+                throw new TimeoutException("No data received.");
+            else
+                throw new Exception("Socket Error, not alive");
+        }
 
         const int bufsize = 5000;
         char[bufsize] buf;
         char[] resp;
+        bool gotresponse = false;
         int val = 0;
         do {
             val = sock.receive(buf);
             if (val == Socket.ERROR)
             {
-                throw new Exception("Socket Error");
+                throw new Exception("Socket Error, receiving");
+            } else if (val > 0)
+            {
+                gotresponse = true;
             }
             resp ~= buf[0..val];
         } while (val == bufsize)
+        if (!gotresponse)
+        {
+            throw new Exception("Socket closed");
+        }
         return resp;
     }
 
@@ -109,8 +137,8 @@ class SocketServer : ServerConnection
         while (sent < buf.length)
         {
             int val = sock.send(buf[sent..length]);
-            if (val == sock.ERROR)
-                throw new Exception("Socket Error");
+            if (val == Socket.ERROR)
+                throw new Exception("Socket Error, sending");
             sent += val;
         }
     }
