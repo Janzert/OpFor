@@ -721,13 +721,9 @@ class ABSearch
                 }
             }
 
-            if (sflag != SType.ALPHA)
+            if (sflag != SType.ALPHA && !pos.inpush)
             {
                 cuthistory.update(pos, new_best, depth);
-            }
-
-            if (sflag == SType.BETA && !pos.inpush)
-            {
                 killers.set_killer(max_depth-depth, pos.side, new_best);
             }
 
