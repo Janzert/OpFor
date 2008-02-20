@@ -919,8 +919,10 @@ class FullSearch : ABSearch
 
     void set_depth(int depth)
     {
+        super.set_depth(depth);
         if (expand_qdepth)
         {
+            depth += 4;
             qdepth = (-(depth/2) * 4) + (depth % 4);
             qdepth = (qdepth > max_qdepth) ? qdepth : max_qdepth;
         }
@@ -1708,7 +1710,7 @@ class Engine : AEIEngine
             {
                 depth++;
                 checked_moves = 0;
-                searcher.set_depth(depth+4);
+                searcher.set_depth(depth);
                 last_score = best_score;
                 last_best = pos_list;
                 best_score = MIN_SCORE;

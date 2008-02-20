@@ -129,23 +129,80 @@ class HistoryHeuristic
     }
 }
 
+class KillerHeuristic
+{
+    const static int MAX_DEPTH = 20;
+    Step[2][2][MAX_DEPTH] steps;
+    uint[64][64][2][MAX_DEPTH] history;
+    uint[2][2][MAX_DEPTH] max_history;
+
+    void set_killer(int depth, Side side, Step step)
+    {
+        int step_history = history[depth][side][step.fromix][step.toix]++;
+        if (step_history > max_history[depth][side][0])
+        {
+            Step* first = &steps[depth][side][0];
+            if (*first != step)
+            {
+                if (first.frombit != 0 || first.tobit != 0)
+                {
+                    steps[depth][side][1] = *first;
+                    max_history[depth][side][1] = max_history[depth][side][0];
+                }
+                *first = step;
+            }
+            max_history[depth][side][0] = step_history;
+        } else if (step_history > max_history[depth][side][1])
+        {
+            if (steps[depth][side][1] != step)
+            {
+                steps[depth][side][1] = step;
+            }
+            max_history[depth][side][1] = step_history;
+        }
+    }
+
+    void age()
+    {
+        for (int d=0; d < MAX_DEPTH; d++)
+        {
+            for (int s=0; s < 2; s++)
+            {
+                for (int n=0; n < 2; n++)
+                {
+                    max_history[d][s][n] = 0;
+                    steps[d][s][n].clear();
+                }
+
+                for (int f=0; f < 64; f++)
+                {
+                    for (int t=0; t < 64; t++)
+                    {
+                        history[d][s][f][t] = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
 class StepSorter
 {
     private static StepSorter[] reserve;
     private static int reservesize;
 
-    static StepSorter allocate(Position p, Step* b)
+    static StepSorter allocate(int d, Position p, Step* b)
     {
         if (reservesize)
         {
             reservesize--;
             StepSorter ss = reserve[reservesize];
             reserve[reservesize] = null;
-            ss.init(p, b);
+            ss.init(d, p, b);
             return ss;
         }
 
-        return new StepSorter(p, b);
+        return new StepSorter(d, p, b);
     }
 
     static void free(StepSorter s)
@@ -162,12 +219,15 @@ class StepSorter
 
     static Logger logger;
 
+    static KillerHeuristic killers;
     static HistoryHeuristic cuthistory;
     static TrapGenerator trap_search;
 
+    static bool use_killers = true;
     static bool use_history = true;
     static bool capture_first = true;
 
+    int depth;
     Position pos;
     StepList steps;
     Step best;
@@ -180,13 +240,16 @@ class StepSorter
     int stage;
     int history_num;
 
-    this(Position p, Step* b)
+    int sub_ix;
+
+    this(int d, Position p, Step* b)
     {
-        init(p, b);
+        init(d, p, b);
     }
 
-    void init(Position p, Step* b)
+    void init(int d, Position p, Step* b)
     {
+        depth = d;
         pos = p;
         steps = StepList.allocate();
         p.get_steps(steps);
@@ -200,6 +263,7 @@ class StepSorter
         stage = 0;
         captures_generated = 0;
         history_num = 0;
+        sub_ix = 0;
     }
 
     Step* next_step()
@@ -269,12 +333,18 @@ class StepSorter
                     {
                         while (capture_num < capture_steps.numsteps)
                         {
-                            int bix = num;
+                            int bix = 0;
                             while ((bix < steps.numsteps)
                                     && (steps.steps[bix] != capture_steps.steps[capture_num]))
                             {
                                 bix++;
                             }
+                            if (bix < num)
+                            {
+                                capture_num++;
+                                continue;
+                            }
+
                             if (bix < steps.numsteps)
                             {
                                 Step tmp = steps.steps[num];
@@ -282,12 +352,11 @@ class StepSorter
                                 steps.steps[bix] = tmp;
                                 break;
                             } else {
-                                bool had_pull = false;
+                                bool had_pull = false; // had the move as a pull or already used in previous step
                                 for (int i=0; i < steps.numsteps; i++)
                                 {
                                     if (capture_steps.steps[capture_num].frombit == steps.steps[i].frombit
-                                            && (capture_steps.steps[capture_num].tobit == steps.steps[i].tobit)
-                                            && (capture_steps.steps[capture_num].push != steps.steps[i].push))
+                                            && (capture_steps.steps[capture_num].tobit == steps.steps[i].tobit))
                                     {
                                         had_pull = true;
                                         break;
@@ -307,20 +376,6 @@ class StepSorter
                                             writefln("Have previous best");
                                         else
                                             writefln("No previous best");
-
-                                        bool already_used = false;
-                                        for (int i=0; i < num; i++)
-                                        {
-                                            if (steps.steps[i] == capture_steps.steps[capture_num])
-                                            {
-                                                already_used = true;
-                                                break;
-                                            }
-                                        }
-                                        if (already_used)
-                                        {
-                                            writefln("Step already used");
-                                        }
 
                                         writefln("Move steps:");
                                         int sn = 0;
@@ -366,6 +421,50 @@ class StepSorter
                 }
                 stage++;
             case 2:
+                if (use_killers && !pos.inpush && depth < killers.MAX_DEPTH)
+                {
+                    bool foundkiller = false;
+                    while (sub_ix < 2)
+                    {
+                        Step* possible = &killers.steps[depth][pos.side][sub_ix++];
+                        if (possible.frombit != 0 || possible.tobit != 0)
+                        {
+                            int bix = 0;
+                            while (bix < steps.numsteps && steps.steps[bix] != *possible)
+                            {
+                                bix++;
+                            }
+                            if (bix < num)
+                            {
+                                // step already searched
+                                continue;
+                            }
+                            
+                            if (bix < steps.numsteps)
+                            {
+                                steps.steps[bix] = steps.steps[num];
+                                steps.steps[num] = *possible;
+                                num++;
+                                step = possible;
+
+                                if (sub_ix > 1)
+                                {
+                                    sub_ix = 0;
+                                    stage++;
+                                }
+                                foundkiller = true;
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    if (foundkiller)
+                        break;
+                }
+                sub_ix = 0;
+                stage++;
+            case 3:
                 if (use_history)
                 {
                     uint score = cuthistory.get_score(pos, steps.steps[num]);
@@ -402,9 +501,11 @@ class ABSearch
     Logger logger;
     TransTable ttable;
     HistoryHeuristic cuthistory;
+    KillerHeuristic killers;
     TrapGenerator trap_search;
 
     Position nullmove;
+    int max_depth;
 
     ulong nodes_searched;
     ulong tthits;
@@ -425,6 +526,8 @@ class ABSearch
         StepSorter.cuthistory = cuthistory;
         trap_search = new TrapGenerator();
         StepSorter.trap_search = trap_search;
+        killers = new KillerHeuristic();
+        StepSorter.killers = killers;
         nodes_searched = 0;
         tthits = 0;
     }
@@ -451,6 +554,9 @@ class ABSearch
                 break;
             case "use_lmr":
                 use_lmr = cast(bool)toInt(value);
+                break;
+            case "use_killers":
+                StepSorter.use_killers = cast(bool)(toInt(value));
                 break;
             default:
                 handled = false;
@@ -523,7 +629,7 @@ class ABSearch
             
             new_best.clear();
         } else {
-            StepSorter sorted_steps = StepSorter.allocate(pos, prev_best);
+            StepSorter sorted_steps = StepSorter.allocate(max_depth-depth, pos, prev_best);
             if (sorted_steps.steps.numsteps == 0)
             {
                 // immobilized
@@ -620,6 +726,11 @@ class ABSearch
                 cuthistory.update(pos, new_best, depth);
             }
 
+            if (sflag == SType.BETA && !pos.inpush)
+            {
+                killers.set_killer(max_depth-depth, pos.side, new_best);
+            }
+
             StepSorter.free(sorted_steps);
 
             if (score == ABORT_SCORE)
@@ -659,7 +770,10 @@ class ABSearch
         return guess;
     }
 
-    void set_depth(int depth) { }
+    void set_depth(int depth)
+    {
+        max_depth = depth;
+    }
 
     void prepare()
     {
@@ -671,6 +785,8 @@ class ABSearch
     {
         ttable.age();
         cuthistory.age();
+        killers.age();
     }
 }
+
 
