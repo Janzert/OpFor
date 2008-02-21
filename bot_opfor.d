@@ -2005,6 +2005,9 @@ int main(char[][] args)
                     if (engine.best_score >= WIN_SCORE)
                     {
                         logger.log("Sending forced win move in %.2f seconds.", seconds);
+                    } else if (engine.pos_list.next is null)
+                    {
+                        logger.log("Sending forced move, or in forced loss, after %.2f seconds.", seconds);
                     }
                 }
                 real average = 0;
