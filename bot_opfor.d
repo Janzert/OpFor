@@ -2097,8 +2097,12 @@ int main(char[][] args)
                             || engine.depth > report_depth 
                             || cur_best !is engine.pos_list)
                     {
-                        int depth = engine.in_step ? engine.depth+4 : engine.depth+3;
-                        logger.info("depth %d", depth);
+                        if (engine.in_step)
+                        {
+                            logger.info("depth %d+", engine.depth+3);
+                        } else {
+                            logger.info("depth %d", engine.depth+3);
+                        }
                         logger.info("time %d", (now-search_start)/TicksPerSecond);
                         logger.info("nodes %d", engine.searcher.nodes_searched);
                         if (engine.in_step)
