@@ -1634,7 +1634,7 @@ class Engine : AEIEngine
                 d_time now = getUTCtime();
                 if (aborts_reported < MAX_ABORT_REPORTS)
                 {
-                    logger.warn("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
+                    logger.log("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
                     aborts_reported += 1;
                 }
                 break;
