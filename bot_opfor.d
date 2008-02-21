@@ -2028,6 +2028,7 @@ int main(char[][] args)
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
+                d_time start_run = getUTCtime();
                 PositionNode cur_best = engine.pos_list;
                 int check_nodes;
                 if (engine.searcher.nodes_searched && (length > (TicksPerSecond * 2)))
@@ -2042,13 +2043,12 @@ int main(char[][] args)
                     d_time max_time_limit = (tc_max_search * TicksPerSecond) + move_start;
                     if (pondering)
                     {
-                        abort_time = 30 * TicksPerSecond + move_start;
+                        abort_time = (30 * TicksPerSecond) + start_run;
                     }
                     if (abort_time > max_time_limit)
                         abort_time = max_time_limit;
                     engine.searcher.abort_time = abort_time;
                 }
-                d_time start_run = getUTCtime();
                 engine.search(check_nodes);
                 check_num += 1;
                 d_time now = getUTCtime();
