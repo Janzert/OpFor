@@ -1457,6 +1457,9 @@ class Engine : AEIEngine
     PositionRecord[] opening_book;
     bool position_record = false;
 
+    const static uint MAX_ABORT_REPORTS = 4;
+    uint aborts_reported = 0;
+
     bool root_lmr = true;
     int last_search_margin = 350; // between a cat and a dog
 
@@ -1629,7 +1632,11 @@ class Engine : AEIEngine
                     || score == -ABORT_SCORE)
             {
                 d_time now = getUTCtime();
-                logger.warn("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
+                if (aborts_reported < MAX_ABORT_REPORTS)
+                {
+                    logger.warn("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
+                    aborts_reported += 1;
+                }
                 break;
             }
 
@@ -1763,6 +1770,7 @@ class Engine : AEIEngine
         num_moves = 0;
         last_score = MIN_SCORE;
         best_score = MIN_SCORE;
+        aborts_reported = 0;
         searcher.cleanup();
     }
 
@@ -2032,6 +2040,10 @@ int main(char[][] args)
                 {
                     d_time abort_time = ((tc_min_search + 30) * TicksPerSecond) + move_start;
                     d_time max_time_limit = (tc_max_search * TicksPerSecond) + move_start;
+                    if (pondering)
+                    {
+                        abort_time = 30 * TicksPerSecond + move_start;
+                    }
                     if (abort_time > max_time_limit)
                         abort_time = max_time_limit;
                     engine.searcher.abort_time = abort_time;
@@ -2040,10 +2052,6 @@ int main(char[][] args)
                 engine.search(check_nodes);
                 check_num += 1;
                 d_time now = getUTCtime();
-                if ((now - start_run) > (TicksPerSecond * 15))
-                {
-                    logger.warn("Long search run %.2f seconds", cast(real)(now-start_run) / TicksPerSecond);
-                }
                 if (cur_best != engine.pos_list)
                 {
                     last_decision_change = now;

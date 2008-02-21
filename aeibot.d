@@ -67,9 +67,7 @@ class SocketServer : ServerConnection
         {
             sock = new TcpSocket(new InternetAddress(ip, port));
             int bufsize;
-            sock.getOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF, bufsize);
-            bufsize = (bufsize < 24 * 1024) ? 24 * 1024 : bufsize;
-            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF, bufsize);
+            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF, 24*1024);
         } catch (SocketException e)
         {
             throw new ConnectException(e.msg);
