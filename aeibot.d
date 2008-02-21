@@ -66,6 +66,10 @@ class SocketServer : ServerConnection
         try
         {
             sock = new TcpSocket(new InternetAddress(ip, port));
+            int bufsize;
+            sock.getOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF, bufsize);
+            bufsize = (bufsize < 24 * 1024) ? 24 * 1024 : bufsize;
+            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF, bufsize);
         } catch (SocketException e)
         {
             throw new ConnectException(e.msg);
@@ -138,7 +142,7 @@ class SocketServer : ServerConnection
         {
             int val = sock.send(buf[sent..length]);
             if (val == Socket.ERROR)
-                throw new Exception("Socket Error, sending");
+                throw new Exception(format("Socket Error, sending. Sent %d bytes", sent));
             sent += val;
         }
     }
