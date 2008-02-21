@@ -376,10 +376,8 @@ int rabbit_home(Position pos)
 
 real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
 {
-    const static int[][] pieceval = [[0, 0, 45, 60, 100, 150, 200,
-          0, -45, -60, -100, -150, -200],
-          [0, 0, -45, -60, -100, -150, -200,
-          0, 45, 60, 100, 150, 200]];
+    const static int[] pieceval = [0, 0, 45, 60, 100, 150, 200,
+          0, -45, -60, -100, -150, -200];
     const static int[] distval = [100, 100, 95, 85, 75,
           70, 40, 30, 20, 10, 1, 1, 1, 1, 0, 0];
     const static real[][] rankval = [[0, 0, 0, 0.2, 0.5, 1.0, 1.2, 0],
@@ -399,23 +397,24 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
     const static int power_balance = 8000;
     const static real full_weak = 14000;
     const static int[] rforward = [8, -8];
+    const static int[] side_mul = [1, -1];
 
     int wscore = 0;
     real sscore = 0;
     ulong allpieces = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
         & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
         & ~pos.frozen;
-    Piece[32] pieces;
-    bitix[32] pixs;
+    int[16] pval;
+    bitix[16] pixs;
     int num_pieces;
     while (allpieces)
     {
-	ulong pbit = allpieces & -allpieces;
-	allpieces ^= pbit;
-	bitix pix = bitindex(pbit);
+        ulong pbit = allpieces & -allpieces;
+        allpieces ^= pbit;
+        bitix pix = bitindex(pbit);
 
-	pieces[num_pieces] = pos.pieces[pix];
-	pixs[num_pieces++] = pix;
+        pval[num_pieces] = pieceval[pos.pieces[pix]];
+        pixs[num_pieces++] = pix;
     }
 
     for (Side s = Side.WHITE; s <= Side.BLACK; s++)
@@ -432,12 +431,14 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
             ulong rbit = rabbits & -rabbits;
             rabbits ^= rbit;
             bitix rix = bitindex(rbit);
+            uint forward = rix+rforward[s];
 
             int power = 0;
             for (int i=0; i < num_pieces; i++)
             {
-                power += pieceval[s][pieces[i]] * distval[taxicab_dist[pixs[i]][rix+rforward[s]]];
+                power += pval[i] * distval[taxicab_dist[forward][pixs[i]]];
             }
+            power *= side_mul[s];
             power -= power_balance;
 
             int goalsteps = goals.board_depth[rix];
@@ -666,20 +667,16 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             }
 
             bool can_push = false;
-            ulong oneighbors = pneighbors & pos.placement[side^1];
+            ulong oneighbors = pneighbors & pos.placement[side^1] & empty_neighbors;
             while (oneighbors)
             {
                 ulong obit = oneighbors & -oneighbors;
                 oneighbors ^= obit;
-
-                if (obit & empty_neighbors)
+                bitix oix = bitindex(obit);
+                if (pos.pieces[pix] > pos.pieces[oix] + enemyoffset)
                 {
-                    bitix oix = bitindex(obit);
-                    if (pos.pieces[pix] > pos.pieces[oix] + enemyoffset)
-                    {
-                        can_push = true;
-                        break;
-                    }
+                    can_push = true;
+                    break;
                 }
             }
             if (can_push)
@@ -709,44 +706,36 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
             }
         }
 
-        ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
-            & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-        for (int steps = 0; steps < 3; steps++)
-        {
-            coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-        }
-
-        /*
-        ulong reachable = coverage;
-        ulong nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
-        while (reachable != nreach)
-        {
-            reachable = nreach;
-            nreach = reachable | (neighbors_of(reachable) & pos.bitBoards[Piece.EMPTY] & ~unsafe);
-        }
-        */
-
         ulong hcheck = (pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset]) & pos.frozen;
-        while (hcheck)
+        if (hcheck)
         {
-            ulong pbit = hcheck & -hcheck;
-            hcheck ^= pbit;
-
-            ulong pneighbors = neighbors_of(pbit);
-            if (popcount(pneighbors & coverage) < 2)
+            ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
+                & pos.bitBoards[Piece.EMPTY] & ~unsafe;
+            for (int steps = 0; steps < 3; steps++)
             {
-                bitix pix = bitindex(pbit);
-                real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.2 to .2
-                if (side)
-                    power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
-                else
-                    power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
-                // power_mul should now be .8 to 1
-                debug (mobility)
+                coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
+            }
+            while (hcheck)
+            {
+                ulong pbit = hcheck & -hcheck;
+                hcheck ^= pbit;
+
+                ulong pneighbors = neighbors_of(pbit);
+                if (popcount(pneighbors & coverage) < 2)
                 {
-                    writefln("h piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
+                    bitix pix = bitindex(pbit);
+                    real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.2 to .2
+                    if (side)
+                        power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
+                    else
+                        power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
+                    // power_mul should now be .8 to 1
+                    debug (mobility)
+                    {
+                        writefln("h piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
+                    }
+                    hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
                 }
-                hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
             }
         }
     }
