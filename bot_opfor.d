@@ -814,7 +814,7 @@ class FullSearch : ABSearch
     real ropen_w = 4;
     real rhome_w = 4;
     real rweak_w = 1;
-    real rstrong_w = 0.001;
+    real rstrong_w = 0.002;
     real pstrength_w = 0.0001;
     real goal_w = 0.3;
     real static_otrap_w = 0.8;
