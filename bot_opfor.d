@@ -703,12 +703,12 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                 bscore += BLOCKADE_VAL[pos.pieces[pix]];
             } else {
                 // the piece is blockaded but actually a hostage
-                real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.8 to .8
+                real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.2 to .2
                 if (side)
                     power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
                 else
                     power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
-                // power_mul should now be .5 to 1
+                // power_mul should now be .8 to 1
                 debug (mobility)
                 {
                     writefln("fb piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
