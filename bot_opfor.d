@@ -596,13 +596,22 @@ int piece_strength(Position pos, int[64] pstrengths)
 int frozen_pieces(Position pos)
 {
     static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+    static const real[33] POPULATION_MUL =
+           [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+                 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+                 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                 1.1, 1.1, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3];
+
+    uint total_pop = popcount(~pos.bitBoards[Piece.EMPTY]);
+    total_pop = (total_pop < 32) ? total_pop : 32;
+    real pop_mul = POPULATION_MUL[total_pop];
 
     int score = 0;
     for (int p=1; p < 12; p++)
     {
         score += popcount(pos.bitBoards[p] & pos.frozen) * FROZEN_PENALTY[p];
     }
-    return score;
+    return cast(int)(score * pop_mul);
 }
 
 int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
