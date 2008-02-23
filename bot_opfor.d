@@ -376,8 +376,8 @@ int rabbit_home(Position pos)
 
 real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
 {
-    const static int[] pieceval = [0, 0, 45, 60, 100, 150, 200,
-          0, -45, -60, -100, -150, -200];
+    const static int[] pieceval = [0, 0, 45, 60, 150, 200, 300,
+          0, -45, -60, -150, -200, -300];
     const static int[] distval = [100, 100, 95, 75, 70,
           40, 30, 25, 20, 5, 1, 1, 1, 1, 0, 0];
     const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.3, 0],
@@ -394,6 +394,7 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           1, 1, 1, 1];
     const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0], 
          [0, 30, 40, 35, 30, 15, 0, 0]];
+    const static int power_balance = 1000;
     const static real full_weak = 6000;
     const static int full_strong = 8000;
     const static int[] rforward = [8, -8];
@@ -439,6 +440,7 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
                 power += pval[i] * distval[taxicab_dist[forward][pixs[i]]];
             }
             power *= side_mul[s];
+            power -= power_balance;
 
             int goalsteps = goals.board_depth[rix];
             goalsteps = (goalsteps < 16) ? goalsteps : 16;
@@ -811,7 +813,7 @@ class FullSearch : ABSearch
     real frozen_w = 3;
     real rwall_w = 1;
     real ropen_w = 4;
-    real rhome_w = 4;
+    real rhome_w = 5;
     real rweak_w = 1;
     real rstrong_w = 0.05;
     real pstrength_w = 0.0001;
