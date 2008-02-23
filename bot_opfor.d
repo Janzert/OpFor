@@ -612,6 +612,15 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
     static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
                                 10, 25, 39, 61, 110, 264];
     static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+    static const int[] TRAP_DIST_MUL =
+        [1, 1, 2, 1, 1, 2, 1, 1,
+         1, 2, 2, 2, 2, 2, 2, 1,
+         2, 2, 2, 2, 2, 2, 2, 2,
+         1, 2, 2, 2, 2, 2, 2, 1,
+         1, 2, 2, 2, 2, 2, 2, 1,
+         2, 2, 2, 2, 2, 2, 2, 2,
+         1, 2, 2, 2, 2, 2, 2, 1,
+         1, 1, 2, 1, 1, 2, 1, 1];
 
     real bscore = 0;
     real hscore = 0;
@@ -704,7 +713,7 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                 {
                     writefln("fb piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
                 }
-                hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
+                hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
                 hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3; // magic number is frozen_w
             }
         }
@@ -737,7 +746,7 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                     {
                         writefln("h piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
                     }
-                    hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
+                    hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
                 }
             }
         }
