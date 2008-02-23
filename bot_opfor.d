@@ -2054,11 +2054,11 @@ int main(char[][] args)
                 }
                 if (tc_max_search)
                 {
-                    d_time abort_time = ((tc_min_search + 30) * TicksPerSecond) + move_start;
+                    d_time abort_time = ((tc_min_search + 20) * TicksPerSecond) + move_start;
                     d_time max_time_limit = (tc_max_search * TicksPerSecond) + move_start;
                     if (pondering)
                     {
-                        abort_time = (30 * TicksPerSecond) + start_run;
+                        abort_time = (20 * TicksPerSecond) + start_run;
                     }
                     if (abort_time > max_time_limit)
                         abort_time = max_time_limit;
