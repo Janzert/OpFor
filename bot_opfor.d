@@ -378,9 +378,9 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
 {
     const static int[] pieceval = [0, 0, 45, 60, 100, 150, 200,
           0, -45, -60, -100, -150, -200];
-    const static int[] distval = [100, 100, 95, 85, 75,
-          70, 40, 30, 20, 10, 1, 1, 1, 1, 0, 0];
-    const static real[][] rankval = [[0, 0, 0, 0.2, 0.5, 1.0, 1.2, 0],
+    const static int[] distval = [100, 100, 95, 75, 70,
+          40, 30, 25, 20, 5, 1, 1, 1, 1, 0, 0];
+    const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.3, 0],
           [0, -1.2, -1.0, -0.5, -0.2, 0, 0, 0]];
     const static real[] goalval = [1.0,
           1.0, 1.0, 1.0, 1.0,
@@ -394,8 +394,8 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
           1, 1, 1, 1];
     const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0], 
          [0, 30, 40, 35, 30, 15, 0, 0]];
-    const static int power_balance = 8000;
-    const static real full_weak = 14000;
+    const static real full_weak = 6000;
+    const static int full_strong = 8000;
     const static int[] rforward = [8, -8];
     const static int[] side_mul = [1, -1];
 
@@ -439,7 +439,6 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
                 power += pval[i] * distval[taxicab_dist[forward][pixs[i]]];
             }
             power *= side_mul[s];
-            power -= power_balance;
 
             int goalsteps = goals.board_depth[rix];
             goalsteps = (goalsteps < 16) ? goalsteps : 16;
@@ -454,14 +453,14 @@ real rabbit_strength(Position pos, GoalSearch goals, real weak_w, real strong_w)
                 }
                 wscore += weakval[s][rix/8] * weakgoal[goalsteps] * sfactor;
             } else {
-                power = (power < 170000) ? power : 170000;
+                power = (power < full_strong) ? power : full_strong;
                 real rv = rankval[s][rix/8];
                 real rval = power * rv * goalval[goalsteps];
                 if (rbit & TRAPS)
                     rval /= 2;
                 debug (rabbit_strength)
                 {
-                    writefln("strong r at %s, val %.2f", ix_to_alg(rix), rval);
+                    writefln("strong r at %s, val %.2f final %d", ix_to_alg(rix), rval, cast(int)(rval*strong_w));
                 }
                 sscore += rval;
             }
@@ -814,7 +813,7 @@ class FullSearch : ABSearch
     real ropen_w = 4;
     real rhome_w = 4;
     real rweak_w = 1;
-    real rstrong_w = 0.002;
+    real rstrong_w = 0.05;
     real pstrength_w = 0.0001;
     real goal_w = 0.3;
     real static_otrap_w = 0.8;
