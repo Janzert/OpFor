@@ -596,21 +596,41 @@ int piece_strength(Position pos, int[64] pstrengths)
 int frozen_pieces(Position pos)
 {
     static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+    static const real ALMOST_FROZEN = 0.1;
     static const real[33] POPULATION_MUL =
            [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
                  0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
                  1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-                 1.1, 1.1, 1.1, 1.1, 1.2, 1.2, 1.3, 1.3];
-
-    uint total_pop = popcount(~pos.bitBoards[Piece.EMPTY]);
-    total_pop = (total_pop < 32) ? total_pop : 32;
-    real pop_mul = POPULATION_MUL[total_pop];
+                 1.1, 1.1, 1.1, 1.1, 1.2, 1.2, 1.2, 1.2];
 
     int score = 0;
     for (int p=1; p < 12; p++)
     {
         score += popcount(pos.bitBoards[p] & pos.frozen) * FROZEN_PENALTY[p];
     }
+
+    for (Side s=Side.WHITE; s <= Side.BLACK; s++)
+    {
+        int enemyoffset = 6;
+        int pieceoffset = 0;
+        if (s == Side.BLACK)
+        {
+            enemyoffset = 0;
+            pieceoffset = 6;
+        }
+        ulong stronger = pos.placement[s^1] & ~pos.bitBoards[Piece.WRABBIT+enemyoffset] & ~pos.frozen;
+        for (int p=Piece.WRABBIT; p <= Piece.WELEPHANT; p++)
+        {
+            ulong nstronger = neighbors_of(stronger);
+            score += (popcount(pos.bitBoards[p+pieceoffset] & ~pos.frozen & nstronger) * FROZEN_PENALTY[p]) * ALMOST_FROZEN;
+            stronger &= ~pos.bitBoards[p+enemyoffset];
+        }
+    }
+
+    uint total_pop = popcount(~pos.bitBoards[Piece.EMPTY]);
+    total_pop = (total_pop < 32) ? total_pop : 32;
+    real pop_mul = POPULATION_MUL[total_pop];
+
     return cast(int)(score * pop_mul);
 }
 
