@@ -705,7 +705,7 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                     writefln("fb piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
                 }
                 hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
-                hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3;
+                hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3; // magic number is frozen_w
             }
         }
 
@@ -1177,7 +1177,7 @@ class FullSearch : ABSearch
                 valuable_length[1] = l;
             }
             if (valuable_victim[1] == valuable_victim[2]
-                    && valuable_victim[1] > valuable_victim[2])
+                    && valuable_length[1] > valuable_length[2])
             {
                 int l = valuable_length[1];
                 valuable_length[1] = valuable_length[2];
