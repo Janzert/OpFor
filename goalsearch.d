@@ -100,7 +100,7 @@ class GoalSearch
             ulong rabbits = start.bitBoards[Piece.WRABBIT+piece_offset];
             while (rabbits)
             {
-                bitix rix = msbindex(rabbits);
+                bitix rix = bitindex(rabbits); // using msbindex for white helps partially sort the goals
                 ulong rbit = 1UL << rix;
                 rabbits ^= rbit;
 
@@ -114,18 +114,22 @@ class GoalSearch
                 board_depth[rix] = gdepth;
                 if (gdepth <= search_depth)
                 {
-                    uint cur_goal = goals_found[s]++;
+                    uint cur_goal = (goals_found[s] == 0) ? 0 : 1;
+                    goals_found[s]++;
                     rabbit_location[s][cur_goal] = rix;
                     goal_depth[s][cur_goal] = gdepth;
-                    while (cur_goal > 0 
+                    //while (cur_goal > 0 
+                    if (cur_goal > 0
                             && goal_depth[s][cur_goal] < goal_depth[s][cur_goal-1])
                     {
-                        rabbit_location[s][cur_goal-1] ^= rabbit_location[s][cur_goal];
-                        rabbit_location[s][cur_goal] ^= rabbit_location[s][cur_goal-1];
-                        rabbit_location[s][cur_goal-1] ^= rabbit_location[s][cur_goal];
-                        goal_depth[s][cur_goal-1] ^= goal_depth[s][cur_goal];
-                        goal_depth[s][cur_goal] ^= goal_depth[s][cur_goal-1];
-                        goal_depth[s][cur_goal-1] ^= goal_depth[s][cur_goal];
+                        rix = rabbit_location[s][cur_goal];
+                        rabbit_location[s][cur_goal] = rabbit_location[s][cur_goal-1];
+                        rabbit_location[s][cur_goal-1] = rix;
+
+                        gdepth = goal_depth[s][cur_goal];
+                        goal_depth[s][cur_goal] = goal_depth[s][cur_goal-1];
+                        goal_depth[s][cur_goal-1] = gdepth;
+                        //cur_goal--;
                     }
                 }
             }
