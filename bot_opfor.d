@@ -211,18 +211,6 @@ int map_elephant(Position pos)
     return score;
 }
 
-
-int frozen_pieces(Position pos)
-{
-    const int[13] frozen_penalty = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
-    int score = 0;
-    for (int p=1; p < 12; p++)
-    {
-        score += popcount(pos.bitBoards[p] & pos.frozen) * frozen_penalty[p];
-    }
-    return score;
-}
-
 int rabbit_wall(Position pos)
 {
     const int[2] BLOCKING_BONUS = [5, -5];
@@ -605,12 +593,25 @@ int piece_strength(Position pos, int[64] pstrengths)
     return score;
 }
 
+int frozen_pieces(Position pos)
+{
+    static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+
+    int score = 0;
+    for (int p=1; p < 12; p++)
+    {
+        score += popcount(pos.bitBoards[p] & pos.frozen) * FROZEN_PENALTY[p];
+    }
+    return score;
+}
+
 int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
 {
     static const int[] BLOCKADE_VAL = [0, -5, -12, -16, -30, -55, -132,
                                 5, 12, 16, 30, 55, 132];
     static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
                                 10, 25, 39, 61, 110, 264];
+    static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
 
     real bscore = 0;
     real hscore = 0;
@@ -704,6 +705,7 @@ int mobility(Position pos, int[64] pstrengths, real blockade_w, real hostage_w)
                     writefln("fb piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
                 }
                 hscore += HOSTAGE_VAL[pos.pieces[pix]] * power_mul;
+                hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3;
             }
         }
 
