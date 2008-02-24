@@ -1639,6 +1639,7 @@ class Engine : AEIEngine
         d_time start_time = getUTCtime();
         searcher.check_interval = check_nodes;
         int stop_nodes = searcher.nodes_searched + check_nodes;
+        searcher.check_nodes = stop_nodes;
         while (searcher.nodes_searched < stop_nodes)
         {
             Position pos = next_pos.pos;
@@ -1851,7 +1852,7 @@ int main(char[][] args)
     int tc_wreserve = 0;        // white's reserve time
     int tc_breserve = 0;        // black's reserve time
     int tc_lastmove = 0;        // time used by opponent for last move
-    int tc_safety_margin = 10;  // safety margin in seconds to end the search
+    int tc_safety_margin = 11;  // safety margin in seconds to end the search
     real tc_min_search_per = 0.66;  // minimum percentage of permove time to search
     real tc_confidence_denom = 3;
     real tc_time_left_denom = 3;
