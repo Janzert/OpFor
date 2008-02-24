@@ -1947,7 +1947,12 @@ int main(char[][] args)
                             int otherreserve = (myside == Side.WHITE) ? tc_breserve : tc_wreserve;
                             int myrealtime = otherreserve + tc_permove;
                             if (myrealtime < 35)
+                            {
                                 pondering = false;
+                                engine.cleanup_search();
+                                engine.state = EngineState.IDLE;
+                                logger.log("Stopping ponder because of low time for next move.");
+                            }
                         }
                         logger.log("Min search: %d Max: %d", tc_min_search, tc_max_search);
                     } else {
