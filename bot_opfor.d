@@ -1941,6 +1941,14 @@ int main(char[][] args)
                             tc_max_search = tc_maxmove;
                         }
                         tc_max_search -= tc_safety_margin;
+
+                        if (pondering)
+                        {
+                            int otherreserve = (myside == Side.WHITE) ? tc_breserve : tc_wreserve;
+                            int myrealtime = otherreserve + tc_permove;
+                            if (myrealtime < 35)
+                                pondering = false;
+                        }
                         logger.log("Min search: %d Max: %d", tc_min_search, tc_max_search);
                     } else {
                         tc_min_search = 0;
