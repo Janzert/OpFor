@@ -618,12 +618,12 @@ int frozen_pieces(Position pos)
             enemyoffset = 0;
             pieceoffset = 6;
         }
-        ulong stronger = pos.placement[s^1] & ~pos.bitBoards[Piece.WRABBIT+enemyoffset] & ~pos.frozen;
+        ulong stronger = pos.placement[s^1] & ~pos.frozen;
         for (int p=Piece.WRABBIT; p <= Piece.WELEPHANT; p++)
         {
+            stronger &= ~pos.bitBoards[p+enemyoffset];
             ulong nstronger = neighbors_of(stronger);
             score += (popcount(pos.bitBoards[p+pieceoffset] & ~pos.frozen & nstronger) * FROZEN_PENALTY[p]) * ALMOST_FROZEN;
-            stronger &= ~pos.bitBoards[p+enemyoffset];
         }
     }
 
