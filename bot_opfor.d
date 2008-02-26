@@ -299,7 +299,8 @@ class FullSearch : ABSearch
     void report()
     {
         super.report();
-        logger.info("qnodes %d", nodes_quiesced);
+        if (do_qsearch)
+            logger.info("qnodes %d", nodes_quiesced);
     }
 }
 
