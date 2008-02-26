@@ -305,6 +305,12 @@ class FullSearch : ABSearch
     {
         return evaluator.logged_eval(pos);
     }
+
+    void report()
+    {
+        super.report();
+        logger.info("qnodes %d", nodes_quiesced);
+    }
 }
 
 class PositionNode
@@ -662,6 +668,20 @@ class Engine : AEIEngine
         return bestline;
     }
 
+    void report()
+    {
+        searcher.report();
+        if (in_step)
+        {
+            logger.info("score cr %d", cast(int)(best_score / 1.96));
+        } else {
+            logger.info("score cr %d", cast(int)(last_score / 1.96));
+        }
+        StepList bestline = get_bestline();
+        logger.info("pv %s", bestline.to_move_str(position));
+        StepList.free(bestline);
+    }
+
     void cleanup_search()
     {
         while (pos_list !is null)
@@ -863,10 +883,15 @@ int main(char[][] args)
                     break;
                 case ServerCmd.CmdType.CHECKEVAL:
                     CheckCmd chkcmd = cast(CheckCmd)server.current_cmd;
-                    Position pos = parse_short_str(chkcmd.side, 4, chkcmd.pos_str);
+                    if (chkcmd.current)
+                    {
+                        engine.searcher.logged_eval(engine.position);
+                    } else {
+                        Position pos = parse_short_str(chkcmd.side, 4, chkcmd.pos_str);
+                        engine.searcher.logged_eval(pos);
+                        Position.free(pos);
+                    }
                     server.clear_cmd();
-                    engine.searcher.logged_eval(pos);
-                    Position.free(pos);
                     break;
                 case ServerCmd.CmdType.SETOPTION:
                     OptionCmd scmd = cast(OptionCmd)server.current_cmd;
@@ -1036,16 +1061,7 @@ int main(char[][] args)
                             logger.info("depth %d", engine.depth+3);
                         }
                         logger.info("time %d", (now-search_start)/TicksPerSecond);
-                        logger.info("nodes %d", engine.searcher.nodes_searched);
-                        if (engine.in_step)
-                        {
-                            logger.info("score cr %d", cast(int)(engine.best_score / 1.96));
-                        } else {
-                            logger.info("score cr %d", cast(int)(engine.last_score / 1.96));
-                        }
-                        StepList bestline = engine.get_bestline();
-                        logger.info("pv %s", bestline.to_move_str(engine.position));
-                        StepList.free(bestline);
+                        engine.report();
                         check_num = 0;
                         nextreport = now + report_interval;
                         report_depth = engine.depth;

@@ -17,6 +17,7 @@ class StaticEval
     GoalSearch goals;
     TrapGenerator trap_search;
 
+    ulong[2] active_traps;
     int[64] pstrengths;
 
     real map_e_w = 2;
@@ -101,104 +102,44 @@ class StaticEval
 
     int trap_safety()
     {
-        const int BOTH_SAFE = 1;
-        const int HOME_CONTROL = 2;
-        const int AWAY_CONTROL = 5;
+        static const int[] BOTH_SAFE = [-1, 1];
+        static const int[] WHITE_SAFE = [2, 5];
+        static const int[] BLACK_SAFE = [-5, -2];
 
         int score = 0;
 
-        ulong c3_neighbors = neighbors_of(TRAP_C3);
-        int trap_safe = 0;
-        if (c3_neighbors & pos.bitBoards[Piece.WELEPHANT]
-                || (popcount(c3_neighbors & pos.placement[Side.WHITE]) > 1))
-            trap_safe |= 1;
-        if (c3_neighbors & pos.bitBoards[Piece.BELEPHANT]
-                || (popcount(c3_neighbors & pos.placement[Side.BLACK]) > 1))
-            trap_safe |= 2;
-        switch (trap_safe)
+        ulong traps = TRAPS;
+        while (traps)
         {
-            case 0:
-                break;
-            case 1:
-                score += HOME_CONTROL;
-                break;
-            case 2:
-                score -= AWAY_CONTROL;
-                break;
-            case 3:
-                score -= BOTH_SAFE;
-                break;
-        }
+            ulong trap = traps & -traps;
+            traps ^= trap;
+            Side tside = (trap > TRAP_C3) ? Side.BLACK : Side.WHITE;
 
-        ulong f3_neighbors = neighbors_of(TRAP_F3);
-        trap_safe = 0;
-        if (f3_neighbors & pos.bitBoards[Piece.WELEPHANT]
-                || (popcount(f3_neighbors & pos.placement[Side.WHITE]) > 1))
-            trap_safe |= 1;
-        if (f3_neighbors & pos.bitBoards[Piece.BELEPHANT]
-                || (popcount(f3_neighbors & pos.placement[Side.BLACK]) > 1))
-            trap_safe |= 2;
-        switch (trap_safe)
-        {
-            case 0:
-                break;
-            case 1:
-                score += HOME_CONTROL;
-                break;
-            case 2:
-                score -= AWAY_CONTROL;
-                break;
-            case 3:
-                score -= BOTH_SAFE;
-                break;
+            ulong neighbors = neighbors_of(trap);
+            int trap_safe = 0;
+            if (!(active_traps[Side.BLACK] & trap)
+                    || neighbors & pos.bitBoards[Piece.WELEPHANT]
+                    || (popcount(neighbors & pos.placement[Side.WHITE]) > 1))
+                trap_safe |= 1;
+            if (!(active_traps[Side.WHITE] & trap)
+                    || neighbors & pos.bitBoards[Piece.BELEPHANT]
+                    || (popcount(neighbors & pos.placement[Side.BLACK]) > 1))
+                trap_safe |= 2;
+            switch (trap_safe)
+            {
+                case 0:
+                    break;
+                case 1:
+                    score += WHITE_SAFE[tside];
+                    break;
+                case 2:
+                    score += BLACK_SAFE[tside];
+                    break;
+                case 3:
+                    score += BOTH_SAFE[tside];
+                    break;
+            }
         }
-
-        ulong c6_neighbors = neighbors_of(TRAP_C6);
-        trap_safe = 0;
-        if (c6_neighbors & pos.bitBoards[Piece.WELEPHANT]
-                || (popcount(c6_neighbors & pos.placement[Side.WHITE]) > 1))
-            trap_safe |= 1;
-        if (c6_neighbors & pos.bitBoards[Piece.BELEPHANT]
-                || (popcount(c6_neighbors & pos.placement[Side.BLACK]) > 1))
-            trap_safe |= 2;
-        switch (trap_safe)
-        {
-            case 0:
-                break;
-            case 1:
-                score += AWAY_CONTROL;
-                break;
-            case 2:
-                score -= HOME_CONTROL;
-                break;
-            case 3:
-                score += BOTH_SAFE;
-                break;
-        }
-
-        ulong f6_neighbors = neighbors_of(TRAP_F6);
-        trap_safe = 0;
-        if (f6_neighbors & pos.bitBoards[Piece.WELEPHANT]
-                || (popcount(f6_neighbors & pos.placement[Side.WHITE]) > 1))
-            trap_safe |= 1;
-        if (f6_neighbors & pos.bitBoards[Piece.BELEPHANT]
-                || (popcount(f6_neighbors & pos.placement[Side.BLACK]) > 1))
-            trap_safe |= 2;
-        switch (trap_safe)
-        {
-            case 0:
-                break;
-            case 1:
-                score += AWAY_CONTROL;
-                break;
-            case 2:
-                score -= HOME_CONTROL;
-                break;
-            case 3:
-                score += BOTH_SAFE;
-                break;
-        }
-
         return score;
     }
 
@@ -822,45 +763,9 @@ class StaticEval
             ulong[3] valuable_traps;
             for (int i=0; i < trap_search.num_captures; i++)
             {
-                /*
-                int tid;
-                version (trap_switch)
-                {
-                    switch (trap_search.captures[i].trap_bit)
-                    {
-                        case TRAP_F3:
-                            tid = 0;
-                            break;
-                        case TRAP_C3:
-                            tid = 1;
-                            break;
-                        case TRAP_F6:
-                            tid = 2;
-                            break;
-                        case TRAP_C6:
-                            tid = 3;
-                            break;
-                        default:
-                            throw new Exception(format("trap_bit not a trap %X", trap_search.captures[i].trap_bit));
-                    }
-                } else
-                {
-                    ulong trap_bit = trap_search.captures[i].trap_bit;
-                    if (trap_bit == TRAP_F3)
-                        tid = 0;
-                    else if (trap_bit == TRAP_C3)
-                        tid = 1;
-                    else if (trap_bit == TRAP_F6)
-                        tid = 2;
-                    else if (trap_bit == TRAP_C6)
-                        tid = 3;
-                    else
-                        throw new Exception(format("trap_bit not a trap %X", trap_search.captures[i].trap_bit));
-                }
-                */
-
-                int vid = bitindex(trap_search.captures[i].victim_bit); // | (tid << 8);
+                int vid = bitindex(trap_search.captures[i].victim_bit);
                 ulong tbit = trap_search.captures[i].trap_bit;
+                active_traps[side] |= tbit;
                 Piece vic = trap_search.captures[i].victim;
                 int len = trap_search.captures[i].length;
                 for (int v=0; v < valuable_vid.length; v++)
@@ -1115,6 +1020,7 @@ class StaticEval
         // clamp the evaluation to be less than a win
         score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
         logger.log("Final (clamped) score %d", score);
+        logger.info("score cr %d", cast(int)(score/1.96));
         return score;
     }
 }

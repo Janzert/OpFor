@@ -216,6 +216,7 @@ class OptionCmd : ServerCmd
 
 class CheckCmd : ServerCmd
 {
+    bool current = false;
     char[] pos_str;
     Side side;
 
@@ -333,11 +334,17 @@ class ServerInterface : LogConsumer
                             case 'b':
                                 c_cmd.side = Side.BLACK;
                                 break;
+                            case 'c':
+                                c_cmd.current = true;
+                                break;
                             default:
                                 throw new Exception("Bad side sent in setposition from server.");
                         }
-                        int pix = find(line, "[");
-                        c_cmd.pos_str = strip(line[pix..length]);
+                        if (!c_cmd.current)
+                        {
+                            int pix = find(line, "[");
+                            c_cmd.pos_str = strip(line[pix..length]);
+                        }
                         break;
                     case "setoption":
                         OptionCmd option_cmd = new OptionCmd();

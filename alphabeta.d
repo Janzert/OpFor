@@ -783,6 +783,10 @@ class ABSearch
         cuthistory.age();
         killers.age();
     }
-}
 
+    void report()
+    {
+        logger.info("nodes %d", nodes_searched);
+    }
+}
 
