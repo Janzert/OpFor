@@ -84,7 +84,6 @@ class FullSearch : ABSearch
     
     int max_qdepth = -16;
     int do_qsearch = 1;
-    int expand_qdepth = true;
 
     int qdepth;
     
@@ -113,9 +112,6 @@ class FullSearch : ABSearch
                 max_qdepth = 0 - toInt(value);
                 qdepth = max_qdepth;
                 break;
-            case "expand_qdepth":
-                expand_qdepth = cast(bool)toInt(value);
-                break;
             default:
                 handled = evaluator.set_option(option, value);
                 if (!handled)
@@ -127,12 +123,6 @@ class FullSearch : ABSearch
     void set_depth(int depth)
     {
         super.set_depth(depth);
-        if (expand_qdepth)
-        {
-            depth += 4;
-            qdepth = (-(depth/2) * 4) + (depth % 4);
-            qdepth = (qdepth > max_qdepth) ? qdepth : max_qdepth;
-        }
     }
 
     int eval(Position pos, int alpha, int beta)
