@@ -754,6 +754,8 @@ class StaticEval
 
     int static_trap_eval(Side side, int pop, int fscore)
     {
+        active_traps[side] = 0;
+
         int score = 0;
         if (trap_search.find_captures(pos, side))
         {
