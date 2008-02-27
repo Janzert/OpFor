@@ -511,8 +511,8 @@ class TrapGenerator
                                         && ((pos.pieces[perix] >= pos.strongest[side^1][pnix] + enemyoffset)
                                             || (pos.placement[side] & neighbors_of(pnbit)))
                                         && ((pos.placement[side] & neighbors_of(pnnbit) & ~perbit)
-                                            || !((perbit & TRAPS)
-                                                || (pos.pieces[perix] >= pos.strongest[side^1][pnnix] + enemyoffset))))
+                                            || !((pnnbit & TRAPS)
+                                                || (pos.pieces[perix] < pos.strongest[side^1][pnnix] + enemyoffset))))
                                 {
                                     add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, pnnbit);
                                     if (!findall)
