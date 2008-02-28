@@ -759,37 +759,37 @@ class StaticEval
         int score = 0;
         if (trap_search.find_captures(pos, side))
         {
-            int[3] valuable_vid;
+            ulong[3] valuable_vbit;
             Piece[3] valuable_victim;
             int[3] valuable_length;
             ulong[3] valuable_traps;
             for (int i=0; i < trap_search.num_captures; i++)
             {
-                int vid = bitindex(trap_search.captures[i].victim_bit);
+                ulong vbit = trap_search.captures[i].victim_bit;
                 ulong tbit = trap_search.captures[i].trap_bit;
                 active_traps[side] |= tbit;
                 Piece vic = trap_search.captures[i].victim;
                 int len = trap_search.captures[i].length;
-                for (int v=0; v < valuable_vid.length; v++)
+                for (int v=0; v < valuable_vbit.length; v++)
                 {
-                    if (vid != valuable_vid[v]
+                    if (vbit != valuable_vbit[v]
                             && (vic > valuable_victim[v]
                                 || (vic == valuable_victim[v]
                                     && len < valuable_length[v])))
                     {
-                        int tvid = valuable_vid[v];
+                        ulong tvbit = valuable_vbit[v];
                         Piece tvic = valuable_victim[v];
                         int tlen = valuable_length[v];
                         ulong ttbits = valuable_traps[v];
-                        valuable_vid[v] = vid;
+                        valuable_vbit[v] = vbit;
                         valuable_victim[v] = vic;
                         valuable_length[v] = len;
                         valuable_traps[v] = tbit;
-                        vid = tvid;
+                        vbit = tvbit;
                         vic = tvic;
                         tbit = ttbits;
                         len = tlen;
-                    } else if (vid == valuable_vid[v])
+                    } else if (vbit == valuable_vbit[v])
                     {
                         if (valuable_length[v] > len)
                         {
@@ -807,6 +807,9 @@ class StaticEval
                 int l = valuable_length[0];
                 valuable_length[0] = valuable_length[1];
                 valuable_length[1] = l;
+                ulong b = valuable_vbit[0];
+                valuable_vbit[0] = valuable_vbit[1];
+                valuable_vbit[1] = b;
             }
             if (valuable_victim[1] == valuable_victim[2]
                     && valuable_length[1] > valuable_length[2])
@@ -814,6 +817,9 @@ class StaticEval
                 int l = valuable_length[1];
                 valuable_length[1] = valuable_length[2];
                 valuable_length[2] = l;
+                ulong b = valuable_vbit[1];
+                valuable_vbit[1] = valuable_vbit[2];
+                valuable_vbit[2] = b;
             }
 
             int attacksteps = 0;
@@ -844,24 +850,50 @@ class StaticEval
                 }
             }
 
-            const static real[] victim_per = [0.5, 0.6, 0.7];
-            const static real[] trap_num = [0, 1.0, 1.5, 1.5, 1.5];
+            // frozen victim
+            // multiple traps for one victim
+            // multiple victims one trap
+            // nearness stronger or even piece
+            const static real[] victim_per = [0.45, 0.55, 0.65];
             const static real[] length_per = [1.0,
                 1.0, 1.0, 0.9, 0.9,
                 0.6, 0.5, 0.4, 0.3,
                 0.1, 0.1, 0.05, 0.05];
-            const static real[] defense_per = [1.0, 0.80, 0.66, 0.50, 0.33];
+            const static real[] defense_per = [1.0, 0.84, 0.68, 0.52, 0.36];
+            const static real frozen_per = 0.1;
+            const static real multivic_per = 0.85;
+            const static real multitrap_per = 1.5;
             const static real max_victim_per = 0.9;
             real defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
+            ulong used_traps = 0;
+            ulong future_victims = 0;
             for (int i=0; i < 3; i++)
             {
                 if (valuable_victim[i] != 0)
                 {
-                    real val = valuable_value[i] * length_per[valuable_length[i]];
+                    real val;
                     if (valuable_length[i])
-                        val *= defense_mul * victim_per[i] * trap_num[popcount(valuable_traps[i])];
-                    else
-                        val *= max_victim_per;
+                    {
+                        real per = victim_per[future_victims];
+                        if (valuable_vbit[i] & pos.frozen)
+                        {
+                            per += frozen_per;
+                        }
+                        if ((valuable_traps[i] & used_traps) == valuable_traps[i])
+                        {
+                            per *= multivic_per;
+                        }
+                        if (popcount(valuable_traps[i]) > 1)
+                        {
+                            per *= multitrap_per;
+                        }
+                        per *= length_per[valuable_length[i]] * defense_mul;
+                        per = (per < max_victim_per) ? per : max_victim_per;
+                        val = valuable_value[i] * per;
+                        future_victims++;
+                    } else {
+                        val = valuable_value[i] * max_victim_per;
+                    }
                         
                     score -= val;
                 }
@@ -899,21 +931,39 @@ class StaticEval
               1000, 1000, 800, 600,
               100, 100, 80, 60,
               10, 10, 8, 6, 0];
-        const real[] DEFENSE_PER = [1.0, 0.8, 0.66, 0.5, 0.33];
-        int score = 0;
-        if (goals.goals_found[pos.side])
-        {
-            int extrasteps = goals.goal_depth[pos.side][0] - pos.stepsLeft;
-            extrasteps = (extrasteps < 17) ? extrasteps : 17;
-            score += GOAL_THREAT[extrasteps] * DEFENSE_PER[4] * goal_w;
-        }
-        if (goals.goals_found[pos.side^1])
-        {
-            int togoal = goals.goal_depth[pos.side^1][0];
-            togoal = (togoal < 17) ? togoal : 17;
-            score -= GOAL_THREAT[togoal] * DEFENSE_PER[pos.stepsLeft] * goal_w;
-        }
+        const real[] DEFENSE_STEPS = [1.0, 0.8, 0.66, 0.5, 0.33];
+        const real[] DEFENSE_NUM = [1.0, 0.8, 0.5, 0.2, 0.1, 0.1, 0.05, 0.01, 0.01];
+        const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
+        const int[] SIDE_MUL = [1, -1];
 
+        int score = 0;
+        for (Side s = Side.WHITE; s <= Side.BLACK; s++)
+        {
+            if (goals.goals_found[s])
+            {
+                uint dsteps = 4;
+                uint extrasteps = goals.goal_depth[s][0];
+                if (s == pos.side)
+                    extrasteps -= pos.stepsLeft;
+                else
+                    dsteps = pos.stepsLeft;
+
+                uint rfile = goals.rabbit_location[s][0] % 8;
+                ulong sector;
+                if (rfile < 6)
+                    sector = DEFENSE_SECTORS[0];
+                if (rfile > 1)
+                    sector |= DEFENSE_SECTORS[1];
+                ulong orabbits = pos.bitBoards[Piece.WRABBIT];
+                if (s == Side.WHITE)
+                {
+                    sector <<= 40;
+                    orabbits = pos.bitBoards[Piece.BRABBIT];
+                }
+                uint defender_num = popcount(sector & pos.placement[s^1] & ~orabbits);
+                score += GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s];
+            }
+        }
         return score;
     }
 
@@ -945,11 +995,10 @@ class StaticEval
         score += map_elephant() * map_e_w;
         score += trap_safety() * tsafety_w;
         score += on_trap() * ontrap_w;
+        score += goal_threat() * goal_w;
 
         if (pos.side == Side.BLACK)
             score = -score;
-
-        score += goal_threat();
 
         // clamp the evaluation to be less than a win
         score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
