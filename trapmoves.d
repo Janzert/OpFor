@@ -190,6 +190,49 @@ class TrapGenerator
                             }
                         }
                     }
+
+                    ulong enn = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
+                    while (enn)
+                    {
+                        ulong ennbit = enn & -enn;
+                        enn ^= ennbit;
+                        bitix ennix = bitindex(ennbit);
+
+                        ulong oneighbors = neighbors_of(ennbit) & pos.placement[side^1];
+                        while (oneighbors)
+                        {
+                            ulong onbit = oneighbors & - oneighbors;
+                            oneighbors ^= onbit;
+                            bitix onix = bitindex(onbit);
+
+                            if (pos.strongest[side][onix] > pos.pieces[onix] + enemyoffset)
+                            {
+                                ulong onn = neighbors_of(onbit) & pos.placement[side];
+                                if (!(onbit & TRAPS)
+                                        || popcount(onn) > 1)
+                                {
+                                    onn &= ~pos.frozen;
+                                    while (onn)
+                                    {
+                                        ulong pusher = onn & -onn;
+                                        onn ^= pusher;
+                                        bitix pushix = bitindex(pusher);
+
+                                        if (pos.pieces[pushix] > pos.pieces[onix] + enemyoffset
+                                                && pos.pieces[pushix] >= pos.strongest[side^1][onix] + enemyoffset
+                                                && pos.pieces[pushix] >= pos.strongest[side^1][ennix] + enemyoffset
+                                                && pos.pieces[pushix] >= pos.strongest[side^1][nix] + enemyoffset)
+                                        {
+                                            add_capture(pos.pieces[onix], onbit, 6, tbit, onbit, ennbit, true);
+                                            if (!findall)
+                                                return;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } else {
