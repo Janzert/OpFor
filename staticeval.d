@@ -25,10 +25,10 @@ class StaticEval
     real ontrap_w = 2;
     real frozen_w = 3;
     real rwall_w = 1;
-    real ropen_w = 4;
+    real ropen_w = 3;
     real rhome_w = 5;
     real rweak_w = 1;
-    real rstrong_w = 0.05;
+    real rstrong_w = 0.04;
     real pstrength_w = 0.0001;
     real goal_w = 0.3;
     real static_otrap_w = 0.8;
@@ -236,7 +236,7 @@ class StaticEval
 
     int rabbit_wall()
     {
-        const int[2] BLOCKING_BONUS = [5, -5];
+        const int[2] BLOCKING_BONUS = [4, -4];
 
         int score = 0;
         for (Side s; s < 2; s++)
@@ -392,7 +392,7 @@ class StaticEval
               0, -45, -60, -150, -200, -300];
         const static int[] distval = [100, 100, 95, 75, 70,
               40, 30, 25, 20, 5, 1, 1, 1, 1, 0, 0];
-        const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.3, 0],
+        const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.2, 0],
               [0, -1.2, -1.0, -0.5, -0.2, 0, 0, 0]];
         const static real[] goalval = [1.0,
               1.0, 1.0, 1.0, 1.0,
