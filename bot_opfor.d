@@ -316,6 +316,7 @@ class PositionNode
     Position pos;
     StepList move;
     int last_score;
+    int last_depth;
 
     this()
     {
@@ -373,7 +374,7 @@ class Engine : AEIEngine
     uint aborts_reported = 0;
 
     bool root_lmr = true;
-    int last_search_margin = 350; // between a cat and a dog
+    const static int[] reduction_margins = [150, 350, 1000, 2600];
 
     this(Logger l)
     {
@@ -399,9 +400,6 @@ class Engine : AEIEngine
                 break;
             case "root_lmr":
                 root_lmr = cast(bool)toInt(value);
-                break;
-            case "reduce_search_margin":
-                last_search_margin = toInt(value);
                 break;
             default:
                 handled = searcher.set_option(option, value);
@@ -517,6 +515,7 @@ class Engine : AEIEngine
             searcher.nullmove = pos.dup;
             searcher.nullmove.do_step(NULL_STEP);
             int score;
+            int searched_depth;
             if (root_lmr && depth > 2
                     && checked_moves > num_best)
             {
@@ -525,18 +524,37 @@ class Engine : AEIEngine
                     firstdepth--;
                 if ((firstdepth > 3) && (next_pos.move.steps[next_pos.move.numsteps-1] == NULL_STEP))
                     firstdepth--;
-                if ((firstdepth > 3) && (next_pos.last_score < (best_score - last_search_margin)))
+                uint margin_num = 0;
+                while ((firstdepth > 2+margin_num) && (margin_num < reduction_margins.length)
+                        && (next_pos.last_score < (best_score - reduction_margins[margin_num])))
+                {
                     firstdepth--;
-                score = -searcher.alphabeta(pos, firstdepth, -(best_score+1), -best_score);
+                    margin_num++;
+                }
+                if (firstdepth > next_pos.last_depth)
+                {
+                    score = -searcher.alphabeta(pos, firstdepth, -(best_score+1), -best_score);
+                    searched_depth = firstdepth;
+                } else {
+                    score = next_pos.last_score;
+                    searched_depth = next_pos.last_depth;
+                }
             } else {
-                score = best_score +1;
+                score = best_score + 1;
+                searched_depth = depth - 1;
             }
 
-            if (score > best_score && score != -ABORT_SCORE)
+            while (searched_depth < depth
+                    && score > best_score
+                    && score != -ABORT_SCORE)
             {
-                score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
+                score = -searcher.alphabeta(pos, ++searched_depth, MIN_SCORE, -best_score);
             }
-            next_pos.last_score = score;
+            if (score != -ABORT_SCORE)
+            {
+                next_pos.last_score = score;
+                next_pos.last_depth = searched_depth;
+            }
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
             checked_moves++;
