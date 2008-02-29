@@ -756,7 +756,7 @@ int main(char[][] args)
     int tc_breserve = 0;        // black's reserve time
     int tc_lastmove = 0;        // time used by opponent for last move
     int tc_safety_margin = 11;  // safety margin in seconds to end the search
-    real tc_min_search_per = 0.66;  // minimum percentage of permove time to search
+    real tc_min_search_per = 0.6;  // minimum percentage of permove time to search
     real tc_confidence_denom = 3;
     real tc_time_left_denom = 3;
     
