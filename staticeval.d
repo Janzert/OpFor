@@ -17,6 +17,7 @@ class StaticEval
     GoalSearch goals;
     TrapGenerator trap_search;
 
+    ulong[2] safe_traps;
     ulong[2] active_traps;
     int[64] pstrengths;
 
@@ -108,6 +109,8 @@ class StaticEval
 
         int score = 0;
 
+        safe_traps[Side.WHITE] = 0;
+        safe_traps[Side.BLACK] = 0;
         ulong traps = TRAPS;
         while (traps)
         {
@@ -131,12 +134,16 @@ class StaticEval
                     break;
                 case 1:
                     score += WHITE_SAFE[tside];
+                    safe_traps[Side.WHITE] |= trap;
                     break;
                 case 2:
                     score += BLACK_SAFE[tside];
+                    safe_traps[Side.BLACK] |= trap;
                     break;
                 case 3:
                     score += BOTH_SAFE[tside];
+                    safe_traps[Side.WHITE] |= trap;
+                    safe_traps[Side.BLACK] |= trap;
                     break;
             }
         }
@@ -387,7 +394,7 @@ class StaticEval
 
     real rabbit_strength()
     {
-        // Depends on goal search being done first
+        // Depends on goal search and trap safety being done first
         const static int[] pieceval = [0, 0, 45, 60, 150, 200, 300,
               0, -45, -60, -150, -200, -300];
         const static int[] distval = [100, 100, 95, 75, 70,
@@ -409,6 +416,7 @@ class StaticEval
         const static int power_balance = 1000;
         const static real full_weak = 6000;
         const static int full_strong = 8000;
+        const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
         const static int[] rforward = [8, -8];
         const static int[] side_mul = [1, -1];
 
@@ -472,9 +480,22 @@ class StaticEval
                     real rval = power * rv * goalval[goalsteps];
                     if (rbit & TRAPS)
                         rval /= 2;
+                    uint rfile = rix % 8;
+                    ulong sector;
+                    if (rfile < 6)
+                        sector = DEFENSE_SECTORS[1];
+                    if (rfile > 1)
+                        sector |= DEFENSE_SECTORS[0];
+                    if (s == Side.WHITE)
+                    {
+                        sector <<= 40;
+                    }
+                    if (safe_traps[s^1] & sector)
+                        rval /= 2;
                     debug (rabbit_strength)
                     {
-                        writefln("strong r at %s, val %.2f final %d", ix_to_alg(rix), rval, cast(int)(rval*strong_w));
+                        writefln("strong r at %s, val %.2f final %d sector %X st %X", ix_to_alg(rix), rval, cast(int)(rval*rstrong_w),
+                                sector, safe_traps[s^1]);
                     }
                     sscore += rval;
                 }
@@ -951,9 +972,9 @@ class StaticEval
                 uint rfile = goals.rabbit_location[s][0] % 8;
                 ulong sector;
                 if (rfile < 6)
-                    sector = DEFENSE_SECTORS[0];
+                    sector = DEFENSE_SECTORS[1];
                 if (rfile > 1)
-                    sector |= DEFENSE_SECTORS[1];
+                    sector |= DEFENSE_SECTORS[0];
                 ulong orabbits = pos.bitBoards[Piece.WRABBIT];
                 if (s == Side.WHITE)
                 {
@@ -985,6 +1006,7 @@ class StaticEval
         score += static_trap_eval(cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
         score += static_trap_eval(pos.side, pop, fscore) * static_strap_w;
 
+        score += trap_safety() * tsafety_w;
         score += piece_strength() * pstrength_w;
         score += mobility();
         score += rabbit_strength();
@@ -993,7 +1015,6 @@ class StaticEval
         score += rabbit_home() * rhome_w;
         score += frozen_pieces() * frozen_w;
         score += map_elephant() * map_e_w;
-        score += trap_safety() * tsafety_w;
         score += on_trap() * ontrap_w;
         score += goal_threat() * goal_w;
 
@@ -1030,6 +1051,9 @@ class StaticEval
         logger.log("static strap %d", score-pscore);
         pscore = score;
 
+        score += trap_safety() * tsafety_w;
+        logger.log("trap safety %d", score-pscore);
+        pscore = score;
         score += piece_strength() * pstrength_w;
         logger.log("piece strength %d", score-pscore);
         pscore = score;
@@ -1053,9 +1077,6 @@ class StaticEval
         pscore = score;
         score += map_elephant() * map_e_w;
         logger.log("map elephant %d", score-pscore);
-        pscore = score;
-        score += trap_safety() * tsafety_w;
-        logger.log("trap safety %d", score-pscore);
         pscore = score;
         score += on_trap() * ontrap_w;
         logger.log("on trap %d", score-pscore);
