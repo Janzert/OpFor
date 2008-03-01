@@ -191,7 +191,7 @@ class TrapGenerator
                         }
                     }
 
-                    ulong enn = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
+                    ulong enn = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY] & ~t_neighbors & neighbors_of(pos.placement[side^1]);
                     while (enn)
                     {
                         ulong ennbit = enn & -enn;
