@@ -878,8 +878,8 @@ class StaticEval
             const static real[] victim_per = [0.45, 0.55, 0.65];
             const static real[] length_per = [1.0,
                 1.0, 1.0, 0.9, 0.9,
-                0.5, 0.4, 0.3, 0.3,
-                0.1, 0.1, 0.05, 0.05];
+                0.3, 0.3, 0.2, 0.1,
+                0.05, 0.05, 0.01, 0.01];
             const static real[] defense_per = [1.0, 0.84, 0.68, 0.52, 0.36];
             const static real frozen_per = 0.1;
             const static real multivic_per = 0.85;
