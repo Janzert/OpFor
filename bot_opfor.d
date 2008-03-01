@@ -1075,6 +1075,12 @@ int main(char[][] args)
                         nextreport = now + report_interval;
                         report_depth = engine.depth;
                     }
+                } else { // pondering
+                    if (now > (tc_permove * TicksPerSecond) + search_start)
+                    {
+                        engine.cleanup_search();
+                        engine.state = EngineState.IDLE;
+                    }
                 }
                 break;
             default:
