@@ -882,7 +882,7 @@ class StaticEval
                 0.05, 0.05, 0.01, 0.01];
             const static real[] defense_per = [1.0, 0.84, 0.68, 0.52, 0.36];
             const static real frozen_per = 0.1;
-            const static real multivic_per = 0.85;
+            const static real multivic_per = 0.9;
             const static real multitrap_per = 1.5;
             const static real max_victim_per = 0.9;
             real defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
