@@ -584,7 +584,7 @@ class StaticEval
     int frozen_pieces()
     {
         static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
-        static const real ALMOST_FROZEN = 0.15;
+        static const real ALMOST_FROZEN = 0.1;
         static const real[33] POPULATION_MUL =
                [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
                      0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
