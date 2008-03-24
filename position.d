@@ -168,13 +168,13 @@ struct Step
         push = p;
     }
 
-   char[] toString()
-   {
-       return toString(false);
-   }
+    char[] toString()
+    {
+        return toString(false);
+    }
 
-   char[] toString(bool showpush=false)
-   {
+    char[] toString(bool showpush=false)
+    {
         char[] str;
         str ~= ix_to_alg(fromix);
         switch (toix - fromix)
@@ -199,7 +199,7 @@ struct Step
             str ~= "p";
         }
         return str;
-   }
+    }
 }
 
 const static Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
