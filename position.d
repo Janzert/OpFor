@@ -137,13 +137,6 @@ struct Step
         push = false;
     }
 
-    void copy(Step other)
-    {
-        frombit = other.frombit;
-        tobit = other.tobit;
-        push = other.push;
-    }
-
     bitix fromix()
     {
         return bitindex(frombit);
@@ -174,13 +167,6 @@ struct Step
         tobit = t;
         push = p;
     }
-
-   void set(Step other)
-   {
-      frombit = other.frombit;
-      tobit = other.tobit;
-      push = other.push;
-   }
 
    char[] toString()
    {

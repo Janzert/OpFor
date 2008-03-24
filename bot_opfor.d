@@ -223,7 +223,7 @@ class FullSearch : ABSearch
                     if (!duplicate)
                     {
                         Step* step = steps.newstep();
-                        step.set(trap_search.captures[six].first_step);
+                        *step = trap_search.captures[six].first_step;
                     }
                 }
             }
@@ -668,7 +668,7 @@ class Engine : AEIEngine
                 break;
             }
             Step* next_step = bestline.newstep();
-            next_step.copy(n.beststep);
+            *next_step = n.beststep;
             pos.do_step(n.beststep);
             n = searcher.ttable.get(pos);
         }

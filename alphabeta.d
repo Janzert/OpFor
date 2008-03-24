@@ -287,7 +287,7 @@ class StepSorter
                     
                     if (bix < steps.numsteps)
                     {
-                        steps.steps[bix].copy(steps.steps[0]);
+                        steps.steps[bix] = steps.steps[0];
                         steps.steps[0] = best;
                         num++;
                         step = &best;
@@ -321,7 +321,7 @@ class StepSorter
                                 if (!duplicate)
                                 {
                                     Step* nstep = capture_steps.newstep();
-                                    nstep.set(trap_search.captures[i].first_step);
+                                    *nstep = trap_search.captures[i].first_step;
                                 }
                             }
                         }
