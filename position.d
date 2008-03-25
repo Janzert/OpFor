@@ -31,6 +31,10 @@ const ulong TRAP_C3 = 0x200000UL;
 const ulong TRAP_F3 = 0x40000UL;
 const ulong TRAP_C6 = 0x200000000000UL;
 const ulong TRAP_F6 = 0x40000000000UL;
+const bitix TRAP_F3_IX = 18;
+const bitix TRAP_C3_IX = 21;
+const bitix TRAP_F6_IX = 42;
+const bitix TRAP_C6_IX = 45;
 
 const ulong ALL_BITS_SET = 0xFFFFFFFFFFFFFFFFUL;
 
@@ -960,69 +964,77 @@ class Position
         return mstr;
     }
 
-    private void updatefrozen(Side side, Piece piece, Step step)
+    private void update_add(Side side, Piece piece, ulong tobit)
     {
         Side oside = cast(Side)(side ^ 1);
-        bitix fromix = step.fromix;
-        bitix toix = step.toix;
 
-        if (pieces[toix] != Piece.EMPTY)    // piece may have been trapped
+        Piece rank = cast(Piece)((piece + side + 6) % (Piece.max+1));
+        ulong tneighbors = neighbors_of(tobit);
+        // unfreeze any friendly neighbors
+        frozen &= ~(tneighbors & placement[side]);
+        // update strongest neighbor
+        ulong checkbits = 0;
+        while (tneighbors)
         {
-            Piece rank = cast(Piece)((piece + side + 6) % (Piece.max+1));
-            ulong tobit = step.tobit;
-            // unfreeze any friendly neighbors
-            frozen ^= frozen & neighbors_of(tobit) & placement[side];
-            // update strongest neighbor
-            ulong checkbits = 0;
-            int sqix = void;
-            if (tobit & NOT_A_FILE)
+            ulong nbit = tneighbors & -tneighbors;
+            tneighbors ^= nbit;
+            bitix nix = bitindex(nbit);
+
+            if (strongest[side][nix] < piece)
             {
-                sqix = toix+1;
-                if (strongest[side][sqix] < piece)
-                {
-                    strongest[side][sqix] = piece;
-                    if (pieces[sqix] < rank)
-                        checkbits |= tobit << 1;
-                }
+                strongest[side][nix] = piece;
+                if (pieces[nix] < rank)
+                    checkbits |= nbit;
             }
-            if (tobit & NOT_H_FILE)
-            {
-                sqix = toix-1;
-                if (strongest[side][sqix] < piece)
-                {
-                    strongest[side][sqix] = piece;
-                    if (pieces[sqix] < rank)
-                        checkbits |= tobit >> 1;
-                }
-            }
-            if (tobit & NOT_RANK_8)
-            {
-                sqix = toix+8;
-                if (strongest[side][sqix] < piece)
-                {
-                    strongest[side][sqix] = piece;
-                    if (pieces[sqix] < rank)
-                        checkbits |= tobit << 8;
-                }
-            }
-            if (tobit & NOT_RANK_1)
-            {
-                sqix = toix-8;
-                if (strongest[side][sqix] < piece)
-                {
-                    strongest[side][sqix] = piece;
-                    if (pieces[sqix] < rank)
-                        checkbits |= tobit >> 8;
-                }
-            }
-            // update neighboring enemies
-            frozen |= placement[oside] & checkbits & (~neighbors_of(placement[oside]));
         }
-        
-        updatefrozen(side, piece, step.frombit);
+        /*
+        int sqix;
+        if (tobit & NOT_A_FILE)
+        {
+            sqix = toix+1;
+            if (strongest[side][sqix] < piece)
+            {
+                strongest[side][sqix] = piece;
+                if (pieces[sqix] < rank)
+                    checkbits |= tobit << 1;
+            }
+        }
+        if (tobit & NOT_H_FILE)
+        {
+            sqix = toix-1;
+            if (strongest[side][sqix] < piece)
+            {
+                strongest[side][sqix] = piece;
+                if (pieces[sqix] < rank)
+                    checkbits |= tobit >> 1;
+            }
+        }
+        if (tobit & NOT_RANK_8)
+        {
+            sqix = toix+8;
+            if (strongest[side][sqix] < piece)
+            {
+                strongest[side][sqix] = piece;
+                if (pieces[sqix] < rank)
+                    checkbits |= tobit << 8;
+            }
+        }
+        if (tobit & NOT_RANK_1)
+        {
+            sqix = toix-8;
+            if (strongest[side][sqix] < piece)
+            {
+                strongest[side][sqix] = piece;
+                if (pieces[sqix] < rank)
+                    checkbits |= tobit >> 8;
+            }
+        }
+        */
+        // update neighboring enemies
+        frozen |= placement[oside] & checkbits & (~neighbors_of(placement[oside]));
     }
 
-    private void updatefrozen(Side side, Piece piece, ulong frombit)
+    private void update_remove(Side side, Piece piece, ulong frombit)
     {
         Side oside = cast(Side)(side ^ 1);
         frozen &= ~frombit;     // make sure from is unfrozen.
@@ -1067,11 +1079,29 @@ class Position
         }
     }
 
-    void do_step(Step step)
-    {
-        //writefln(to_long_str());
-        //writefln("%d, %d", step.from, step.to);
+    static const uint U_LPIECE_MASK = 0b1111;
+    static const uint U_LFROM_SHIFT = 4;
+    static const uint U_LFROM_MASK = 0b11111 << U_LFROM_SHIFT;
+    static const uint U_PIECE_SHIFT = 9;
+    static const uint U_PIECE_MASK = 0b1111 << U_PIECE_SHIFT;
+    static const uint U_PUSH_SHIFT = 13;
+    static const uint U_PUSH_MASK = 0b1 << U_PUSH_SHIFT;
+    static const uint U_FROM_SHIFT = 14;
+    static const uint U_FROM_MASK = 0b11111 << U_FROM_SHIFT;
+    static const uint U_TO_SHIFT = 19;
+    static const uint U_TO_MASK = 0b11111 << U_TO_SHIFT;
+    static const uint U_ISTRAP_SHIFT = 24;
+    static const uint U_ISTRAP_MASK = 0b1 << U_ISTRAP_SHIFT;
+    static const uint U_TRAPNUM_SHIFT = 25;
+    static const uint U_TRAPNUM_MASK = 0b11 << U_TRAPNUM_SHIFT;
+    static const uint U_TRAPPIECE_SHIFT = 27;
+    static const uint U_TRAPPIECE_MASK = 0b1111 << U_TRAPPIECE_SHIFT;
+    static const uint U_STEPS_SHIFT = 13;
+    static const uint U_STEPS_MASK = 0b111 << U_STEPS_SHIFT;
 
+    uint do_step(Step step)
+    {
+        uint undo = lastpiece | (lastfrom << U_LFROM_SHIFT);
         zobrist ^= ZOBRIST_STEP[stepsLeft];
 
         if (step.tobit != INV_STEP) // not a pass or trap step
@@ -1079,6 +1109,7 @@ class Position
             bitix fromix = step.fromix;
             bitix toix = step.toix;
             Piece piece = pieces[fromix];
+            undo |= (piece << U_PIECE_SHIFT) | (fromix << U_FROM_SHIFT) | (toix << U_TO_SHIFT);
             assert (piece != Piece.EMPTY, format("move empty piece f%d t%d", fromix, toix));
             assert (pieces[toix] == Piece.EMPTY, format("occupied to f%d t%d", fromix, toix));
 
@@ -1086,8 +1117,7 @@ class Position
             if (placement[Side.WHITE] & step.frombit)
             {
                 piece_side = Side.WHITE;
-            } else
-            {
+            } else {
                 piece_side = Side.BLACK;
                 assert (placement[Side.BLACK] & step.frombit);
             }
@@ -1113,9 +1143,31 @@ class Position
                 bitBoards[Piece.EMPTY] ^= trapped;
                 zobrist ^= ZOBRIST_PIECE[piecetr][trapix];
                 if (trapix != toix)
-                    updatefrozen(piece_side, piecetr, trapped);
+                    update_remove(piece_side, piecetr, trapped);
+                uint trapnum;
+                switch (trapix)
+                {
+                    case TRAP_F3_IX:
+                        trapnum = 0;
+                        break;
+                    case TRAP_C3_IX:
+                        trapnum = 1;
+                        break;
+                    case TRAP_F6_IX:
+                        trapnum = 2;
+                        break;
+                    case TRAP_C6_IX:
+                        trapnum = 3;
+                        break;
+                }
+                undo |= (1 << U_ISTRAP_SHIFT) | (trapnum << U_TRAPNUM_SHIFT)
+                        | (piecetr << U_TRAPPIECE_SHIFT);
+            } 
+            if (placement[piece_side] & step.tobit)
+            {
+                update_add(piece_side, piece, step.tobit);
             }
-            updatefrozen(piece_side, piece, step);
+            update_remove(piece_side, piece, step.frombit);
             stepsLeft--;
 
             zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
@@ -1139,6 +1191,8 @@ class Position
             (step.frombit == INV_STEP && step.tobit == INV_STEP)) // pass step
         {
             assert (!inpush, format("stepsleft %d, step.from %d, step.to %d", stepsLeft, step.fromix, step.toix));
+            if (stepsLeft > 0)
+                undo |= stepsLeft << U_STEPS_SHIFT;
             side ^= 1;
             zobrist ^= ZOBRIST_SIDE ^ ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
             stepsLeft = 4;
@@ -1147,6 +1201,87 @@ class Position
         }
 
         zobrist ^= ZOBRIST_STEP[stepsLeft];
+        return undo;
+    }
+
+    void undo_step(uint ustep)
+    {
+        zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
+        lastpiece = cast(Piece)(ustep & U_LPIECE_MASK);
+        lastfrom = cast(bitix)((ustep & U_LFROM_MASK) >> U_LFROM_SHIFT);
+        zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
+
+        zobrist ^= ZOBRIST_STEP[stepsLeft];
+        Piece piece = cast(Piece)((ustep & U_PIECE_MASK) >> U_PIECE_SHIFT);
+        if (piece == Piece.EMPTY) // a pass step
+        {
+            stepsLeft = (ustep & U_STEPS_MASK) >> U_STEPS_SHIFT;
+            side ^= 1;
+            zobrist ^= ZOBRIST_SIDE ^ ZOBRIST_STEP[stepsLeft];
+            return;
+        }
+
+        stepsLeft++;
+        if (stepsLeft > 4)
+        {
+            side ^= 1;
+            zobrist ^= ZOBRIST_SIDE;
+        }
+        bool was_push = cast(bool)((ustep & U_PUSH_MASK) >> U_PUSH_SHIFT);
+        if (inpush != was_push)
+        {
+            zobrist ^= ZOBRIST_INPUSH;
+            inpush = was_push;
+        }
+
+        Side pside = (piece < Piece.BRABBIT) ? Side.WHITE : Side.BLACK;
+        bool istrap = cast(bool)((ustep & U_ISTRAP_MASK) >> U_ISTRAP_SHIFT);
+        bitix fromix = cast(bitix)((ustep & U_FROM_MASK) >> U_FROM_SHIFT);
+        bitix toix = cast(bitix)((ustep & U_TO_MASK) >> U_TO_SHIFT);
+        bitix trapix = 64;
+        if (istrap)
+        {
+            uint trapnum = (ustep & U_TRAPNUM_MASK) >> U_TRAPNUM_SHIFT;
+            ulong trapbit;
+            switch (trapnum)
+            {
+                case 0:
+                    trapbit = TRAP_F3;
+                    trapix = TRAP_F3_IX;
+                    break;
+                case 1:
+                    trapbit = TRAP_C3;
+                    trapix = TRAP_C3_IX;
+                    break;
+                case 2:
+                    trapbit = TRAP_F6;
+                    trapix = TRAP_F6_IX;
+                    break;
+                case 3:
+                    trapbit = TRAP_C6;
+                    trapix = TRAP_C6_IX;
+            }
+            Piece trappiece = cast(Piece)((ustep & U_TRAPPIECE_MASK) >> U_TRAPPIECE_SHIFT);
+            placement[pside] ^= trapbit;
+            bitBoards[trappiece] ^= trapbit;
+            bitBoards[Piece.EMPTY] ^= trapbit;
+            pieces[trapix] = trappiece;
+            zobrist ^= ZOBRIST_PIECE[trappiece][trapix];
+            if (trapix != toix)
+                update_add(pside, trappiece, trapbit);
+        }
+        ulong tobit = 1UL << toix;
+        ulong frombit = 1UL << fromix;
+        ulong stepbits = frombit | tobit;
+        placement[pside] ^= stepbits;
+        bitBoards[piece] ^= stepbits;
+        bitBoards[Piece.EMPTY] ^= stepbits;
+        pieces[toix] = Piece.EMPTY;
+        pieces[fromix] = piece;
+        if (trapix != toix)
+            update_remove(pside, piece, tobit);
+        update_add(pside, piece, frombit);
+        zobrist ^= ZOBRIST_PIECE[piece][fromix] ^ ZOBRIST_PIECE[piece][toix];
     }
 
     void do_str_move(char[] move)
