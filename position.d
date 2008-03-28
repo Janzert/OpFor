@@ -724,6 +724,7 @@ class Position
             lastpiece != other.lastpiece ||
             lastfrom != other.lastfrom ||
             inpush != other.inpush ||
+            frozen != other.frozen ||
             placement[Side.WHITE] != other.placement[Side.WHITE] ||
             placement[Side.BLACK] != other.placement[Side.BLACK])
             return false;
@@ -987,49 +988,6 @@ class Position
                     checkbits |= nbit;
             }
         }
-        /*
-        int sqix;
-        if (tobit & NOT_A_FILE)
-        {
-            sqix = toix+1;
-            if (strongest[side][sqix] < piece)
-            {
-                strongest[side][sqix] = piece;
-                if (pieces[sqix] < rank)
-                    checkbits |= tobit << 1;
-            }
-        }
-        if (tobit & NOT_H_FILE)
-        {
-            sqix = toix-1;
-            if (strongest[side][sqix] < piece)
-            {
-                strongest[side][sqix] = piece;
-                if (pieces[sqix] < rank)
-                    checkbits |= tobit >> 1;
-            }
-        }
-        if (tobit & NOT_RANK_8)
-        {
-            sqix = toix+8;
-            if (strongest[side][sqix] < piece)
-            {
-                strongest[side][sqix] = piece;
-                if (pieces[sqix] < rank)
-                    checkbits |= tobit << 8;
-            }
-        }
-        if (tobit & NOT_RANK_1)
-        {
-            sqix = toix-8;
-            if (strongest[side][sqix] < piece)
-            {
-                strongest[side][sqix] = piece;
-                if (pieces[sqix] < rank)
-                    checkbits |= tobit >> 8;
-            }
-        }
-        */
         // update neighboring enemies
         frozen |= placement[oside] & checkbits & (~neighbors_of(placement[oside]));
     }
@@ -1081,22 +1039,20 @@ class Position
 
     static const uint U_LPIECE_MASK = 0b1111;
     static const uint U_LFROM_SHIFT = 4;
-    static const uint U_LFROM_MASK = 0b11111 << U_LFROM_SHIFT;
-    static const uint U_PIECE_SHIFT = 9;
+    static const uint U_LFROM_MASK = 0b1111111 << U_LFROM_SHIFT;
+    static const uint U_PIECE_SHIFT = 11;
     static const uint U_PIECE_MASK = 0b1111 << U_PIECE_SHIFT;
-    static const uint U_PUSH_SHIFT = 13;
+    static const uint U_PUSH_SHIFT = 15;
     static const uint U_PUSH_MASK = 0b1 << U_PUSH_SHIFT;
-    static const uint U_FROM_SHIFT = 14;
-    static const uint U_FROM_MASK = 0b11111 << U_FROM_SHIFT;
-    static const uint U_TO_SHIFT = 19;
-    static const uint U_TO_MASK = 0b11111 << U_TO_SHIFT;
-    static const uint U_ISTRAP_SHIFT = 24;
-    static const uint U_ISTRAP_MASK = 0b1 << U_ISTRAP_SHIFT;
-    static const uint U_TRAPNUM_SHIFT = 25;
+    static const uint U_FROM_SHIFT = 16;
+    static const uint U_FROM_MASK = 0b111111 << U_FROM_SHIFT;
+    static const uint U_TO_SHIFT = 22;
+    static const uint U_TO_MASK = 0b11 << U_TO_SHIFT;
+    static const uint U_TRAPNUM_SHIFT = 24;
     static const uint U_TRAPNUM_MASK = 0b11 << U_TRAPNUM_SHIFT;
-    static const uint U_TRAPPIECE_SHIFT = 27;
+    static const uint U_TRAPPIECE_SHIFT = 26;
     static const uint U_TRAPPIECE_MASK = 0b1111 << U_TRAPPIECE_SHIFT;
-    static const uint U_STEPS_SHIFT = 13;
+    static const uint U_STEPS_SHIFT = 15;
     static const uint U_STEPS_MASK = 0b111 << U_STEPS_SHIFT;
 
     uint do_step(Step step)
@@ -1109,7 +1065,25 @@ class Position
             bitix fromix = step.fromix;
             bitix toix = step.toix;
             Piece piece = pieces[fromix];
-            undo |= (piece << U_PIECE_SHIFT) | (fromix << U_FROM_SHIFT) | (toix << U_TO_SHIFT);
+            undo |= (piece << U_PIECE_SHIFT) | (fromix << U_FROM_SHIFT);
+            uint direction;
+            switch (toix - fromix)
+            {
+                case 8:
+                    direction = 0;
+                    break;
+                case -1:
+                    direction = 1;
+                    break;
+                case -8:
+                    direction = 2;
+                    break;
+                case 1:
+                    direction = 3;
+                    break;
+            }
+            undo |= direction << U_TO_SHIFT;
+                    
             assert (piece != Piece.EMPTY, format("move empty piece f%d t%d", fromix, toix));
             assert (pieces[toix] == Piece.EMPTY, format("occupied to f%d t%d", fromix, toix));
 
@@ -1160,7 +1134,7 @@ class Position
                         trapnum = 3;
                         break;
                 }
-                undo |= (1 << U_ISTRAP_SHIFT) | (trapnum << U_TRAPNUM_SHIFT)
+                undo |= (trapnum << U_TRAPNUM_SHIFT)
                         | (piecetr << U_TRAPPIECE_SHIFT);
             } 
             if (placement[piece_side] & step.tobit)
@@ -1174,6 +1148,7 @@ class Position
             if (inpush != step.push)
             {
                 zobrist ^= ZOBRIST_INPUSH;
+                undo |= 1 << U_PUSH_SHIFT;
             }
             if (!inpush && (step.push || (piece_side == side)))
             {
@@ -1225,21 +1200,40 @@ class Position
         if (stepsLeft > 4)
         {
             side ^= 1;
+            stepsLeft = 1;
             zobrist ^= ZOBRIST_SIDE;
         }
-        bool was_push = cast(bool)((ustep & U_PUSH_MASK) >> U_PUSH_SHIFT);
-        if (inpush != was_push)
+        zobrist ^= ZOBRIST_STEP[stepsLeft];
+
+        bool push_change = cast(bool)((ustep & U_PUSH_MASK) >> U_PUSH_SHIFT);
+        if (push_change)
         {
             zobrist ^= ZOBRIST_INPUSH;
-            inpush = was_push;
+            inpush ^= 1;
         }
 
         Side pside = (piece < Piece.BRABBIT) ? Side.WHITE : Side.BLACK;
-        bool istrap = cast(bool)((ustep & U_ISTRAP_MASK) >> U_ISTRAP_SHIFT);
         bitix fromix = cast(bitix)((ustep & U_FROM_MASK) >> U_FROM_SHIFT);
-        bitix toix = cast(bitix)((ustep & U_TO_MASK) >> U_TO_SHIFT);
-        bitix trapix = 64;
-        if (istrap)
+        bitix toix;
+        switch ((ustep & U_TO_MASK) >> U_TO_SHIFT)
+        {
+            case 0:
+                toix = cast(bitix)(fromix + 8);
+                break;
+            case 1:
+                toix = cast(bitix)(fromix - 1);
+                break;
+            case 2:
+                toix = cast(bitix)(fromix - 8);
+                break;
+            case 3:
+                toix = cast(bitix)(fromix + 1);
+                break;
+        }
+
+        bitix trapix = -1;
+        Piece trappiece = cast(Piece)((ustep & U_TRAPPIECE_MASK) >> U_TRAPPIECE_SHIFT);
+        if (trappiece)
         {
             uint trapnum = (ustep & U_TRAPNUM_MASK) >> U_TRAPNUM_SHIFT;
             ulong trapbit;
@@ -1261,13 +1255,12 @@ class Position
                     trapbit = TRAP_C6;
                     trapix = TRAP_C6_IX;
             }
-            Piece trappiece = cast(Piece)((ustep & U_TRAPPIECE_MASK) >> U_TRAPPIECE_SHIFT);
             placement[pside] ^= trapbit;
             bitBoards[trappiece] ^= trapbit;
             bitBoards[Piece.EMPTY] ^= trapbit;
             pieces[trapix] = trappiece;
             zobrist ^= ZOBRIST_PIECE[trappiece][trapix];
-            if (trapix != toix)
+            //if (trapix != toix)
                 update_add(pside, trappiece, trapbit);
         }
         ulong tobit = 1UL << toix;
@@ -1278,7 +1271,7 @@ class Position
         bitBoards[Piece.EMPTY] ^= stepbits;
         pieces[toix] = Piece.EMPTY;
         pieces[fromix] = piece;
-        if (trapix != toix)
+        //if (trapix != toix)
             update_remove(pside, piece, tobit);
         update_add(pside, piece, frombit);
         zobrist ^= ZOBRIST_PIECE[piece][fromix] ^ ZOBRIST_PIECE[piece][toix];
