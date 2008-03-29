@@ -391,7 +391,7 @@ class Position
     bitix lastfrom;
     bool inpush;
 
-    debug (2)
+    debug (check_position)
     {
         invariant
         {
@@ -1117,7 +1117,10 @@ class Position
                 bitBoards[Piece.EMPTY] ^= trapped;
                 zobrist ^= ZOBRIST_PIECE[piecetr][trapix];
                 if (trapix != toix)
+                {
                     update_remove(piece_side, piecetr, trapped);
+                    update_add(piece_side, piece, step.tobit);
+                }
                 uint trapnum;
                 switch (trapix)
                 {
@@ -1136,9 +1139,7 @@ class Position
                 }
                 undo |= (trapnum << U_TRAPNUM_SHIFT)
                         | (piecetr << U_TRAPPIECE_SHIFT);
-            } 
-            if (placement[piece_side] & step.tobit)
-            {
+            } else {
                 update_add(piece_side, piece, step.tobit);
             }
             update_remove(piece_side, piece, step.frombit);
@@ -1181,6 +1182,7 @@ class Position
 
     void undo_step(uint ustep)
     {
+        static const int[] DIR_TO_OFFSET = [8, -1, -8, 1];
         zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
         lastpiece = cast(Piece)(ustep & U_LPIECE_MASK);
         lastfrom = cast(bitix)((ustep & U_LFROM_MASK) >> U_LFROM_SHIFT);
@@ -1214,25 +1216,19 @@ class Position
 
         Side pside = (piece < Piece.BRABBIT) ? Side.WHITE : Side.BLACK;
         bitix fromix = cast(bitix)((ustep & U_FROM_MASK) >> U_FROM_SHIFT);
-        bitix toix;
-        switch ((ustep & U_TO_MASK) >> U_TO_SHIFT)
-        {
-            case 0:
-                toix = cast(bitix)(fromix + 8);
-                break;
-            case 1:
-                toix = cast(bitix)(fromix - 1);
-                break;
-            case 2:
-                toix = cast(bitix)(fromix - 8);
-                break;
-            case 3:
-                toix = cast(bitix)(fromix + 1);
-                break;
-        }
+        bitix toix = cast(bitix)(fromix + DIR_TO_OFFSET[(ustep & U_TO_MASK) >> U_TO_SHIFT]);
+        ulong tobit = 1UL << toix;
+        ulong frombit = 1UL << fromix;
+        ulong stepbits = frombit | tobit;
+        placement[pside] ^= stepbits;
+        bitBoards[piece] ^= stepbits;
+        bitBoards[Piece.EMPTY] ^= stepbits;
+        pieces[toix] = Piece.EMPTY;
+        pieces[fromix] = piece;
+        update_add(pside, piece, frombit);
 
-        bitix trapix = -1;
         Piece trappiece = cast(Piece)((ustep & U_TRAPPIECE_MASK) >> U_TRAPPIECE_SHIFT);
+        bitix trapix;
         if (trappiece)
         {
             uint trapnum = (ustep & U_TRAPNUM_MASK) >> U_TRAPNUM_SHIFT;
@@ -1258,22 +1254,22 @@ class Position
             placement[pside] ^= trapbit;
             bitBoards[trappiece] ^= trapbit;
             bitBoards[Piece.EMPTY] ^= trapbit;
-            pieces[trapix] = trappiece;
             zobrist ^= ZOBRIST_PIECE[trappiece][trapix];
-            //if (trapix != toix)
+            if (trapix != toix)
+            {
+                pieces[trapix] = trappiece;
                 update_add(pside, trappiece, trapbit);
-        }
-        ulong tobit = 1UL << toix;
-        ulong frombit = 1UL << fromix;
-        ulong stepbits = frombit | tobit;
-        placement[pside] ^= stepbits;
-        bitBoards[piece] ^= stepbits;
-        bitBoards[Piece.EMPTY] ^= stepbits;
-        pieces[toix] = Piece.EMPTY;
-        pieces[fromix] = piece;
-        //if (trapix != toix)
+                update_remove(pside, piece, tobit);
+            } else if (!(neighbors_of(frombit) & placement[pside]))
+            {
+                // Check if the added piece is frozen
+                int offset = (pside == Side.WHITE) ? 6 : -6;
+                if (strongest[pside^1][fromix] > piece+offset)
+                    frozen |= frombit;
+            }
+        } else {
             update_remove(pside, piece, tobit);
-        update_add(pside, piece, frombit);
+        }
         zobrist ^= ZOBRIST_PIECE[piece][fromix] ^ ZOBRIST_PIECE[piece][toix];
     }
 

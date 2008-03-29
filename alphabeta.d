@@ -706,7 +706,9 @@ class ABSearch
                         writefln("zobrist %d, %d", npos.zobrist, pos.zobrist);
                         writefln("lp %d, %d lf %d, %d", npos.lastpiece, pos.lastpiece, npos.lastfrom, pos.lastfrom);
                         writefln("sl %d, %d s %d, %d", npos.stepsLeft, pos.stepsLeft, npos.side, pos.side);
-                        writefln("ip %d, %d", npos.inpush, pos.inpush);
+                        writef("ip %d, %d ", npos.inpush, pos.inpush);
+                        writefln("fr %X, %X", npos.frozen, pos.frozen);
+                        writefln("f %s, t %s", ix_to_alg(curstep.fromix), ix_to_alg(curstep.toix));
                         throw new Exception("Undone position not equal to prestep position");
                     }
                     Position.free(npos);
