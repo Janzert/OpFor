@@ -641,13 +641,10 @@ class ABSearch
                 nodes_searched++;
                 int cal;
 
-                debug (undomove)
-                {
-                    Position npos = pos.dup;
-                }
-                uint undo = pos.do_step(*curstep);
+                Position npos = pos.dup;
+                npos.do_step(*curstep);
 
-                if (pos == nullmove)
+                if (npos == nullmove)
                 {
                     cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                             // loss since it's actually an illegal move
@@ -658,18 +655,18 @@ class ABSearch
                             && sorted_steps.history_num > 1)
                     {
                         use_lmr = false;
-                        if (pos.stepsLeft == 4)
+                        if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
-                            nullmove = pos.dup;
+                            nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            first_val = -alphabeta(pos, depth-2, -(alpha+1), -alpha);
+                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            first_val = alphabeta(pos, depth-2, alpha, alpha+1);
+                            first_val = alphabeta(npos, depth-2, alpha, alpha+1);
                         }
                         use_lmr = true;
                     } else {
@@ -678,41 +675,25 @@ class ABSearch
 
                     if (first_val > alpha)
                     {
-                        if (pos.stepsLeft == 4)
+                        if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
-                            nullmove = pos.dup;
+                            nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            cal = -alphabeta(pos, depth-1, -beta, -alpha);
+                            cal = -alphabeta(npos, depth-1, -beta, -alpha);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            cal = alphabeta(pos, depth-1, alpha, beta);
+                            cal = alphabeta(npos, depth-1, alpha, beta);
                         }
                     } else {
                         cal = first_val;
                     }
                 }
 
-                pos.undo_step(undo);
-                debug (undomove)
-                {
-                    if (npos != pos)
-                    {
-                        writefln("%s\n%s", "wb"[npos.side], npos.to_long_str());
-                        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                        writefln("zobrist %d, %d", npos.zobrist, pos.zobrist);
-                        writefln("lp %d, %d lf %d, %d", npos.lastpiece, pos.lastpiece, npos.lastfrom, pos.lastfrom);
-                        writefln("sl %d, %d s %d, %d", npos.stepsLeft, pos.stepsLeft, npos.side, pos.side);
-                        writef("ip %d, %d ", npos.inpush, pos.inpush);
-                        writefln("fr %X, %X", npos.frozen, pos.frozen);
-                        writefln("f %s, t %s", ix_to_alg(curstep.fromix), ix_to_alg(curstep.toix));
-                        throw new Exception("Undone position not equal to prestep position");
-                    }
-                    Position.free(npos);
-                }
+                Position.free(npos);
 
                 if (cal == ABORT_SCORE
                         || cal == -ABORT_SCORE)

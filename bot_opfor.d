@@ -236,27 +236,28 @@ class FullSearch : ABSearch
             nodes_searched++;
             nodes_quiesced++;
             int cal;
-            uint undo = pos.do_step(steps.steps[six]);
+            Position npos = pos.dup;
+            npos.do_step(steps.steps[six]);
 
-            if (pos == nullmove)
+            if (npos == nullmove)
             {
                 cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                         // loss since it's actually an illegal move
-            } else if (pos.stepsLeft == 4)
+            } else if (npos.stepsLeft == 4)
             {
                 Position mynull = nullmove;
-                nullmove = pos.dup;
+                nullmove = npos.dup;
                 nullmove.do_step(NULL_STEP);
 
-                cal = -quiesce(pos, depth-1, -beta, -alpha);
+                cal = -quiesce(npos, depth-1, -beta, -alpha);
 
                 Position.free(nullmove);
                 nullmove = mynull;
             } else {
-                cal = quiesce(pos, depth-1, alpha, beta);
+                cal = quiesce(npos, depth-1, alpha, beta);
             }
 
-            pos.undo_step(undo);
+            Position.free(npos);
 
             if (cal > score)
             {
