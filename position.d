@@ -391,7 +391,7 @@ class Position
     bitix lastfrom;
     bool inpush;
 
-    debug (2)
+    debug (verify_position)
     {
         invariant
         {
