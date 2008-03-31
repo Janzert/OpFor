@@ -943,10 +943,10 @@ class Position
         {
             if (side == -1)
             {
-                mstr ~= "b ";
+                mstr ~= "\nb ";
             }
 
-            for (Piece p = Piece.BRABBIT; p <= Piece.WELEPHANT; p++)
+            for (Piece p = Piece.BRABBIT; p <= Piece.BELEPHANT; p++)
             {
                 ulong pieces = bitBoards[p];
                 while (pieces)
@@ -1797,9 +1797,9 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
 
     StepList steps = StepList.allocate();
 
+    Side curside = pos.side;
     while (!pos.is_endstate() && (max_length == 0 || result.length < max_length))
     {
-        result.length += 1;
         pos.get_steps(steps);
         if (steps.numsteps == 0)
         {
@@ -1814,6 +1814,8 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
         int stepix = rand() % steps.numsteps;
         pos.do_step(steps.steps[stepix]);
         steps.clear();
+        if (pos.side != curside)
+            result.length += 1;
     }
     if (result.endscore == 0)
         result.endscore = pos.endscore();
