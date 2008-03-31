@@ -915,7 +915,7 @@ class Position
     {
         const static char[] piece_char = " RCDHMErcdhme";
 
-	char[] mstr;
+        char[] mstr;
         if (side == 0 || side == -1)
         {
             if (side == -1)

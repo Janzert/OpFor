@@ -356,6 +356,7 @@ class Engine : AEIEngine
     int num_moves;
     int checked_moves;
     int num_best;
+    int num_losing;
 
     int depth;
     int best_score;
@@ -374,7 +375,7 @@ class Engine : AEIEngine
     uint aborts_reported = 0;
 
     bool root_lmr = true;
-    const static int[] reduction_margins = [150, 350, 1000, 2600];
+    const static int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
 
     this(Logger l)
     {
@@ -496,6 +497,7 @@ class Engine : AEIEngine
             depth = 0;
             checked_moves = 0;
             num_best = 0;
+            num_losing = 0;
             searcher.set_depth(4);
             searcher.prepare();
             state = EngineState.SEARCHING;
@@ -515,52 +517,49 @@ class Engine : AEIEngine
             searcher.nullmove = pos.dup;
             searcher.nullmove.do_step(NULL_STEP);
             int score;
-            int searched_depth;
+            int search_depth;
             if (root_lmr && depth > 2
                     && checked_moves > num_best)
             {
-                int firstdepth = depth - 1;
-                if ((firstdepth > 2) && (next_pos.move.numsteps < 4))
-                    firstdepth--;
-                if ((firstdepth > 3) && (next_pos.move.steps[next_pos.move.numsteps-1] == NULL_STEP))
-                    firstdepth--;
+                search_depth = depth - 1;
+                if ((search_depth > 2) && (next_pos.move.numsteps < 4))
+                    search_depth--;
+                if ((search_depth > 3) && (next_pos.move.steps[next_pos.move.numsteps-1] == NULL_STEP))
+                    search_depth--;
                 uint margin_num = 0;
-                while ((firstdepth > 2+margin_num) && (margin_num < reduction_margins.length)
+                while ((search_depth > 2+margin_num) && (margin_num < reduction_margins.length)
                         && (next_pos.last_score < (best_score - reduction_margins[margin_num])))
                 {
-                    firstdepth--;
+                    search_depth--;
                     margin_num++;
                 }
-                if (firstdepth > next_pos.last_depth)
+                if (search_depth > next_pos.last_depth)
                 {
-                    score = -searcher.alphabeta(pos, firstdepth, -(best_score+1), -best_score);
-                    searched_depth = firstdepth;
+                    score = -searcher.alphabeta(pos, search_depth, -(best_score+1), -best_score);
                 } else {
                     score = next_pos.last_score;
-                    searched_depth = next_pos.last_depth;
+                    search_depth = next_pos.last_depth;
                 }
             } else {
                 score = best_score + 1;
-                searched_depth = depth - 1;
+                search_depth = depth - 1;
             }
 
-            while (searched_depth < depth
-                    && score > best_score
-                    && score != -ABORT_SCORE)
+            while (search_depth < depth
+                    && score > best_score)
             {
-                score = -searcher.alphabeta(pos, ++searched_depth, MIN_SCORE, -best_score);
+                score = -searcher.alphabeta(pos, ++search_depth, MIN_SCORE, -best_score);
             }
             if (score != -ABORT_SCORE)
             {
                 next_pos.last_score = score;
-                next_pos.last_depth = searched_depth;
+                next_pos.last_depth = search_depth;
             }
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
             checked_moves++;
 
-            if (score == ABORT_SCORE
-                    || score == -ABORT_SCORE)
+            if (score == -ABORT_SCORE)
             {
                 d_time now = getUTCtime();
                 if (aborts_reported < MAX_ABORT_REPORTS)
@@ -602,6 +601,7 @@ class Engine : AEIEngine
                 if (loss_list !is null)
                     loss_list.prev = n;
                 loss_list = n;
+                num_losing += 1;
             }
 
             if (score > best_score)
@@ -680,11 +680,14 @@ class Engine : AEIEngine
     void report()
     {
         searcher.report();
+        if (num_losing)
+            logger.info("losing moves %d", num_losing);
         if (in_step)
         {
-            logger.info("score cr %d", cast(int)(best_score / 1.96));
+            logger.info("dsearched %d", checked_moves);
+            logger.info("score %d", cast(int)(best_score / 1.96));
         } else {
-            logger.info("score cr %d", cast(int)(last_score / 1.96));
+            logger.info("score %d", cast(int)(last_score / 1.96));
         }
         StepList bestline = get_bestline();
         logger.info("pv %s", bestline.to_move_str(position));
