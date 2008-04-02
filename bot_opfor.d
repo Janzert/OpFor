@@ -681,10 +681,10 @@ class Engine : AEIEngine
     {
         searcher.report();
         if (num_losing)
-            logger.info("losing moves %d", num_losing);
+            logger.info("losing_moves %d", num_losing);
         if (in_step)
         {
-            logger.info("dsearched %d", checked_moves);
+            logger.info("depth_searched %d", checked_moves);
             logger.info("score %d", cast(int)(best_score / 1.96));
         } else {
             logger.info("score %d", cast(int)(last_score / 1.96));
