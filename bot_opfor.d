@@ -12,6 +12,7 @@ import aeibot;
 import goalsearch;
 import logging;
 import position;
+import setupboard;
 import staticeval;
 
 const char[] BOT_NAME = "OpFor";
@@ -349,6 +350,7 @@ class PositionNode
 
 class Engine : AEIEngine
 {
+    SetupGenerator board_setup;
     ABSearch searcher;
     PositionNode pos_list;
     PositionNode loss_list;
@@ -380,6 +382,7 @@ class Engine : AEIEngine
     this(Logger l)
     {
         super(l);
+        board_setup = new SetupGenerator();
         searcher = new FullSearch(l);
         //searcher = new ScoreSearch();
         in_step = false;
@@ -401,6 +404,23 @@ class Engine : AEIEngine
                 break;
             case "root_lmr":
                 root_lmr = cast(bool)toInt(value);
+                break;
+            case "rabbit_setup":
+                switch (toupper(value))
+                {
+                    case "ANY":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.ANY;
+                        break;
+                    case "STANDARD":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.STANDARD;
+                        break;
+                    case "99OF9":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.NINETY_NINE;
+                        break;
+                    case "FRITZ":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.FRITZ;
+                        break;
+                }
                 break;
             default:
                 handled = searcher.set_option(option, value);
@@ -434,16 +454,17 @@ class Engine : AEIEngine
     {
         if (ply == 1) // white setup move
         {
-            bestmove = "Ra1 Rb1 Rc1 Rd1 Re1 Rf1 Rg1 Rh1 Da2 Hb2 Cc2 Md2 Ee2 Cf2 Hg2 Dh2";
+            Position pos = Position.allocate();
+            board_setup.setup_white(pos);
+            bestmove = pos.to_placing_move(Side.WHITE);
+            Position.free(pos);
             state = EngineState.MOVESET;
         } else if (ply == 2)
         {
-            if (position.pieces[11] == Piece.WELEPHANT)
-            {
-                bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 da7 hb7 cc7 ed7 me7 cf7 hg7 dh7";
-            } else {
-                bestmove = "ra8 rb8 rc8 rd8 re8 rf8 rg8 rh8 da7 hb7 cc7 md7 ee7 cf7 hg7 dh7";
-            }
+            Position pos = Position.allocate();
+            board_setup.setup_black(pos);
+            bestmove = pos.to_placing_move(Side.BLACK);
+            Position.free(pos);
             state = EngineState.MOVESET;
         } else {
             PosStore pstore = position.get_moves();

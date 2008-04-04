@@ -660,7 +660,7 @@ class Position
         inpush = false;
     }
 
-    private void update_derived()
+    void update_derived()
     {
         if (side)
             zobrist = ZOBRIST_SIDE;
@@ -916,7 +916,7 @@ class Position
         const static char[] piece_char = " RCDHMErcdhme";
 
         char[] mstr;
-        if (side == 0 || side == -1)
+        if (side == Side.WHITE || side == -1)
         {
             if (side == -1)
             {
@@ -939,7 +939,7 @@ class Position
             }
         }
 
-        if (side == 1 || side == -1)
+        if (side == Side.BLACK || side == -1)
         {
             if (side == -1)
             {
