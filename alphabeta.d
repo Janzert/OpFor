@@ -41,10 +41,12 @@ struct TTNode
 
 class TransTable
 {
+    Logger log;
     TTNode[] store;
 
-    this (int size)
+    this (Logger l, int size)
     {
+        log = l;
         set_size(size);
     }
 
@@ -52,6 +54,7 @@ class TransTable
     {
         store.length = 0;
         store.length = (size*1024*1024) / TTNode.sizeof;
+        log.log("Set transposition table size to %dMB (%d entries)", size, store.length);
     }
 
     TTNode* get(Position pos)
@@ -521,7 +524,7 @@ class ABSearch
     {
         logger = l;
         StepSorter.logger = l;
-        ttable = new TransTable(10);
+        ttable = new TransTable(l, 10);
         cuthistory = new HistoryHeuristic();
         StepSorter.cuthistory = cuthistory;
         trap_search = new TrapGenerator();
