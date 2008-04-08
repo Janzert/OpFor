@@ -405,7 +405,7 @@ class Engine : AEIEngine
             case "root_lmr":
                 root_lmr = cast(bool)toInt(value);
                 break;
-            case "rabbit_setup":
+            case "setup_rabbits":
                 switch (toupper(value))
                 {
                     case "ANY":
@@ -421,6 +421,9 @@ class Engine : AEIEngine
                         board_setup.rabbit_style = SetupGenerator.RabbitSetup.FRITZ;
                         break;
                 }
+                break;
+            case "setup_random_minor":
+                board_setup.random_minor = cast(bool)toInt(value);
                 break;
             default:
                 handled = searcher.set_option(option, value);
