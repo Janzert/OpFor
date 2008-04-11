@@ -786,6 +786,9 @@ int main(char[][] args)
     real tc_min_search_per = 0.6;  // minimum percentage of permove time to search
     real tc_confidence_denom = 3;
     real tc_time_left_denom = 3;
+
+    int tc_target_length = 0; // used to set different thinking times than the game timecontrol
+    int tc_max_length = 0;
     
     d_time search_time = 0;
     d_time search_max = 0;
@@ -965,6 +968,12 @@ int main(char[][] args)
                         case "tcmoveused":
                             move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
                             break;
+                        case "target_min_time":
+                            tc_target_length = toInt(scmd.value);
+                            break;
+                        case "target_max_time":
+                            tc_max_length = toInt(scmd.value);
+                            break;
                         case "log_console":
                             logger.to_console = cast(bool)toInt(scmd.value);
                             break;
@@ -1054,23 +1063,53 @@ int main(char[][] args)
                     if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                         || (engine.best_score >= WIN_SCORE)
                         || (engine.pos_list.next is null)
-                        || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start))))
+                        || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start)))
+                        || (tc_max_length && (now >= ((tc_max_length * TicksPerSecond) + search_start))))
                     {
                         engine.set_bestmove();
                         engine.state = EngineState.MOVESET;
+                    } else if (tc_target_length && (now > ((tc_target_length * TicksPerSecond) + search_start)))
+                    {
+                        logger.log("Target search time reached");
+                        d_time decision_length = now - last_decision_change;
+                        d_time think_time = now - search_start;
+                        d_time time_left = (move_start + (tc_max_search * TicksPerSecond)) - now;
+                        d_time search_left = (search_start + (tc_max_length * TicksPerSecond)) - now;
+                        if (time_left < search_left)
+                            search_left = time_left;
+                        logger.log("search_length %d, decision_length %d, search_left %d", 
+                                   (think_time / TicksPerSecond),
+                                   (decision_length / TicksPerSecond),
+                                   (search_left / TicksPerSecond));
+                        if (decision_length < think_time * (1.0/tc_confidence_denom)
+                                && decision_length < search_left * (1.0/tc_time_left_denom))
+                        {
+                            real tc_cd = 1.0 / (tc_confidence_denom-1);
+                            real tc_tld = 1.0 / (tc_time_left_denom-1);
+                            d_time length_cutoff = cast(d_time)((last_decision_change - search_start) * tc_cd) + last_decision_change;
+                            d_time reserve_cutoff = cast(d_time)(((search_start + (tc_max_length * TicksPerSecond))
+                                        - last_decision_change) * tc_tld) + last_decision_change;
+                            d_time end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
+                            end_search += cast(d_time)(0.1 * TicksPerSecond);
+                            tc_target_length = (end_search - search_start) / TicksPerSecond;
+                            logger.log("next target time set to %d", tc_target_length);
+                        } else {
+                            engine.set_bestmove();
+                            engine.state = EngineState.MOVESET;
+                        }
                     } else if (tc_permove && (now > ((tc_min_search * TicksPerSecond) + move_start)))
                     {
                         logger.log("Min search time reached");
                         d_time decision_length = now - last_decision_change;
                         d_time move_length = now - move_start;
                         d_time time_left = (move_start + (tc_max_search * TicksPerSecond)) - now;
+                        logger.log("move_length %d, decision_length %d, time_left %d", 
+                                    (move_length / TicksPerSecond),
+                                    (decision_length / TicksPerSecond),
+                                    (time_left / TicksPerSecond));
                         if (decision_length < move_length * (1.0/tc_confidence_denom)
                                 && decision_length < time_left * (1.0/tc_time_left_denom))
                         {
-                            logger.log("move_length %d, decision_length %d, time_left %d", 
-                                        (move_length / TicksPerSecond),
-                                        (decision_length / TicksPerSecond),
-                                        (time_left / TicksPerSecond));
                             real tc_cd = 1.0 / (tc_confidence_denom-1);
                             real tc_tld = 1.0 / (tc_time_left_denom-1);
                             d_time length_cutoff = cast(d_time)((last_decision_change - move_start) * tc_cd) + last_decision_change;
@@ -1081,7 +1120,6 @@ int main(char[][] args)
                             tc_min_search = (end_search - move_start) / TicksPerSecond;
                             logger.log("next min_search set to %d", tc_min_search);
                         } else {
-                            logger.log("last decision change %d seconds ago", decision_length / TicksPerSecond);
                             engine.set_bestmove();
                             engine.state = EngineState.MOVESET;
                         }
