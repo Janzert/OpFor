@@ -519,6 +519,7 @@ class ABSearch
 
     bool tournament_rules = true;
     bool use_lmr = true;
+    bool use_nmh = true;
 
     this(Logger l)
     {
@@ -557,6 +558,9 @@ class ABSearch
                 break;
             case "use_lmr":
                 use_lmr = cast(bool)toInt(value);
+                break;
+            case "use_nmh":
+                use_nmh = cast(bool)toInt(value);
                 break;
             case "use_killers":
                 StepSorter.use_killers = cast(bool)(toInt(value));
@@ -632,6 +636,24 @@ class ABSearch
             
             new_best.clear();
         } else {
+            if (use_nmh && depth > 4 && !pos.inpush)
+            {
+                Position mynull = nullmove;
+                nullmove = pos;
+                Position n = pos.dup;
+                n.do_step(NULL_STEP);
+
+                use_nmh = false;
+                int null_score = -alphabeta(n, depth-4, -beta, -alpha);
+                use_nmh = true;
+
+                Position.free(n);
+                nullmove = mynull;
+                
+                if (null_score >= beta)
+                    return null_score;
+            }
+
             StepSorter sorted_steps = StepSorter.allocate(max_depth-depth, pos, prev_best);
             if (sorted_steps.steps.numsteps == 0)
             {
@@ -653,9 +675,7 @@ class ABSearch
                                             // loss since it's actually an illegal move
                 } else {
                     Position mynull = nullmove;
-                    int a, b, null_a, null_b;
-                    int neg_mask = 0;
-                    int neg_add = 0;
+                    int a, b, null_a, null_b, neg_mul;
                     if (npos.stepsLeft == 4)
                     {
                         nullmove = npos.dup;
@@ -664,14 +684,14 @@ class ABSearch
                         b = -alpha;
                         null_a = -(alpha+1);
                         null_b = b;
-                        neg_mask = 0xFFFFFFFF;
-                        neg_add = 1;
+                        neg_mul = -1;
                     } else {
                         nullmove = mynull.dup;
                         a = alpha;
                         b = beta;
                         null_a = alpha;
                         null_b = alpha+1;
+                        neg_mul = 1;
                     }
 
                     int first_val;
@@ -680,7 +700,7 @@ class ABSearch
                             && sorted_steps.history_num > 1)
                     {
                         use_lmr = false;
-                        first_val = (alphabeta(npos, depth-2, null_a, null_b) ^ neg_mask) + neg_add;
+                        first_val = alphabeta(npos, depth-2, null_a, null_b) * neg_mul;
                         use_lmr = true;
                     } else {
                         first_val = alpha + 1;
@@ -688,7 +708,7 @@ class ABSearch
 
                     if (first_val > alpha)
                     {
-                        cal = (alphabeta(npos, depth-1, a, b) ^ neg_mask) + neg_add;
+                        cal = alphabeta(npos, depth-1, a, b) * neg_mul;
                     } else {
                         cal = first_val;
                     }
