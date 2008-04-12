@@ -674,33 +674,25 @@ class ABSearch
                     cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                             // loss since it's actually an illegal move
                 } else {
-                    Position mynull = nullmove;
-                    int a, b, null_a, null_b, neg_mul;
-                    if (npos.stepsLeft == 4)
-                    {
-                        nullmove = npos.dup;
-                        nullmove.do_step(NULL_STEP);
-                        a = -beta;
-                        b = -alpha;
-                        null_a = -(alpha+1);
-                        null_b = b;
-                        neg_mul = -1;
-                    } else {
-                        nullmove = mynull.dup;
-                        a = alpha;
-                        b = beta;
-                        null_a = alpha;
-                        null_b = alpha+1;
-                        neg_mul = 1;
-                    }
-
                     int first_val;
                     if (use_lmr && depth > 2
                             && sorted_steps.num > 3
                             && sorted_steps.history_num > 1)
                     {
                         use_lmr = false;
-                        first_val = alphabeta(npos, depth-2, null_a, null_b) * neg_mul;
+                        if (npos.stepsLeft == 4)
+                        {
+                            Position mynull = nullmove;
+                            nullmove = npos.dup;
+                            nullmove.do_step(NULL_STEP);
+
+                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha);
+
+                            Position.free(nullmove);
+                            nullmove = mynull;
+                        } else {
+                            first_val = alphabeta(npos, depth-2, alpha, alpha+1);
+                        }
                         use_lmr = true;
                     } else {
                         first_val = alpha + 1;
@@ -708,13 +700,22 @@ class ABSearch
 
                     if (first_val > alpha)
                     {
-                        cal = alphabeta(npos, depth-1, a, b) * neg_mul;
+                        if (npos.stepsLeft == 4)
+                        {
+                            Position mynull = nullmove;
+                            nullmove = npos.dup;
+                            nullmove.do_step(NULL_STEP);
+
+                            cal = -alphabeta(npos, depth-1, -beta, -alpha);
+
+                            Position.free(nullmove);
+                            nullmove = mynull;
+                        } else {
+                            cal = alphabeta(npos, depth-1, alpha, beta);
+                        }
                     } else {
                         cal = first_val;
                     }
-
-                    Position.free(nullmove);
-                    nullmove = mynull;
                 }
 
                 Position.free(npos);
