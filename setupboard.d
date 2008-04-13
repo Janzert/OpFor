@@ -20,7 +20,7 @@ class SetupGenerator
         FRITZ };
 
     RabbitSetup rabbit_style = RabbitSetup.ANY;
-    bool random_minor = false;
+    bool random_minor = true;
 
     private ulong gold_to_silver(ulong bitboard)
     {
