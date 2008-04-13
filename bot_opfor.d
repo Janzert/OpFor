@@ -210,7 +210,7 @@ class FullSearch : ABSearch
             trap_search.find_captures(pos, pos.side);
             for (int six=0; six < trap_search.num_captures; six++)
             {
-                if (trap_search.captures[six].length <= pos.stepsLeft)
+                if (trap_search.captures[six].length <= pos.stepsLeft + 2)
                 {
                     bool duplicate = false;
                     for (int cix=0; cix < steps.numsteps; cix++)
