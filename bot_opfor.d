@@ -221,7 +221,8 @@ class FullSearch : ABSearch
                             break;
                         }
                     }
-                    if (!duplicate)
+                    if (!duplicate && (pos.stepsLeft > 1
+                                || !trap_search.captures[six].first_step.push))
                     {
                         Step* step = steps.newstep();
                         *step = trap_search.captures[six].first_step;
