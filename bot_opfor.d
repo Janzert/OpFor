@@ -1050,6 +1050,12 @@ int main(char[][] args)
                     }
                     if (abort_time > max_time_limit)
                         abort_time = max_time_limit;
+                    if (tc_max_length)
+                    {
+                        d_time length_abort = (tc_max_length * TicksPerSecond) + search_start;
+                        if (abort_time > length_abort)
+                            abort_time = length_abort;
+                    }
                     engine.searcher.abort_time = abort_time;
                 }
                 engine.search(check_nodes);
