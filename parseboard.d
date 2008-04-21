@@ -110,7 +110,7 @@ int main(char[][] args)
     Timer.start();
     Position gamepos = Position.allocate();
     PlayoutResult result;
-    const int tests = 10000;
+    const int tests = 100000;
     int wins = 0;
     int totalsteps = 0;
     for (int plays = 0; plays < tests; plays++)
@@ -131,7 +131,7 @@ int main(char[][] args)
     Position.free(gamepos);
     Timer.stop();
     writefln("Win percentage for side to move %.2f%% with random play.", (cast(double)wins / tests) *100.0);
-    writefln("%d playouts took %.2f seconds and averaged %d moves.",  tests, cast(double)Timer.milliseconds / 1000, totalsteps/tests);
+    writefln("%d playouts took %.2f seconds and averaged %d moves with %d total wins.",  tests, cast(double)Timer.milliseconds / 1000, totalsteps/tests, wins);
     
 
     return 0;
