@@ -400,7 +400,12 @@ class Position
             {
                 if ((usedsquares & board) != 0)
                 {
-                    assert (0, "two pieces on same square");
+                    if (board & bitBoards[Piece.EMPTY])
+                    {
+                        assert(0, "Piece on empty square");
+                    } else {
+                        assert (0, "two pieces on same square");
+                    }
                 }
                 usedsquares |= board;
 
@@ -433,7 +438,6 @@ class Position
                     if (pieces[pieceix] != piece)
                     {
                         assert (0, "pieces array has wrong piece");
-                        return false;
                     }
                 }
             }
@@ -660,24 +664,33 @@ class Position
         inpush = false;
     }
 
-    void update_derived()
+    private void update_derived()
     {
         if (side)
             zobrist = ZOBRIST_SIDE;
         else
             zobrist = 0;
         zobrist ^= ZOBRIST_STEP[stepsLeft];
-        for (int pix = 1; pix <= Piece.max; pix++)
+        placement[Side.WHITE] = 0UL;
+        placement[Side.BLACK] = 0UL;
+        for (int i=0; i < 64; i++)
+            pieces[i] = Piece.EMPTY;
+
+        for (Piece pix = Piece.WRABBIT; pix <= Piece.BELEPHANT; pix++)
         {
             ulong board = bitBoards[pix];
+            Side s = (pix < Piece.BRABBIT) ? Side.WHITE : Side.BLACK;
+            placement[s] |= board;
             while (board)
             {
                 ulong piecebit = board & ((board ^ ALL_BITS_SET) + 1);
                 board ^= piecebit;
                 bitix pieceix = bitindex(piecebit);
+                pieces[pieceix] = pix;
                 zobrist ^= ZOBRIST_PIECE[pix][pieceix];
             }
         }
+        bitBoards[Piece.EMPTY] = ~(placement[Side.WHITE] | placement[Side.BLACK]);
         if (inpush)
         {
             zobrist ^= ZOBRIST_INPUSH;
@@ -1228,6 +1241,21 @@ class Position
         inpush = false;
         update_derived();
         
+    }
+
+    void place_piece(Piece p, ulong squares, bool clear_other = false)
+    {
+        if (clear_other)
+        {
+            bitBoards[Piece.EMPTY] |= bitBoards[p];
+            bitBoards[p] = 0UL;
+        }
+
+        if ((~bitBoards[Piece.EMPTY]) & squares)
+            throw new ValueException(format("Tried to place a piece in a non-empty square. squares %X empty %X", squares, bitBoards[Piece.EMPTY]));
+
+        bitBoards[p] |= squares;
+        update_derived();
     }
 
     void get_steps(StepList steps)

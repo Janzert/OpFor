@@ -456,18 +456,11 @@ class Engine : AEIEngine
 
     void start_search()
     {
-        if (ply == 1) // white setup move
+        if (ply < 3)
         {
-            Position pos = Position.allocate();
-            board_setup.setup_white(pos);
-            bestmove = pos.to_placing_move(Side.WHITE);
-            Position.free(pos);
-            state = EngineState.MOVESET;
-        } else if (ply == 2)
-        {
-            Position pos = Position.allocate();
-            board_setup.setup_black(pos);
-            bestmove = pos.to_placing_move(Side.BLACK);
+            Position pos = position.dup;
+            board_setup.setup_board(pos.side, pos);
+            bestmove = pos.to_placing_move(pos.side);
             Position.free(pos);
             state = EngineState.MOVESET;
         } else {

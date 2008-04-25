@@ -21,6 +21,7 @@ class SetupGenerator
 
     RabbitSetup rabbit_style = RabbitSetup.ANY;
     bool random_minor = true;
+    bool random_all = false;
 
     private ulong gold_to_silver(ulong bitboard)
     {
@@ -33,12 +34,19 @@ class SetupGenerator
                | ((bitboard & ROW_1_MASK) << ROW_1_TO_8);
     }
 
+    private ulong adjust_side(Side s, ulong bitboard)
+    {
+        if (s == Side.BLACK)
+            return gold_to_silver(bitboard);
+        return bitboard;
+    }
+
     private void randomize_minor(Side s, inout Position pos)
     {
         int offset = (s == Side.WHITE) ? 0 : 6;
         ulong squares = pos.bitBoards[Piece.WCAT + offset] | pos.bitBoards[Piece.WDOG + offset];
-        pos.bitBoards[Piece.WCAT + offset] = 0;
-        pos.bitBoards[Piece.WDOG + offset] = 0;
+        pos.place_piece(cast(Piece)(Piece.WCAT + offset), 0, true);
+        pos.place_piece(cast(Piece)(Piece.WDOG + offset), 0, true);
         int[] pieces = [Piece.WDOG + offset, Piece.WDOG + offset,
                         Piece.WCAT + offset, Piece.WCAT + offset];
         while (squares)
@@ -51,58 +59,108 @@ class SetupGenerator
             pieces[pix] = pieces[length-1];
             pieces.length = pieces.length - 1;
 
-            pos.bitBoards[piece] |= sbit;
+            pos.place_piece(cast(Piece)piece, sbit);
+        }
+    }
+
+    private void randomize_all(Side s, inout Position pos)
+    {
+        int offset = (s == Side.WHITE) ? 0 : 6;
+        ulong squares = 0xFFFF;
+        if (s == Side.BLACK)
+            squares <<= 48;
+        for (Piece p = cast(Piece)(Piece.WRABBIT+offset); p <= Piece.WELEPHANT+offset; p++)
+        {
+            pos.place_piece(p, 0, true);
+        }
+        Piece[] pieces;
+        pieces.length = 16;
+        for (int i = 0; i < 8; i++)
+        {
+            pieces[i] = cast(Piece)(Piece.WRABBIT+offset);
+        }
+        Piece p = cast(Piece)(Piece.WCAT + offset);
+        for (int i = 8; i < 14; i++)
+        {
+            pieces[i] = p;
+            if (i % 2 == 1)
+                p++;
+        }
+        pieces[14] = cast(Piece)(Piece.WCAMEL + offset);
+        pieces[15] = cast(Piece)(Piece.WELEPHANT + offset);
+
+        while (squares)
+        {
+            ulong sbit = squares & -squares;
+            squares ^= sbit;
+
+            int pix = rand() % pieces.length;
+            Piece piece = pieces[pix];
+            pieces[pix] = pieces[length-1];
+            pieces.length = pieces.length - 1;
+
+            pos.place_piece(piece, sbit);
         }
     }
     
-    void setup_white(inout Position pos)
+    void setup_board(Side s, inout Position pos)
     {
+        int offset = (s == Side.WHITE) ? 0 : 6;
         RabbitSetup rsetup = rabbit_style;
         if (rsetup == RabbitSetup.ANY)
         {
             rsetup = cast(RabbitSetup)(rand() % (RabbitSetup.max + 1));
         }
-        pos.bitBoards[Piece.WRABBIT] = rabbit_setups[rsetup];
-        pos.bitBoards[Piece.WCAT] = cat_setups[rsetup];
-        pos.bitBoards[Piece.WDOG] = dog_setups[rsetup];
-        pos.bitBoards[Piece.WHORSE] = 0x4200;
-        pos.bitBoards[Piece.WCAMEL] = 0x1000;
-        pos.bitBoards[Piece.WELEPHANT] = 0x0800;
-
-        if (random_minor)
+        pos.place_piece(cast(Piece)(Piece.WRABBIT+offset), adjust_side(s, rabbit_setups[rsetup]), true);
+        pos.place_piece(cast(Piece)(Piece.WCAT+offset), adjust_side(s, cat_setups[rsetup]), true);
+        pos.place_piece(cast(Piece)(Piece.WDOG+offset), adjust_side(s, dog_setups[rsetup]), true);
+        pos.place_piece(cast(Piece)(Piece.WHORSE+offset), adjust_side(s, 0x4200), true);
+        pos.place_piece(cast(Piece)(Piece.WCAMEL+offset), adjust_side(s, 0x1000), true);
+        pos.place_piece(cast(Piece)(Piece.WELEPHANT+offset), adjust_side(s, 0x0800), true);
+        if (s == Side.BLACK)
         {
-            randomize_minor(Side.WHITE, pos);
+            if (pos.bitBoards[Piece.WELEPHANT] & 0xE8F0)
+            {
+                pos.place_piece(Piece.BELEPHANT, 0, true);
+                pos.place_piece(Piece.BCAMEL, 0, true);
+                pos.place_piece(Piece.BELEPHANT, 0x10000000000000, true);
+                pos.place_piece(Piece.BCAMEL, 0x8000000000000, true);
+            }
         }
 
-        pos.update_derived();
+        if (random_minor)
+            randomize_minor(s, pos);
+        if (random_all)
+            randomize_all(s, pos);
     }
 
-    void setup_black(inout Position pos)
+    private ulong random_bit(ulong bits)
     {
-        RabbitSetup rsetup = rabbit_style;
-        if (rsetup == RabbitSetup.ANY)
+        int num = popcount(bits);
+        int bix = rand() % num;
+        ulong b;
+        for (int i=0; i <= bix; i++)
         {
-            rsetup = cast(RabbitSetup)(rand() % (RabbitSetup.max + 1));
+            b = bits & -bits;
+            bits ^= b;
         }
-        pos.bitBoards[Piece.BRABBIT] = gold_to_silver(rabbit_setups[rsetup]);
-        pos.bitBoards[Piece.BCAT] = gold_to_silver(cat_setups[rsetup]);
-        pos.bitBoards[Piece.BDOG] = gold_to_silver(dog_setups[rsetup]);
-        pos.bitBoards[Piece.BHORSE] = gold_to_silver(0x4200);
-        if (pos.bitBoards[Piece.WELEPHANT] & 0x170F)
+        return b;
+    }
+
+    void setup_handicap(Piece[] pieces, inout Position pos)
+    {
+        ulong squares = 0xFFFF;
+        if (pieces[0] > Piece.WELEPHANT)
         {
-            pos.bitBoards[Piece.BELEPHANT] = 0x08000000000000;
-            pos.bitBoards[Piece.BCAMEL] = 0x10000000000000;
-        } else {
-            pos.bitBoards[Piece.BELEPHANT] = 0x10000000000000;
-            pos.bitBoards[Piece.BCAMEL] = 0x8000000000000;
+            squares <<= 48;
         }
 
-        if (random_minor)
+        for (int i=0; i < pieces.length; i++)
         {
-            randomize_minor(Side.BLACK, pos);
+            ulong sq = random_bit(squares);
+            squares ^= sq;
+            pos.place_piece(pieces[i], sq);
         }
-
-        pos.update_derived();
     }
 }
 
