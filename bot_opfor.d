@@ -522,12 +522,12 @@ class Engine : AEIEngine
         }
     }
 
-    void search(int check_nodes)
+    void search(uint check_nodes)
     {
         in_step = true;
         d_time start_time = getUTCtime();
         searcher.check_interval = check_nodes;
-        int stop_nodes = searcher.nodes_searched + check_nodes;
+        ulong stop_nodes = searcher.nodes_searched + check_nodes;
         searcher.check_nodes = stop_nodes;
         while (searcher.nodes_searched < stop_nodes)
         {

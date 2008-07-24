@@ -514,7 +514,7 @@ class ABSearch
     ulong tthits;
 
     ulong check_nodes;
-    int check_interval = 100000;
+    uint check_interval = 100000;
     d_time abort_time = 0;
 
     bool tournament_rules = true;
