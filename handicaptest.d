@@ -1,21 +1,37 @@
 
+import std.conv;
 import std.stdio;
 import std.string;
 
 import position;
 import setupboard;
 
+static char[] usage_str = 
+    "usage: handicaptest <handicap pieces> [number of playouts]";
+
 int main(char[][] args)
 {
     SetupGenerator setgen = new SetupGenerator();
     setgen.random_all = true;
     Position pos = Position.allocate();
-    int tests = 1000000;
+    uint tests = 1000000;
     int wins = 0;
     if (args.length < 2)
     {
-        writefln("usage: handicaptest <handicap pieces>");
+        writefln(usage_str);
         return 1;
+    }
+
+    if (args.length > 2)
+    {
+        try {
+            tests = toUint(args[2]);
+        } catch (ConvError E)
+        {
+            writefln("Could not understand the number of playouts");
+            writefln("\n%s", usage_str);
+            return 1;
+        }
     }
 
     int[13] handicap = [0, 8,2,2,2,1,1, 8,2,2,2,1,1];
