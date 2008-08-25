@@ -7,6 +7,8 @@ import logging;
 import position;
 import trapmoves;
 
+static const int MAX_EVAL_SCORE = 63979;
+static const int MIN_WIN_SCORE = 63980;
 static const int WIN_SCORE = 64000;
 static const int MAX_SCORE = 65000;
 static const int MIN_SCORE = -MAX_SCORE;

@@ -1022,7 +1022,7 @@ class StaticEval
             score = -score;
 
         // clamp the evaluation to be less than a win
-        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
+        score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;
         return score;
     }
 
@@ -1090,7 +1090,7 @@ class StaticEval
         pscore = score;
 
         // clamp the evaluation to be less than a win
-        score = (score < WIN_SCORE-10) ? ((score > -(WIN_SCORE-10)) ? score : -(WIN_SCORE-10)) : WIN_SCORE-10;
+        score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;
         logger.log("Final (clamped) score %d", score);
         logger.info("score cr %d", cast(int)(score/1.96));
         return score;

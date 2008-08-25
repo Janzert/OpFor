@@ -360,6 +360,7 @@ class Engine : AEIEngine
     int checked_moves;
     int num_best;
     int num_losing;
+    int losing_score;
 
     int depth;
     int best_score;
@@ -516,6 +517,7 @@ class Engine : AEIEngine
             checked_moves = 0;
             num_best = 0;
             num_losing = 0;
+            losing_score = -MIN_WIN_SCORE;
             searcher.set_depth(4);
             searcher.prepare();
             state = EngineState.SEARCHING;
@@ -603,7 +605,7 @@ class Engine : AEIEngine
                 }
             }
 
-            if (score == -WIN_SCORE
+            if (score <= losing_score
                     && next_pos !is pos_list)
             {
                 PositionNode n = next_pos;
@@ -620,6 +622,20 @@ class Engine : AEIEngine
                     loss_list.prev = n;
                 loss_list = n;
                 num_losing += 1;
+
+                if (next_pos is pos_list
+                        && next_pos.next is null
+                        && next_pos.last_score <= losing_score
+                        && losing_score > -WIN_SCORE)
+                {
+                    logger.info("msg All moves lose, searching for longest loss");
+                    num_losing = 0;
+                    losing_score = -WIN_SCORE;
+                    next_pos.next = loss_list;
+                    if (loss_list !is null)
+                        loss_list.prev = next_pos;
+                    loss_list = null;
+                }
             }
 
             if (score > best_score)
@@ -1000,7 +1016,12 @@ int main(char[][] args)
                         logger.log("Sending forced win move in %.2f seconds.", seconds);
                     } else if (engine.pos_list.next is null)
                     {
-                        logger.log("Sending forced move, or in forced loss, after %.2f seconds.", seconds);
+                        if (engine.best_score <= -MIN_WIN_SCORE)
+                        {
+                            logger.log("Sending move with forced loss, after %.2f seconds.", seconds);
+                        } else {
+                            logger.log("Sending forced move, after %.2f seconds.", seconds);
+                        }
                     }
                 }
                 real average = 0;
