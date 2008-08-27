@@ -23,6 +23,8 @@ class SetupGenerator
     bool random_minor = true;
     bool random_all = false;
 
+    int[] setup_weights = [2, 3, 1];
+
     private ulong gold_to_silver(ulong bitboard)
     {
         const static ulong ROW_1_MASK = 0xFF;
@@ -109,7 +111,18 @@ class SetupGenerator
         RabbitSetup rsetup = rabbit_style;
         if (rsetup == RabbitSetup.ANY)
         {
-            rsetup = cast(RabbitSetup)(rand() % (RabbitSetup.max + 1));
+            int total_weight = 0;
+            for (int i=0; i <= RabbitSetup.max; i++)
+                total_weight += setup_weights[i];
+            int choice_weight = rand() % total_weight;
+            int cur_weight = 0;
+            for (int i=0; i <= RabbitSetup.max; i++)
+            {
+                cur_weight += setup_weights[i];
+                rsetup = cast(RabbitSetup)i;
+                if (cur_weight > choice_weight)
+                    break;
+            }
         }
         pos.place_piece(cast(Piece)(Piece.WRABBIT+offset), adjust_side(s, rabbit_setups[rsetup]), true);
         pos.place_piece(cast(Piece)(Piece.WCAT+offset), adjust_side(s, cat_setups[rsetup]), true);
