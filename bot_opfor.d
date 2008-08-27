@@ -143,17 +143,14 @@ class FullSearch : ABSearch
         int score = MIN_SCORE;
         if (pos.is_endstate())
         {
-            if (tournament_rules || pos.is_goal())
+            // This is actually technically incorrect as it disallows 
+            // pushing a rabbit onto then back off of the goal line
+            score = pos.endscore() * WIN_SCORE;
+            if (pos.side == Side.BLACK)
             {
-                // This is actually technically incorrect as it disallows 
-                // pushing a rabbit onto then back off of the goal line
-                score = pos.endscore() * WIN_SCORE;
-                if (pos.side == Side.BLACK)
-                {
-                    score = -score;
-                }
-                return score;
+                score = -score;
             }
+            return score;
         }
 
         SType sflag = SType.ALPHA;

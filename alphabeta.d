@@ -519,7 +519,6 @@ class ABSearch
     uint check_interval = 100000;
     d_time abort_time = 0;
 
-    bool tournament_rules = true;
     bool use_lmr = true;
     bool use_nmh = true;
 
@@ -548,9 +547,6 @@ class ABSearch
                 {
                     ttable.set_size(toInt(value));
                 } catch (ConvError e) { }
-                break;
-            case "tournament_rules":
-                tournament_rules = cast(bool)toInt(value);
                 break;
             case "history":
                 StepSorter.use_history = cast(bool)(toInt(value));
@@ -589,17 +585,14 @@ class ABSearch
         int score = MIN_SCORE;
         if (pos.is_endstate())
         {
-            if (tournament_rules || pos.is_goal())
+            // This is actually technically incorrect as it disallows 
+            // pushing a rabbit onto then back off of the goal line
+            score = pos.endscore() * WIN_SCORE;
+            if (pos.side == Side.BLACK)
             {
-                // This is actually technically incorrect as it disallows 
-                // pushing a rabbit onto then back off of the goal line
-                score = pos.endscore() * WIN_SCORE;
-                if (pos.side == Side.BLACK)
-                {
-                    score = -score;
-                }
-                return score;
+                score = -score;
             }
+            return score;
         }
 
         SType sflag = SType.ALPHA;
