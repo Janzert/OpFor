@@ -10,6 +10,10 @@ import std.stdio;
 import std.socket;
 import std.utf;
 
+import tango.core.Thread;
+import tango.core.sync.Mutex;
+import tango.core.sync.Condition;
+
 import logging;
 import position;
 
@@ -55,6 +59,135 @@ interface ServerConnection
     void shutdown();
     char[] receive(float timeout=-1);
     void send(char[]);
+}
+
+class SQueue
+{
+    struct QMsg
+    {
+        QMsg* next;
+        char[] msg;
+    }
+    QMsg* qhead = null;
+    QMsg* qtail = null;
+    QMsg* qbuf = null;
+
+    Mutex mutex;
+    Condition cnd;
+
+    this()
+    {
+        mutex = new Mutex();
+        cnd = new Condition(mutex);
+    }
+
+    char[] get(double timeout=0)
+    {
+        synchronized (mutex)
+        {
+            if (qhead is null && timeout != 0)
+            {
+                if (timeout > 0)
+                {
+                    cnd.wait(timeout);
+                } else {
+                    cnd.wait();
+                }
+            }
+
+            if (qhead !is null)
+            {
+                QMsg* qmsg = qhead;
+                qhead = qhead.next;
+                char[] msg = qmsg.msg;
+                qmsg.msg = null;
+                qmsg.next = qbuf;
+                qbuf = qmsg;
+                if (qtail == qmsg)
+                    qtail = null;
+
+                return msg;
+            }
+            return null;
+        }
+    }
+
+    void set(char[] msg)
+    {
+        synchronized (mutex)
+        {
+            QMsg* qmsg;
+            if (qbuf !is null)
+            {
+                qmsg = qbuf;
+                qbuf = qmsg.next;
+            } else {
+                qmsg = new QMsg();
+            }
+
+            qmsg.msg = msg;
+            if (qtail !is null)
+            {
+                qtail.next = qmsg;
+                qtail = qmsg;
+            } else {
+                qhead = qmsg;
+                qtail = qmsg;
+            }
+            cnd.notify();
+        }
+    }
+}
+
+class _StdioCom : Thread
+{
+    SQueue inq;
+    bool stop = false;
+
+    this()
+    {
+        super(&run);
+        inq = new SQueue();
+    }
+
+    void run()
+    {
+        char[] buf;
+        while (!stop && ((buf = readln()) != null))
+        {
+            inq.set(buf);
+        }
+    }
+}
+
+class StdioServer : ServerConnection
+{
+    _StdioCom comt;
+
+    this()
+    {
+        comt = new _StdioCom();
+        comt.start();
+    }
+
+    void shutdown()
+    {
+        comt.stop = true;
+    }
+
+    char[] receive(float timeout=-1)
+    {
+        char[] msg = comt.inq.get(timeout);
+        if (msg is null)
+            throw new TimeoutException("No data received");
+        return msg;
+    }
+
+    void send(char[] msg)
+    {
+        fwritef(stdout, msg);
+        fflush(stdout);
+    }
 }
 
 class SocketServer : ServerConnection

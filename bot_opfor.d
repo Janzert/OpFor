@@ -7,6 +7,9 @@ import std.random;
 import std.stdio;
 import std.string;
 
+// Lifted from tango trunk, should be included in some release after 0.99.7
+import Arguments;
+
 import alphabeta;
 import aeibot;
 import goalsearch;
@@ -182,8 +185,8 @@ class FullSearch : ABSearch
                 int rscore = evaluator.static_eval(reversed);
                 if ((score < rscore-2) || (score > rscore+2))
                 {
-                    writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                    writefln("reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
+                    fwritefln(stderr, "%s\n%s", "wb"[pos.side], pos.to_long_str());
+                    fwritefln(stderr, "reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
                     throw new Exception(format("Biased eval, %d != %d", score, rscore));
                 }
                 Position.free(reversed);
@@ -759,11 +762,30 @@ int main(char[][] args)
 {
     char[] ip = "127.0.0.1";
     ushort port = 40007;
+    bool use_stdio = false;
+
+    Arguments arguments = new Arguments();
+    arguments.define("server").aliases(["s"]).parameters(1);
+    arguments.define("port").aliases(["p"]).parameters(1);
+    arguments.define("stdio");
 
     if (args.length > 1)
-        ip = args[1].dup;
-    if (args.length > 2)
-        port = toUshort(args[2]);
+    {
+        arguments.parse(args[1..$]);
+
+        if (arguments.contains("server"))
+        {
+            ip = arguments["server"];
+        }
+        if (arguments.contains("port"))
+        {
+            port = toUshort(arguments["port"]);
+        }
+        if (arguments.contains("stdio"))
+        {
+            use_stdio = true;
+        }
+    }
 
     d_time report_interval = 60 * std.date.TicksPerSecond;
     d_time nextreport = 0;
@@ -771,14 +793,21 @@ int main(char[][] args)
 
     Logger logger = new Logger();
     ServerInterface server;
-    try
+    if (use_stdio)
     {
-        server = new ServerInterface(new SocketServer(ip, port),
-            BOT_NAME, BOT_AUTHOR);
-    } catch (ConnectException e)
-    {
-        writefln("Error connecting to server: %s", e.msg);
-        return 1;
+        server = new ServerInterface(new StdioServer(),
+               BOT_NAME, BOT_AUTHOR);
+    } else {
+        try
+        {
+            server = new ServerInterface(new SocketServer(ip, port),
+                BOT_NAME, BOT_AUTHOR);
+        } catch (ConnectException e)
+        {
+            fwritefln(stderr, "Error connecting to server: %s", e.msg);
+            fwritefln(stderr, "Tried to connect to %s:%d", ip, port);
+            return 1;
+        }
     }
     logger.register(server);
     Engine engine = new Engine(logger);
@@ -814,7 +843,8 @@ int main(char[][] args)
     {
         try
         {
-            if (engine.state == EngineState.IDLE)
+            if (engine.state == EngineState.IDLE
+                    || engine.state == EngineState.UNINITIALIZED)
             {
                 server.check(10);
             } else {

@@ -37,7 +37,7 @@ class Logger
             }
             std.format.doFormat(&putc, _arguments, _argptr);
 
-            writefln(message);
+            fwritefln(stderr, message);
         }
     }
 
@@ -56,7 +56,7 @@ class Logger
         }
 
         if (to_console)
-            writefln("log: %s", message);
+            fwritefln(stderr, "log: %s", message);
     }
 
     void warn(...)
@@ -74,7 +74,7 @@ class Logger
         }
 
         if (to_console)
-            writefln("Warning: %s", message);
+            fwritefln(stderr, "Warning: %s", message);
     }
 
     void info(...)
