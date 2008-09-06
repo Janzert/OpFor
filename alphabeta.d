@@ -1,6 +1,5 @@
 
 import std.conv;
-import std.date;
 import std.stdio;
 
 import logging;
@@ -517,7 +516,7 @@ class ABSearch
 
     ulong check_nodes;
     uint check_interval = 100000;
-    d_time abort_time = 0;
+    bool delegate() should_abort;
 
     bool use_lmr = true;
     bool use_nmh = true;
@@ -757,11 +756,10 @@ class ABSearch
 
         if (nodes_searched > check_nodes)
         {
-            if (abort_time && getUTCtime() > abort_time)
+            if (should_abort())
             {
                 return ABORT_SCORE;
             }
-
             check_nodes += check_interval;
         }
 

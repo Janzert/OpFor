@@ -524,13 +524,14 @@ class Engine : AEIEngine
         }
     }
 
-    void search(uint check_nodes)
+    void search(uint check_nodes, bool delegate() should_abort)
     {
         in_step = true;
         d_time start_time = getUTCtime();
         searcher.check_interval = check_nodes;
         ulong stop_nodes = searcher.nodes_searched + check_nodes;
         searcher.check_nodes = stop_nodes;
+        searcher.should_abort = should_abort;
         while (searcher.nodes_searched < stop_nodes)
         {
             Position pos = next_pos.pos;
@@ -812,6 +813,24 @@ int main(char[][] args)
     logger.register(server);
     Engine engine = new Engine(logger);
 
+    class AbortChecker
+    {
+        d_time abort_time;
+        ServerInterface server;
+        this(ServerInterface s)
+        {
+            server = s;
+        }
+
+        bool should_abort()
+        {
+            if (abort_time && getUTCtime() > abort_time)
+                return true;
+            return server.should_abort();
+        }
+    }
+    AbortChecker abort_checker = new AbortChecker(server);
+
     int tc_permove = 0;         // time given per move
     int tc_maxreserve = 0;      // maximum reserve size
     int tc_maxmove = 0;         // maximum time for a single move
@@ -1081,14 +1100,10 @@ int main(char[][] args)
                 } else {
                     check_nodes = START_SEARCH_NODES;
                 }
-                if (tc_max_search)
+                if (tc_max_search && !pondering)
                 {
                     d_time abort_time = ((tc_min_search + 20) * TicksPerSecond) + move_start;
                     d_time max_time_limit = (tc_max_search * TicksPerSecond) + move_start;
-                    if (pondering)
-                    {
-                        abort_time = (20 * TicksPerSecond) + start_run;
-                    }
                     if (abort_time > max_time_limit)
                         abort_time = max_time_limit;
                     if (tc_max_length)
@@ -1097,9 +1112,11 @@ int main(char[][] args)
                         if (abort_time > length_abort)
                             abort_time = length_abort;
                     }
-                    engine.searcher.abort_time = abort_time;
+                    abort_checker.abort_time = abort_time;
+                } else {
+                    abort_checker.abort_time = 0;
                 }
-                engine.search(check_nodes);
+                engine.search(check_nodes, &abort_checker.should_abort);
                 check_num += 1;
                 d_time now = getUTCtime();
                 if (cur_best != engine.pos_list)

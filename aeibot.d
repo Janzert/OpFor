@@ -282,16 +282,20 @@ class SocketServer : ServerConnection
 
 class ServerCmd
 {
-    enum CmdType { NONE,
-        ISREADY,
-        QUIT,
-        NEWGAME,
+    enum CmdType {
+        NONE,
+        SETOPTION,
+        CHECKEVAL,
         GO,
-        STOP,
+        ISREADY,
+        CRITICAL,   // Any commands past this are critical to handle ASAP
+                    // i.e. stop the current search for
+        NEWGAME,
         MAKEMOVE,
         SETPOSITION,
-        SETOPTION,
-        CHECKEVAL };
+        STOP,
+        QUIT,
+    };
 
     CmdType type;
 
@@ -365,6 +369,7 @@ class ServerInterface : LogConsumer
     char[] partial;
 
     ServerCmd[] cmd_queue;
+    bool have_critical = false;
 
     this(ServerConnection cn, char[] bot_name, char[] bot_author)
     {
@@ -496,10 +501,17 @@ class ServerInterface : LogConsumer
                     default:
                         throw new UnknownCommand("Unrecognized command.", line);
                 }
+                if (cmd_queue[0].type > ServerCmd.CmdType.CRITICAL)
+                    have_critical = true;
             }
         } catch (TimeoutException e) { }
 
         return cast(bool)cmd_queue.length;
+    }
+
+    bool should_abort()
+    {
+        return check() && have_critical;
     }
 
     void readyok()
@@ -541,6 +553,19 @@ class ServerInterface : LogConsumer
     {
         if (cmd_queue)
         {
+            have_critical = false;
+            if (cmd_queue[0].type > ServerCmd.CmdType.CRITICAL
+                    && cmd_queue.length > 1)
+            {
+                for (int i=1; i < cmd_queue.length; i++)
+                {
+                    if (cmd_queue[i].type > ServerCmd.CmdType.CRITICAL)
+                    {
+                        have_critical = true;
+                        break;
+                    }
+                }
+            }
             cmd_queue = cmd_queue[1..length];
             return cast(bool)cmd_queue.length;
         }
@@ -591,7 +616,7 @@ class AEIEngine
         throw new NotImplementedException("AEIEngine.start_search() has not been implemented.");
     }
 
-    void search()
+    void search(uint check_nodes, bool delegate() should_abort)
     {
         throw new NotImplementedException("AEIEngine.search() has not been implemented.");
     }
