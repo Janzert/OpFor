@@ -884,6 +884,7 @@ int main(char[][] args)
                     break;
                 case ServerCmd.CmdType.QUIT:
                     logger.log("Exiting by server command.");
+                    server.shutdown();
                     return 0;
                 case ServerCmd.CmdType.NEWGAME:
                     logger.log("Starting new game.");

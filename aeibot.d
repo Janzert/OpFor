@@ -148,6 +148,7 @@ class _StdioCom : Thread
     {
         super(&run);
         inq = new SQueue();
+        isDaemon(true);
     }
 
     void run()
@@ -168,6 +169,11 @@ class StdioServer : ServerConnection
     {
         comt = new _StdioCom();
         comt.start();
+    }
+    
+    ~this()
+    {
+        shutdown();
     }
 
     void shutdown()
@@ -380,6 +386,11 @@ class ServerInterface : LogConsumer
         con.send(format("id name %s\n", bot_name));
         con.send(format("id author %s\n", bot_author));
         con.send("aeiok\n");
+    }
+
+    void shutdown()
+    {
+        con.shutdown();
     }
 
     bool check(int timeout=0)
