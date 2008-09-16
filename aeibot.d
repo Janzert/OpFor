@@ -99,12 +99,15 @@ class SQueue
             {
                 QMsg* qmsg = qhead;
                 qhead = qhead.next;
+                if (qhead is null)
+                {
+                    assert(qtail is qmsg);
+                    qtail = null;
+                }
                 char[] msg = qmsg.msg;
                 qmsg.msg = null;
                 qmsg.next = qbuf;
                 qbuf = qmsg;
-                if (qtail == qmsg)
-                    qtail = null;
 
                 return msg;
             }
@@ -126,6 +129,8 @@ class SQueue
             }
 
             qmsg.msg = msg;
+            qmsg.next = null;
+
             if (qtail !is null)
             {
                 qtail.next = qmsg;
@@ -154,7 +159,7 @@ class _StdioCom : Thread
     void run()
     {
         char[] buf;
-        while (!stop && ((buf = readln()) != null))
+        while (!stop && ((buf = readln()) !is null))
         {
             inq.set(buf);
         }

@@ -965,9 +965,11 @@ int main(char[][] args)
                     {
                         engine.cleanup_search();
                         engine.state = EngineState.IDLE;
+                        logger.log("Stopping engine for incoming move.");
                     }
                     engine.make_move(mcmd.move);
                     server.clear_cmd();
+                    logger.log("made move %s", mcmd.move);
                     break;
                 case ServerCmd.CmdType.SETPOSITION:
                     PositionCmd pcmd = cast(PositionCmd)server.current_cmd;
