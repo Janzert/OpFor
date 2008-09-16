@@ -763,12 +763,13 @@ int main(char[][] args)
 {
     char[] ip = "127.0.0.1";
     ushort port = 40007;
-    bool use_stdio = false;
+    bool use_stdio = true;
 
     Arguments arguments = new Arguments();
     arguments.define("server").aliases(["s"]).parameters(1);
     arguments.define("port").aliases(["p"]).parameters(1);
-    arguments.define("stdio");
+    arguments.define("stdio").conflicts(["socket"]);
+    arguments.define("socket").conflicts(["stdio"]);
 
     if (args.length > 1)
     {
@@ -776,11 +777,17 @@ int main(char[][] args)
 
         if (arguments.contains("server"))
         {
+            use_stdio = false;
             ip = arguments["server"];
         }
         if (arguments.contains("port"))
         {
+            use_stdio = false;
             port = toUshort(arguments["port"]);
+        }
+        if (arguments.contains("socket"))
+        {
+            use_stdio = false;
         }
         if (arguments.contains("stdio"))
         {
