@@ -1,5 +1,4 @@
 
-import std.c.string;
 import std.conv;
 import std.date;
 import std.math;
@@ -1072,7 +1071,10 @@ int main(char[][] args)
                         logger.log("Sending forced win move in %.2f seconds.", seconds);
                     } else if (engine.pos_list.next is null)
                     {
-                        if (engine.best_score <= -MIN_WIN_SCORE)
+                        auto score = engine.best_score;
+                        if (!engine.in_step)
+                            score = engine.last_score;
+                        if (score <= -MIN_WIN_SCORE)
                         {
                             logger.log("Sending move with forced loss, after %.2f seconds.", seconds);
                         } else {
