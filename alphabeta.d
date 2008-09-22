@@ -617,6 +617,11 @@ class ABSearch
         if (depth < 1 && !pos.inpush)
         {
             score = eval(pos, alpha, beta);
+
+            if (score == ABORT_SCORE
+                    || score == -ABORT_SCORE)
+                return ABORT_SCORE;
+
             if (score > alpha)
             {
                 alpha = score;
@@ -643,6 +648,10 @@ class ABSearch
 
                 Position.free(n);
                 nullmove = mynull;
+
+                if (score == -ABORT_SCORE
+                        || score == ABORT_SCORE)
+                    return ABORT_SCORE;
                 
                 if (null_score >= beta)
                     return null_score;
