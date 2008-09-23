@@ -260,6 +260,13 @@ class FullSearch : ABSearch
 
             Position.free(npos);
 
+            if (cal == ABORT_SCORE
+                    || cal == -ABORT_SCORE)
+            {
+                score = ABORT_SCORE;
+                break;
+            }
+
             if (cal > score)
             {
                 score = cal;
@@ -286,8 +293,19 @@ class FullSearch : ABSearch
         } else {
             bstep.clear();
         }
-        node.set(pos, depth, score, sflag, bstep);
         StepList.free(steps);
+
+        if (score != ABORT_SCORE)
+            node.set(pos, depth, score, sflag, bstep);
+
+        if (nodes_searched > check_nodes)
+        {
+            if (should_abort())
+            {
+                return ABORT_SCORE;
+            }
+            check_nodes += check_interval;
+        }
 
         return score;
     }
