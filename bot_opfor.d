@@ -6,6 +6,7 @@ import std.random;
 import std.stdio;
 import std.string;
 
+import tango.core.Memory;
 // Lifted from tango trunk, should be included in some release after 0.99.7
 import Arguments;
 
@@ -930,6 +931,16 @@ int main(char[][] args)
                     logger.log("Starting search");
                     logger.console("%s\n%s", "wb"[engine.position.side], engine.position.to_long_str);
                     search_start = getUTCtime();
+                    debug (gc_time)
+                    {
+                        if (gcmd.option == GoCmd.Option.PONDER)
+                        {
+                            d_time start_collect = getUTCtime();
+                            GC.collect();
+                            d_time clength = getUTCtime() - start_collect;
+                            logger.log("Garbage collection took %d seconds", clength / TicksPerSecond);
+                        }
+                    }
                     engine.start_search();
                     last_decision_change = search_start;
                     nextreport = getUTCtime() + report_interval;
@@ -1117,7 +1128,14 @@ int main(char[][] args)
                 engine.cleanup_search();
                 logger.log("Positions allocated %d, in reserve %d (%.0fMB).",
                         Position.allocated, Position.reserved, Position.reserve_size);
-                logger.log("PNodes allocated %d, in reserve %d.", PositionNode.allocated, PositionNode.reserved);
+                if (PositionNode.allocated != PositionNode.reserved)
+                {
+                    logger.warn("PNodes allocated %d != in reserve %d.", PositionNode.allocated, PositionNode.reserved);
+                }
+                if (StepList.allocated != StepList.reserved)
+                {
+                    logger.warn("StepList allocated %d != in reserve %d", StepList.allocated, StepList.reserved);
+                }
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:

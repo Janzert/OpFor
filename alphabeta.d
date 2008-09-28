@@ -2,6 +2,8 @@
 import std.conv;
 import std.stdio;
 
+import tango.core.Memory;
+
 import logging;
 import position;
 import trapmoves;
@@ -218,6 +220,11 @@ class StepSorter
 
         StepList.free(s.steps);
         s.steps = null;
+        if (s.capture_steps !is null)
+        {
+            StepList.free(s.capture_steps);
+            s.capture_steps = null;
+        }
         reserve[reservesize++] = s;
     }
 
@@ -421,6 +428,7 @@ class StepSorter
                         break;
                     } else {
                         StepList.free(capture_steps);
+                        capture_steps = null;
                     }
                 }
                 stage++;
