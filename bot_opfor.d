@@ -359,7 +359,16 @@ class PositionNode
 
     static void free(PositionNode n)
     {
-        n.pos = null;
+        if (n.pos !is null)
+        {
+            Position.free(n.pos);
+            n.pos = null;
+        }
+        if (n.move !is null)
+        {
+            StepList.free(n.move);
+            n.move = null;
+        }
         n.prev = null;
         n.next = cache_head;
         cache_head = n;
@@ -502,8 +511,6 @@ class Engine : AEIEngine
                 {
                     if (repeated !is null)
                     {
-                        Position.free(repeated.pos);
-                        StepList.free(repeated.move);
                         PositionNode.free(repeated);
                     }
                     repeated = n;
@@ -751,16 +758,12 @@ class Engine : AEIEngine
     {
         while (pos_list !is null)
         {
-            Position.free(pos_list.pos);
-            StepList.free(pos_list.move);
             PositionNode n = pos_list;
             pos_list = n.next;
             PositionNode.free(n);
         }
         while (loss_list !is null)
         {
-            Position.free(loss_list.pos);
-            StepList.free(loss_list.move);
             PositionNode n = loss_list;
             loss_list = n.next;
             PositionNode.free(n);
@@ -1253,13 +1256,7 @@ int main(char[][] args)
                         nextreport = now + report_interval;
                         report_depth = engine.depth;
                     }
-                } else { // pondering
-                    if (now > (tc_permove * TicksPerSecond) + search_start)
-                    {
-                        engine.cleanup_search();
-                        engine.state = EngineState.IDLE;
-                    }
-                }
+                } 
                 break;
             default:
                 break;

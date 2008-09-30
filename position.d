@@ -4,6 +4,8 @@ import std.stdio;
 import std.string;
 import std.random;
 
+import tango.core.Memory;
+
 import zobristkeys;
 
 typedef byte bitix;
@@ -576,6 +578,7 @@ class Position
     {
         this.bitBoards[0] = ALL_BITS_SET;
         this.lastfrom = 64;
+        GC.setAttr(&this, GC.BlkAttr.NO_SCAN);
         allocated++;
     }
 
@@ -592,6 +595,7 @@ class Position
         this.lastpiece = other.lastpiece;
         this.lastfrom = other.lastfrom;
         this.inpush = other.inpush;
+        GC.setAttr(&this, GC.BlkAttr.NO_SCAN);
         allocated++;
     }
 
@@ -626,6 +630,7 @@ class Position
 
         update_derived();
 
+        GC.setAttr(&this, GC.BlkAttr.NO_SCAN);
         allocated++;
     }
 

@@ -57,6 +57,7 @@ class TransTable
     {
         store.length = 0;
         store.length = (size*1024*1024) / TTNode.sizeof;
+        GC.setAttr(&store, GC.BlkAttr.NO_SCAN);
         log.log("Set transposition table size to %dMB (%d entries)", size, store.length);
     }
 
