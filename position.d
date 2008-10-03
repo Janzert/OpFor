@@ -250,6 +250,7 @@ class StepList
     this(int startlength=32)
     {
         steps.length = startlength;
+        GC.setAttr(cast(void*)steps, GC.BlkAttr.NO_SCAN);
         allocated += 1;
     }
 
@@ -265,6 +266,7 @@ class StepList
         StepList newlist = allocate();
         newlist.steps[0..numsteps] = steps[0..numsteps];
         newlist.numsteps = numsteps;
+        GC.setAttr(cast(void*)newlist.steps, GC.BlkAttr.NO_SCAN);
         return newlist;
     }
 
@@ -284,6 +286,7 @@ class StepList
         if (numsteps == steps.length)
         {
             steps.length = steps.length * ALLOCA_MULT;
+            GC.setAttr(cast(void*)steps, GC.BlkAttr.NO_SCAN);
         }
         return &steps[numsteps++];
     }
@@ -578,7 +581,7 @@ class Position
     {
         this.bitBoards[0] = ALL_BITS_SET;
         this.lastfrom = 64;
-        GC.setAttr(&this, GC.BlkAttr.NO_SCAN);
+        GC.setAttr(cast(void*)this, GC.BlkAttr.NO_SCAN);
         allocated++;
     }
 
@@ -595,7 +598,7 @@ class Position
         this.lastpiece = other.lastpiece;
         this.lastfrom = other.lastfrom;
         this.inpush = other.inpush;
-        GC.setAttr(&this, GC.BlkAttr.NO_SCAN);
+        GC.setAttr(cast(void*)this, GC.BlkAttr.NO_SCAN);
         allocated++;
     }
 
@@ -630,7 +633,7 @@ class Position
 
         update_derived();
 
-        GC.setAttr(&this, GC.BlkAttr.NO_SCAN);
+        GC.setAttr(cast(void*)this, GC.BlkAttr.NO_SCAN);
         allocated++;
     }
 
