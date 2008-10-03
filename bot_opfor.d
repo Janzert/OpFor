@@ -1074,6 +1074,12 @@ int main(char[][] args)
                         case "log_console":
                             logger.to_console = cast(bool)toInt(scmd.value);
                             break;
+                        case "run_gc":
+                            d_time start_collect = getUTCtime();
+                            GC.collect();
+                            d_time clength = getUTCtime() - start_collect;
+                            logger.log("Garbage collection took %d seconds", clength / TicksPerSecond);
+                            break;
                         default:
                             engine.set_option(scmd.name, scmd.value);
                             break;
