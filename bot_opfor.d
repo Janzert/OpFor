@@ -1046,6 +1046,12 @@ int main(char[][] args)
                             break;
                         case "tcmove":
                             tc_permove = toInt(scmd.value);
+                            if (tc_permove < 600)
+                            {
+                                GC.disable();
+                            } else {
+                                GC.enable();
+                            }
                             break;
                         case "tcmax":
                             tc_maxreserve = toInt(scmd.value);
