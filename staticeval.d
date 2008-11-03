@@ -629,6 +629,8 @@ class StaticEval
                                     5, 12, 16, 30, 55, 132];
         static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
                                     10, 25, 39, 61, 110, 264];
+        static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
+                                    0, 4, 5, 10, 18, 44];
         static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
         static const int[] TRAP_DIST_MUL =
             [1, 1, 2, 1, 1, 2, 1, 1,
@@ -711,7 +713,10 @@ class StaticEval
                 if (can_push)
                     continue;
 
-                if (pos.pieces[pix] >= (pos.strongest[side^1][pix] + enemyoffset))
+
+                Piece strong_holder = pos.strongest[side^1][pix];
+                hscore += HOLDER_PENALTY[strong_holder];
+                if (pos.pieces[pix] >= (strong_holder + enemyoffset))
                 {
                     // the piece is blockaded
                     debug (mobility)
@@ -765,6 +770,9 @@ class StaticEval
                             writefln("h piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
                         }
                         hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
+
+                        Piece strong_holder = pos.strongest[side^1][pix];
+                        hscore += HOLDER_PENALTY[strong_holder];
                     }
                 }
             }
