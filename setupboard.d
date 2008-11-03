@@ -23,7 +23,7 @@ class SetupGenerator
     bool random_minor = true;
     bool random_all = false;
 
-    int[] setup_weights = [2, 3, 1];
+    int[] setup_weights = [3, 6, 1];
 
     private ulong gold_to_silver(ulong bitboard)
     {
