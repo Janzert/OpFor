@@ -73,9 +73,9 @@ int main(char[][] args)
     gsdt.set_start(pos);
     gsdt.find_goals();
     if (gsdt.wgoal != gsdt.NOT_FOUND)
-        writefln("White has a goal in %d steps.", gsdt.wgoal);
+        writefln("DT: White has a goal in %d steps.", gsdt.wgoal);
     if (gsdt.bgoal != gsdt.NOT_FOUND)
-        writefln("Black has a goal in %d steps.", gsdt.bgoal);
+        writefln("DT: Black has a goal in %d steps.", gsdt.bgoal);
 
     TrapGenerator tgen = new TrapGenerator();
     for (Side s = Side.WHITE; s <= Side.BLACK; s++)
