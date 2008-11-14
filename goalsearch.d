@@ -161,6 +161,7 @@ class GoalSearchDT
         {
             Position.free(start);
         }
+        start = null;
         wgoal = bgoal = NOT_FOUND;
     }
 
