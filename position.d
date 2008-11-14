@@ -1266,6 +1266,14 @@ class Position
         update_derived();
     }
 
+    void set_steps_left(int num)
+    {
+        if (num < 0 || num > 4)
+            throw new ValueException(format("Tried to set steps left to an illegal value, %d.", num));
+        stepsLeft = num;
+        update_derived();
+    }
+
     void get_steps(StepList steps)
     {
         Step* step;
