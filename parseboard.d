@@ -69,6 +69,13 @@ int main(char[][] args)
         writefln("Black has a goal in %d steps from %s.", gsearch.goal_depth[Side.BLACK][0],
                 ix_to_alg(gsearch.rabbit_location[Side.BLACK][0]));
     }
+    GoalSearchDT gsdt = new GoalSearchDT();
+    gsdt.set_start(pos);
+    gsdt.find_goals();
+    if (gsdt.wgoal != gsdt.NOT_FOUND)
+        writefln("White has a goal in %d steps.", gsdt.wgoal);
+    if (gsdt.bgoal != gsdt.NOT_FOUND)
+        writefln("Black has a goal in %d steps.", gsdt.bgoal);
 
     TrapGenerator tgen = new TrapGenerator();
     for (Side s = Side.WHITE; s <= Side.BLACK; s++)
