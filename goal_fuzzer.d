@@ -83,12 +83,16 @@ int main(char[][] args)
     Position pos = new Position();
     GoalSearchDT gs = new GoalSearchDT();
     int shortest_goal = gs.wgoal;
-    while (shortest_goal == gs.wgoal)
+    int wgoal = shortest_goal;
+    int pos_count = 0;
+    while (shortest_goal == wgoal)
     {
         shortest_goal = gs.NOT_FOUND;
         gs.clear_start();
         pos.clear();
         gen_possible_goal_position(pos);
+        pos_count += 1;
+        writefln("%dw", pos_count);
         writefln(pos.to_long_str());
         PosStore moves = pos.get_moves();
         foreach(Position res; moves)
@@ -115,8 +119,23 @@ int main(char[][] args)
             writefln("Is white goal in %d", shortest_goal);
         gs.set_start(pos);
         gs.find_goals();
-        if (gs.wgoal < gs.NOT_FOUND)
+        wgoal = gs.wgoal;
+        if (wgoal < gs.NOT_FOUND)
             writefln("Goal search found white goal in %d", gs.wgoal);
+        Position bpos = pos.reverse();
+        gs.set_start(bpos);
+        gs.find_goals();
+        if (gs.bgoal != wgoal)
+        {
+            writefln("%db", pos_count);
+            writefln(bpos.to_long_str());
+            if (shortest_goal != gs.NOT_FOUND)
+                writefln("Is black goal in %d", shortest_goal);
+            if (gs.bgoal != gs.NOT_FOUND)
+                writefln("Goal search found black goal in %d", gs.bgoal);
+            break;
+        }
+        Position.free(bpos);
     }
 
     return 0;
