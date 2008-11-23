@@ -88,6 +88,7 @@ int main(char[][] args)
     while (shortest_goal == wgoal)
     {
         shortest_goal = gs.NOT_FOUND;
+        StepList shortest_move;
         gs.clear_start();
         pos.clear();
         gen_possible_goal_position(pos);
@@ -110,9 +111,14 @@ int main(char[][] args)
                 if (goal_len < shortest_goal)
                 {
                     shortest_goal = goal_len;
+                    shortest_move = move;
                 }
             }
         }
+        if (shortest_goal != gs.NOT_FOUND)
+            shortest_move = shortest_move.dup;
+        else
+            shortest_move = StepList.allocate();
         moves.free_items();
         delete moves;
         if (shortest_goal < gs.NOT_FOUND)
@@ -136,6 +142,43 @@ int main(char[][] args)
             break;
         }
         Position.free(bpos);
+        if (shortest_goal == gs.NOT_FOUND)
+            continue;
+        Position mpos = pos.dup;
+        for (int i=0; i < (shortest_goal-1); i++)
+        {
+            mpos.do_step(shortest_move.steps[i]);
+            if (mpos.inpush)
+                continue;
+            gs.set_start(mpos);
+            gs.find_goals();
+            if (gs.wgoal != (shortest_goal - (i+1)))
+            {
+                writefln(shortest_move.to_move_str(pos));
+                writefln("step %d", i+1);
+                writefln("%dw", pos_count);
+                writefln(mpos.to_long_str());
+                writefln("Is white goal in %d", (shortest_goal - (i+1)));
+                writefln("Search found white goal in %d", gs.wgoal);
+                return 0;
+            }
+            bpos = mpos.reverse();
+            gs.set_start(bpos);
+            gs.find_goals();
+            if (gs.bgoal != (shortest_goal - (i+1)))
+            {
+                writefln(shortest_move.to_move_str(pos));
+                writefln("step %d", i+1);
+                writefln("%dw", pos_count);
+                writefln(mpos.to_long_str());
+                writefln("Is black goal in %d", (shortest_goal - (i+1)));
+                writefln("Search found black goal in %d", gs.bgoal);
+                return 0;
+            }
+            Position.free(bpos);
+        }
+        Position.free(mpos);
+        StepList.free(shortest_move);
     }
 
     return 0;
