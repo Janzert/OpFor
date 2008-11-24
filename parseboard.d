@@ -34,7 +34,7 @@ int main(char[][] args)
     writefln();
     StepList steps = new StepList();
     pos.get_steps(steps);
-    writefln("There are %d initial steps.", 
+    writefln("There are %d initial steps.",
                 steps.numsteps);
     ProcessTimesCounter Timer = new ProcessTimesCounter();
     Timer.start();
@@ -42,10 +42,31 @@ int main(char[][] args)
     Timer.stop();
     writefln("%d unique moves.", moves.length);
     writefln("Time to generate moves %.3f seconds", cast(double)Timer.milliseconds / 1000);
-    /*foreach (Position move; moves)
+    GoalSearchDT gsdt = new GoalSearchDT();
+    int shortest_goal = gsdt.NOT_FOUND;
+    StepList shortest_move;
+    foreach (Position res; moves)
     {
-        writefln(move.to_short_str());
-    }*/
+        if (res.endscore() == 1)
+        {
+            StepList move = moves.getpos(res);
+            int goal_len = 0;
+            for (int i=0; i < move.numsteps; i++)
+            {
+                if (move.steps[i].frombit != INV_STEP
+                        && move.steps[i].tobit != INV_STEP)
+                    goal_len += 1;
+            }
+            if (goal_len < shortest_goal)
+            {
+                shortest_goal = goal_len;
+                shortest_move = move;
+            }
+        }
+    }
+    if (shortest_goal != gsdt.NOT_FOUND)
+        shortest_move = shortest_move.dup;
+    moves.free_items();
     delete moves;
     std.gc.fullCollect();
 
@@ -56,6 +77,8 @@ int main(char[][] args)
     if (fast_score != cast(int)(slow_score))
         writefln("Fast FAME score %d != slow fame score %d", fast_score, cast(int)(slow_score));
 
+    if (shortest_goal != gsdt.NOT_FOUND)
+        writefln("Side to move goals in %d steps", shortest_goal);
     GoalSearch gsearch = new GoalSearch();
     gsearch.set_start(pos);
     gsearch.find_goals(30);
@@ -69,13 +92,40 @@ int main(char[][] args)
         writefln("Black has a goal in %d steps from %s.", gsearch.goal_depth[Side.BLACK][0],
                 ix_to_alg(gsearch.rabbit_location[Side.BLACK][0]));
     }
-    GoalSearchDT gsdt = new GoalSearchDT();
     gsdt.set_start(pos);
     gsdt.find_goals();
-    if (gsdt.wgoal != gsdt.NOT_FOUND)
-        writefln("DT: White has a goal in %d steps.", gsdt.wgoal);
-    if (gsdt.bgoal != gsdt.NOT_FOUND)
-        writefln("DT: Black has a goal in %d steps.", gsdt.bgoal);
+    if (gsdt.shortest[Side.WHITE] != gsdt.NOT_FOUND)
+        writefln("DT: White has a goal in %d steps.",
+                gsdt.shortest[Side.WHITE]);
+    if (gsdt.shortest[Side.BLACK] != gsdt.NOT_FOUND)
+        writefln("DT: Black has a goal in %d steps.",
+                gsdt.shortest[Side.BLACK]);
+
+    if ((shortest_goal != gsdt.NOT_FOUND)
+            && (gsdt.shortest[pos.side] != gsdt.NOT_FOUND))
+    {
+        writefln("checking shortest goal with %s",
+                shortest_move.to_move_str(pos));
+        Position mpos = pos.dup;
+        for (int i=0; i < (shortest_goal-1); i++)
+        {
+            mpos.do_step(shortest_move.steps[i]);
+            if (mpos.inpush)
+                continue;
+            gsdt.set_start(mpos);
+            gsdt.find_goals();
+            if (gsdt.shortest[pos.side] != (shortest_goal - (i+1)))
+            {
+                writefln("step %d", i+1);
+                writefln(mpos.to_long_str());
+                writefln("Is goal in %d", (shortest_goal - (i+1)));
+                writefln("Search found goal in %d", gsdt.shortest[mpos.side]);
+                break;
+            }
+        }
+        Position.free(mpos);
+        StepList.free(shortest_move);
+    }
 
     TrapGenerator tgen = new TrapGenerator();
     for (Side s = Side.WHITE; s <= Side.BLACK; s++)
@@ -112,12 +162,12 @@ int main(char[][] args)
             }*/
         }
     }
-    
+
     Timer = new ProcessTimesCounter();
     Timer.start();
     Position gamepos = Position.allocate();
     PlayoutResult result;
-    const int tests = 100000;
+    const int tests = 10000;
     int wins = 0;
     int totalsteps = 0;
     for (int plays = 0; plays < tests; plays++)
@@ -139,7 +189,7 @@ int main(char[][] args)
     Timer.stop();
     writefln("Win percentage for side to move %.2f%% with random play.", (cast(double)wins / tests) *100.0);
     writefln("%d playouts took %.2f seconds and averaged %d moves with %d total wins.",  tests, cast(double)Timer.milliseconds / 1000, totalsteps/tests, wins);
-    
+
 
     return 0;
 }

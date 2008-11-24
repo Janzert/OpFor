@@ -82,7 +82,7 @@ int main(char[][] args)
 {
     Position pos = new Position();
     GoalSearchDT gs = new GoalSearchDT();
-    int shortest_goal = gs.wgoal;
+    int shortest_goal = gs.NOT_FOUND;
     int wgoal = shortest_goal;
     int pos_count = 0;
     while (shortest_goal == wgoal)
@@ -125,20 +125,21 @@ int main(char[][] args)
             writefln("Is white goal in %d", shortest_goal);
         gs.set_start(pos);
         gs.find_goals();
-        wgoal = gs.wgoal;
+        wgoal = gs.shortest[Side.WHITE];
         if (wgoal < gs.NOT_FOUND)
-            writefln("Goal search found white goal in %d", gs.wgoal);
+            writefln("Goal search found white goal in %d", wgoal);
         Position bpos = pos.reverse();
         gs.set_start(bpos);
         gs.find_goals();
-        if (gs.bgoal != wgoal)
+        if (gs.shortest[Side.BLACK] != wgoal)
         {
             writefln("%db", pos_count);
             writefln(bpos.to_long_str());
             if (shortest_goal != gs.NOT_FOUND)
                 writefln("Is black goal in %d", shortest_goal);
-            if (gs.bgoal != gs.NOT_FOUND)
-                writefln("Goal search found black goal in %d", gs.bgoal);
+            if (gs.shortest[Side.BLACK] != gs.NOT_FOUND)
+                writefln("Goal search found black goal in %d",
+                        gs.shortest[Side.BLACK]);
             break;
         }
         Position.free(bpos);
@@ -152,28 +153,30 @@ int main(char[][] args)
                 continue;
             gs.set_start(mpos);
             gs.find_goals();
-            if (gs.wgoal != (shortest_goal - (i+1)))
+            if (gs.shortest[Side.WHITE] != (shortest_goal - (i+1)))
             {
                 writefln(shortest_move.to_move_str(pos));
                 writefln("step %d", i+1);
                 writefln("%dw", pos_count);
                 writefln(mpos.to_long_str());
                 writefln("Is white goal in %d", (shortest_goal - (i+1)));
-                writefln("Search found white goal in %d", gs.wgoal);
+                writefln("Search found white goal in %d",
+                        gs.shortest[Side.WHITE]);
                 writefln("\a");
                 return 0;
             }
             bpos = mpos.reverse();
             gs.set_start(bpos);
             gs.find_goals();
-            if (gs.bgoal != (shortest_goal - (i+1)))
+            if (gs.shortest[Side.BLACK] != (shortest_goal - (i+1)))
             {
                 writefln(shortest_move.to_move_str(pos));
                 writefln("step %d", i+1);
                 writefln("%dw", pos_count);
                 writefln(mpos.to_long_str());
                 writefln("Is black goal in %d", (shortest_goal - (i+1)));
-                writefln("Search found black goal in %d", gs.bgoal);
+                writefln("Search found black goal in %d",
+                        gs.shortest[Side.BLACK]);
                 writefln("\a");
                 return 0;
             }
