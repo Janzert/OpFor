@@ -160,6 +160,7 @@ int main(char[][] args)
                 writefln(mpos.to_long_str());
                 writefln("Is white goal in %d", (shortest_goal - (i+1)));
                 writefln("Search found white goal in %d", gs.wgoal);
+                writefln("\a");
                 return 0;
             }
             bpos = mpos.reverse();
@@ -173,6 +174,7 @@ int main(char[][] args)
                 writefln(mpos.to_long_str());
                 writefln("Is black goal in %d", (shortest_goal - (i+1)));
                 writefln("Search found black goal in %d", gs.bgoal);
+                writefln("\a");
                 return 0;
             }
             Position.free(bpos);
@@ -181,6 +183,7 @@ int main(char[][] args)
         StepList.free(shortest_move);
     }
 
+    writefln("\a");
     return 0;
 }
 

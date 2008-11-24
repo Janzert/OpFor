@@ -221,14 +221,17 @@ class GoalSearchDT
                     && ((start.lastpiece + enemyoffset)
                         > start.pieces[gix]))
             {
-                if (back_bit & start.bitBoards[myrabbit]
-                        & ~start.frozen)
+                if ((back_bit & start.bitBoards[myrabbit])
+                        && ((back_bit & ~start.frozen)
+                            || !(bneighbors & start.placement[side^1]
+                                & ~start.bitBoards[erabbit] & ~gbit)))
                     return 2;
                 ulong bn_rabbits = bneighbors & start.bitBoards[myrabbit];
                 if (bn_rabbits & ~start.frozen)
                 {
                     if (!(bneighbors & start.placement[side^1]
-                                & ~start.bitBoards[erabbit])
+                                & ~start.bitBoards[erabbit]
+                                & ~gbit)
                             || popcount(bneighbors
                                 & start.placement[side]) > 1)
                         return 3;
@@ -796,8 +799,8 @@ class GoalSearchDT
                 return shortest_goal;
             if (back_bit & start.bitBoards[myrabbit])
             {
-                if (neighbors_of(neighbors_of(side_neighbors
-                                & start.placement[side])
+                ulong side_friendlies = side_neighbors & start.placement[side];
+                if (neighbors_of(neighbors_of(side_friendlies)
                             & start.placement[side])
                         & start.bitBoards[Piece.EMPTY]
                         && (back_bit & ~neighbors_of(start.placement[side^1]
@@ -807,12 +810,21 @@ class GoalSearchDT
                 {
                     return 4;
                 }
-                ulong pushed = neighbors_of(side_neighbors
-                        & start.placement[side])
+                if ((neighbors_of(side_friendlies)
+                            & start.bitBoards[Piece.EMPTY])
+                        && (neighbors_of(bneighbors
+                                & start.bitBoards[Piece.EMPTY])
+                            & start.placement[side]
+                            & ~start.frozen & ~back_bit))
+                {
+                    return 4;
+                }
+                ulong pushed = neighbors_of(side_friendlies)
                     & start.placement[side^1]
                             & neighbors_of(start.bitBoards[Piece.EMPTY]);
-                if (back_bit & neighbors_of(start.placement[side^1]
+                if ((back_bit & neighbors_of(start.placement[side^1]
                             & ~start.bitBoards[erabbit]))
+                        && (popcount(bneighbors & start.placement[side]) < 2))
                     pushed &= bneighbors;
                 while (pushed)
                 {
@@ -979,10 +991,17 @@ class GoalSearchDT
                                 & neighbors_of(unfreezers))
                                 || popcount(pbn) > 1))
                         return NOT_FOUND;
-                    if (pbn & ~((TRAPS | neighbors_of(start.placement[side^1]
+                    // make sure rabbit doesn't freeze and unfreezer doesn't
+                    // get trapped
+                    if ((pbn & ~((TRAPS | neighbors_of(start.placement[side^1]
                                         & ~start.bitBoards[erabbit]))
                                 & ~neighbors_of(start.placement[side]
                                     & ~unfreezers & ~prabbits)))
+                            && ((neighbors_of(unfreezers) & bneighbors
+                                    & start.bitBoards[Piece.EMPTY]
+                                    & ~pbn) & ~(TRAPS
+                                        & ~neighbors_of(start.placement[side]
+                                            & ~unfreezers))))
                     {
                         return 4;
                     }
@@ -1125,8 +1144,34 @@ class GoalSearchDT
                         shortest_goal = 4;
                     }
                     ulong orn = neighbors_of(bn_rabbits)
-                        & start.placement[side^1]
-                        & neighbors_of(start.placement[side]
+                        & start.placement[side^1];
+                    if (start.lastpiece != Piece.EMPTY
+                            && (neighbors_of(orn) & (1UL << start.lastfrom)))
+                    {
+                        ulong lfbit = 1UL << start.lastfrom;
+                        ulong potentials = orn & neighbors_of(lfbit);
+                        while (potentials)
+                        {
+                            ulong pbit = potentials & -potentials;
+                            potentials ^= pbit;
+                            bitix pix = bitindex(pbit);
+                            if (start.lastpiece + enemyoffset
+                                    < start.pieces[pix])
+                                continue;
+                            if ((bn_rabbits &
+                                    ~neighbors_of(start.placement[side^1]
+                                        & ~start.bitBoards[erabbit]
+                                        & ~pbit))
+                                    && ((lfbit & ~bneighbors)
+                                        || popcount(bneighbors
+                                            & start.placement[side]) > 1))
+                            {
+                                shortest_goal = 4;
+                                break;
+                            }
+                        }
+                    }
+                    orn &= neighbors_of(start.placement[side]
                                 & ~start.bitBoards[myrabbit]
                                 & ~start.frozen);
                     while (orn && shortest_goal == NOT_FOUND)
@@ -1373,7 +1418,6 @@ class GoalSearchDT
                             }
                         }
                     }
-
                 }
                 ulong friendly_bn = bneighbors & start.placement[side]
                     & neighbors_of(start.bitBoards[myrabbit])
@@ -1406,8 +1450,9 @@ class GoalSearchDT
                         ulong prb = prabbits & -prabbits;
 
                         ulong prb_neighbors = neighbors_of(prb);
-                        if (!(prb_neighbors & start.placement[side^1]
-                                    & ~start.bitBoards[erabbit])
+                        if (!((prb & TRAPS) || (prb_neighbors
+                                        & start.placement[side^1]
+                                        & ~start.bitBoards[erabbit]))
                                 || popcount(prb_neighbors
                                     & start.placement[side]) > 1)
                             return 4;
@@ -1415,7 +1460,7 @@ class GoalSearchDT
                     }
                 }
             } else {
-                // there are a mix of friendly and enemy pieces
+                // there are a mix of friendly and enemy pieces around back bit
                 int shortest_goal = NOT_FOUND;
                 ulong bn_rabbits = bneighbors & start.bitBoards[myrabbit];
                 if ((bn_rabbits & ~start.frozen)
@@ -1493,10 +1538,15 @@ class GoalSearchDT
                                     {
                                         shortest_goal = 4;
                                     }
-                                    else if (neighbors_of(neighbors_of(rbit)
-                                                & start.bitBoards[Piece.EMPTY])
-                                            & start.placement[side]
-                                            & ~start.frozen)
+                                    else if ((empty & ~(TRAPS
+                                                    & ~neighbors_of(
+                                                        start.placement[side]
+                                                        & ~fneb)))
+                                            && (neighbors_of(neighbors_of(rbit)
+                                                    & start.bitBoards[Piece.EMPTY])
+                                                & start.placement[side]
+                                                & ~start.frozen
+                                                & ~rbit))
                                     {
                                         shortest_goal = 4;
                                     }
@@ -1706,7 +1756,8 @@ class GoalSearchDT
                             } else {
                                 ulong unfsqs = neighbors_of(unfreezers)
                                     & neighbors_of(rbit)
-                                    & start.bitBoards[Piece.EMPTY];
+                                    & start.bitBoards[Piece.EMPTY]
+                                    & ~back_bit;
                                 if (unfsqs & ~(TRAPS
                                             | neighbors_of(
                                                 start.placement[side^1]
@@ -1795,7 +1846,7 @@ class GoalSearchDT
                             bitix unfsqix = bitindex(unfsqb);
                             bitix unfpix = bitindex(unfp);
                             if (start.pieces[unfpix] + enemyoffset
-                                    >= start.pieces[unfsqix])
+                                    >= start.strongest[side^1][unfsqix])
                             {
                                 shortest_goal = 4;
                                 break;
@@ -1833,7 +1884,7 @@ class GoalSearchDT
                                     shortest_goal = 4;
                                     break;
                                 }
-                                if (!(rb_neighbors & start.placement[side]
+                                if (!(rb_neighbors & start.placement[side^1]
                                             & ~start.bitBoards[erabbit]
                                             & ~obit)
                                         && (neighbors_of(pbit)
@@ -1878,8 +1929,10 @@ class GoalSearchDT
                         assert (popcount(rabbits) == 1);
                         // can an unfreezer move first?
                         if (!(rabbits & TRAPS)
-                                && !(rn & start.placement[side^1]
+                                && (!(rn & start.placement[side^1]
                                     & ~start.bitBoards[erabbit])
+                                    || popcount(rn
+                                        & start.placement[side]) > 1)
                                 && (unfreezers & neighbors_of(en
                                         & start.bitBoards[Piece.EMPTY])))
                         {
@@ -1898,9 +1951,9 @@ class GoalSearchDT
                             }
                             // get rid of unfreezers that are captured when the
                             // rabbit moves
-                            unfreezers &= TRAPS
-                                & ~neighbors_of(start.placement[side]
-                                    & ~rabbits);
+                            unfreezers &= ~(TRAPS
+                                    & ~neighbors_of(start.placement[side]
+                                        & ~rabbits));
                             while (unfreezers)
                             {
                                 ulong unfbit = unfreezers & -unfreezers;
@@ -2013,8 +2066,8 @@ class GoalSearchDT
                 return 2;
             ulong obn = bneighbors & start.placement[side^1];
             ulong frbn = obn & ~start.bitBoards[erabbit];
-            if (popcount(frbn) == 1 && (neighbors_of(frbn)
-                        & (1UL << start.lastfrom)))
+            if (popcount(frbn) == 1 && start.lastpiece != Piece.EMPTY
+                    && (neighbors_of(frbn) & (1UL << start.lastfrom)))
             {
                 bitix frix = bitindex(frbn);
                 if (start.lastpiece + enemyoffset
@@ -2195,6 +2248,7 @@ class GoalSearchDT
                     }
                 }
             } // while (enebn)
+            ulong lfbit = 1UL << start.lastfrom;
             while (obn)
             {
                 ulong o_bit = obn & -obn;
@@ -2202,6 +2256,41 @@ class GoalSearchDT
                 bitix oix = bitindex(o_bit);
 
                 ulong o_neighbors = neighbors_of(o_bit);
+                // check to see if pieces is getting pulled away
+                if ((o_neighbors & lfbit)
+                        && start.lastpiece + enemyoffset > start.pieces[oix])
+                {
+                    // can a piece move in and unfreeze once o_bit is gone
+                    ulong fon = o_neighbors & start.placement[side];
+                    if ((fon & ~start.frozen)
+                            || (fon & ~neighbors_of(start.placement[side^1]
+                                    & ~start.bitBoards[erabbit]
+                                    & ~o_bit)))
+                    {
+                        return 3;
+                    }
+                    while (fon)
+                    {
+                        ulong fbit = fon & -fon;
+                        fon ^= fbit;
+                        bitix fix = bitindex(fbit);
+                        ulong ofn = neighbors_of(fbit)
+                            & start.placement[side^1]
+                            & ~start.bitBoards[erabbit]
+                            & ~o_bit;
+                        while (ofn)
+                        {
+                            ulong ofbit = ofn & -ofn;
+                            bitix ofix = bitindex(ofbit);
+                            if (start.pieces[fix] + enemyoffset
+                                    < start.pieces[ofix])
+                                break;
+                            ofn ^= ofbit;
+                        }
+                        if (!ofn)
+                            return 3;
+                    }
+                }
                 if (start.pieces[oix] < start.strongest[side][oix]
                         + enemyoffset)
                 {
@@ -2235,21 +2324,24 @@ class GoalSearchDT
                             // neighbor that can move out of the way
                             ulong clear = neighbors_of(o_bit)
                                 & start.placement[side]
-                                & ~p_bit & ~back_bit
-                                & neighbors_of(start.bitBoards[Piece.EMPTY]);
+                                & ~p_bit & ~back_bit;
                             if (clear)
                             {
-                                // can we pull to neighbor the clear piece so
-                                // it can step in and unfreeze the rabbit
-                                if (clear & neighbors_of(
-                                            neighbors_of(p_bit)
-                                            & start.bitBoards[Piece.EMPTY]))
+                                // can a clear piece for sure move away
+                                if (clear & ~start.frozen
+                                        & ~start.bitBoards[myrabbit]
+                                        & neighbors_of(start.bitBoards[Piece.EMPTY]))
                                 {
                                     shortest_goal = 4;
                                     continue;
                                 }
-                                clear &= ~start.frozen;
-                                if (clear & ~start.bitBoards[myrabbit])
+                                // can a clear piece for sure move in if we
+                                // pull away
+                                ulong pb_empties = neighbors_of(p_bit) &
+                                    start.bitBoards[Piece.EMPTY];
+                                if (((clear & ~start.frozen)
+                                            && pb_empties)
+                                        || (clear & neighbors_of(pb_empties)))
                                 {
                                     shortest_goal = 4;
                                     continue;
@@ -2258,9 +2350,31 @@ class GoalSearchDT
                                 {
                                     ulong cbit = clear & -clear;
                                     clear ^= cbit;
-                                    if (neighbors_of(cbit)
-                                            & ~backward(cbit, side)
-                                            & start.bitBoards[Piece.EMPTY])
+                                    // the only unfrozens can be rabbits
+                                    if (cbit & ~start.frozen
+                                            & neighbors_of(
+                                                start.bitBoards[Piece.EMPTY]
+                                                & ~backward(cbit, side)))
+                                    {
+                                        shortest_goal = 4;
+                                        break;
+                                    }
+                                    // will it unfreeze after o_bit is pulled
+                                    ulong freezers = neighbors_of(cbit)
+                                        & start.placement[side^1]
+                                        & ~start.bitBoards[erabbit]
+                                        & ~o_bit;
+                                    bitix cix = bitindex(cbit);
+                                    while (freezers)
+                                    {
+                                        ulong fbit = freezers & -freezers;
+                                        bitix fix = bitindex(fbit);
+                                        if (start.pieces[cix] + enemyoffset
+                                                < start.pieces[fix])
+                                            break;
+                                        freezers ^= fbit;
+                                    }
+                                    if (!freezers)
                                     {
                                         shortest_goal = 4;
                                         break;
