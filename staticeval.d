@@ -967,7 +967,7 @@ class StaticEval
         int score = 0;
         for (Side s = Side.WHITE; s <= Side.BLACK; s++)
         {
-            if (goals.shortest[s])
+            if (goals.shortest[s] != goals.NOT_FOUND)
             {
                 uint dsteps = 4;
                 uint extrasteps = goals.shortest[s];
@@ -1017,7 +1017,7 @@ class StaticEval
         this.pos = pos;
         goals.set_start(pos);
         goals.find_goals();
-        if (goals.shortest[pos.side]
+        if ((goals.shortest[pos.side] != goals.NOT_FOUND)
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
             return WIN_SCORE - goals.shortest[pos.side];
@@ -1055,7 +1055,7 @@ class StaticEval
         this.pos = pos;
         goals.set_start(pos);
         goals.find_goals();
-        if (goals.shortest[pos.side]
+        if ((goals.shortest[pos.side] != goals.NOT_FOUND)
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
             logger.log("Found goal in %d steps", goals.shortest[pos.side]);
