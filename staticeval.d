@@ -14,7 +14,7 @@ class StaticEval
 
     Position pos;
     FastFAME fame;
-    GoalSearch goals;
+    GoalSearchDT goals;
     TrapGenerator trap_search;
 
     ulong[2] safe_traps;
@@ -37,7 +37,7 @@ class StaticEval
     real blockade_w = 1;
     real hostage_w = 1;
 
-    this(Logger l, GoalSearch g, TrapGenerator t)
+    this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
         logger = l;
         goals = g;
@@ -462,22 +462,19 @@ class StaticEval
                 power *= side_mul[s];
                 power -= power_balance;
 
-                int goalsteps = goals.board_depth[rix];
-                goalsteps = (goalsteps < 16) ? goalsteps : 16;
-
                 if (power <= 0)
                 {
                     real sfactor = -power / full_weak;
                     sfactor = (sfactor < 1) ? sfactor : 1;
                     debug (rabbit_strength)
                     {
-                        writefln("weak r at %s, gs %d, pf %.2f", ix_to_alg(rix), goalsteps, sfactor);
+                        writefln("weak r at %s, pf %.2f", ix_to_alg(rix), sfactor);
                     }
-                    wscore += weakval[s][rix/8] * weakgoal[goalsteps] * sfactor;
+                    wscore += weakval[s][rix/8] * sfactor;
                 } else {
                     power = (power < full_strong) ? power : full_strong;
                     real rv = rankval[s][rix/8];
-                    real rval = power * rv * goalval[goalsteps];
+                    real rval = power * rv * goalval[16];
                     if (rbit & TRAPS)
                         rval /= 2;
                     uint rfile = rix % 8;
@@ -963,33 +960,52 @@ class StaticEval
         const real[] DEFENSE_STEPS = [1.0, 0.8, 0.66, 0.5, 0.33];
         const real[] DEFENSE_NUM = [1.0, 0.8, 0.5, 0.2, 0.1, 0.1, 0.05, 0.01, 0.01];
         const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
+        const ulong MIDDLE_SECTOR = 0x181818;
+        const ulong[] GOAL_RANK = [RANK_8, RANK_1];
         const int[] SIDE_MUL = [1, -1];
 
         int score = 0;
         for (Side s = Side.WHITE; s <= Side.BLACK; s++)
         {
-            if (goals.goals_found[s])
+            if (goals.shortest[s])
             {
                 uint dsteps = 4;
-                uint extrasteps = goals.goal_depth[s][0];
+                uint extrasteps = goals.shortest[s];
                 if (s == pos.side)
                     extrasteps -= pos.stepsLeft;
                 else
                     dsteps = pos.stepsLeft;
 
-                uint rfile = goals.rabbit_location[s][0] % 8;
-                ulong sector;
-                if (rfile < 6)
-                    sector = DEFENSE_SECTORS[1];
-                if (rfile > 1)
-                    sector |= DEFENSE_SECTORS[0];
+                int sector_shift = 0;
                 ulong orabbits = pos.bitBoards[Piece.WRABBIT];
                 if (s == Side.WHITE)
                 {
-                    sector <<= 40;
+                    sector_shift = 40;
                     orabbits = pos.bitBoards[Piece.BRABBIT];
                 }
-                uint defender_num = popcount(sector & pos.placement[s^1] & ~orabbits);
+                ulong defenders = pos.placement[s^1] & ~orabbits;
+                int defender_num;
+                if (goals.goal_squares & ~(MIDDLE_SECTOR << sector_shift) & GOAL_RANK[s])
+                {
+                    ulong sector = DEFENSE_SECTORS[0] << sector_shift;;
+                    int[2] sector_defenders;
+                    if (goals.goal_squares & sector & GOAL_RANK[s])
+                    {
+                        sector_defenders[0] = popcount(sector & defenders);
+                    } else {
+                        sector_defenders[0] = 8;
+                    }
+                    sector = DEFENSE_SECTORS[1] << sector_shift;
+                    if (goals.goal_squares & sector & GOAL_RANK[s])
+                    {
+                        sector_defenders[1] = popcount(sector & defenders);
+                    } else {
+                        sector_defenders[1] = 8;
+                    }
+                    defender_num = sector_defenders[0] < sector_defenders[1] ? sector_defenders[0] : sector_defenders[1];
+                } else {
+                    defender_num = defenders & (0xFFFFFF << sector_shift);
+                }
                 score += GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s];
             }
         }
@@ -1000,11 +1016,11 @@ class StaticEval
     {
         this.pos = pos;
         goals.set_start(pos);
-        goals.find_goals(16);
-        if (goals.goals_found[pos.side]
-                && goals.goal_depth[pos.side][0] <= pos.stepsLeft)
+        goals.find_goals();
+        if (goals.shortest[pos.side]
+                && goals.shortest[pos.side] <= pos.stepsLeft)
         {
-            return WIN_SCORE - goals.goal_depth[pos.side][0];
+            return WIN_SCORE - goals.shortest[pos.side];
         }
 
         int pop = population(pos);
@@ -1038,12 +1054,12 @@ class StaticEval
     {
         this.pos = pos;
         goals.set_start(pos);
-        goals.find_goals(16);
-        if (goals.goals_found[pos.side]
-                && goals.goal_depth[pos.side][0] <= pos.stepsLeft)
+        goals.find_goals();
+        if (goals.shortest[pos.side]
+                && goals.shortest[pos.side] <= pos.stepsLeft)
         {
-            logger.log("Found goal in %d steps", goals.goal_depth[pos.side][0]);
-            return WIN_SCORE - goals.goal_depth[pos.side][0];
+            logger.log("Found goal in %d steps", goals.shortest[pos.side]);
+            return WIN_SCORE - goals.shortest[pos.side];
         }
 
         int pop = population(pos);

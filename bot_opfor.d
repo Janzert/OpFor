@@ -81,20 +81,20 @@ struct PositionRecord
 
 class FullSearch : ABSearch
 {
-    GoalSearch goal_searcher;
+    GoalSearchDT goal_searcher;
     StaticEval evaluator;
 
     ulong nodes_quiesced = 0;
-    
+
     int max_qdepth = -16;
     int do_qsearch = 1;
 
     int qdepth;
-    
+
     this(Logger l)
     {
         super(l);
-        goal_searcher = new GoalSearch();
+        goal_searcher = new GoalSearchDT();
         evaluator = new StaticEval(l, goal_searcher, trap_search);
     }
 
@@ -103,7 +103,7 @@ class FullSearch : ABSearch
         super.prepare();
         nodes_quiesced = 0;
     }
-    
+
     bool set_option(char[] option, char[] value)
     {
         bool handled = true;
@@ -203,7 +203,7 @@ class FullSearch : ABSearch
                 sflag = SType.EXACT;
             }
         }
-        
+
         StepList steps = StepList.allocate();
         if (!pos.inpush)
         {
