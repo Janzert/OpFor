@@ -8,6 +8,32 @@ import logging;
 import position;
 import trapmoves;
 
+struct SCNode
+{
+    ulong zobrist;
+    int score;
+}
+
+class ScoreCache
+{
+    SCNode[] cache;
+
+    this(int size)
+    {
+        cache.length = size;
+    }
+
+    void set_size(int size)
+    {
+        cache.length = size;
+    }
+
+    SCNode* get(Position pos)
+    {
+        return &cache[pos.zobrist % cache.length];
+    }
+}
+
 class StaticEval
 {
     Logger logger;
@@ -20,6 +46,8 @@ class StaticEval
     ulong[2] safe_traps;
     ulong[2] active_traps;
     int[64] pstrengths;
+
+    ScoreCache sc_cache;
 
     real map_e_w = 2;
     real tsafety_w = 1;
@@ -43,6 +71,7 @@ class StaticEval
         goals = g;
         trap_search = t;
         fame = new FastFAME(0.1716);
+        sc_cache= new ScoreCache(200000);
     }
 
     bool set_option(char[] option, char[] value)
@@ -94,6 +123,9 @@ class StaticEval
                 break;
             case "eval_hostage":
                 hostage_w = toReal(value);
+                break;
+            case "eval_cache_size":
+                sc_cache.set_size(toInt(value));
                 break;
             default:
                 handled = false;
@@ -169,7 +201,7 @@ class StaticEval
             Piece tpiece = pos.pieces[tix];
             Side tside = (tpiece > Piece.WELEPHANT) ? Side.BLACK : Side.WHITE;
             int pieceoffset = (tside == Side.WHITE) ? 6 : -6;
-            
+
             if (pos.strongest[tside][tix] == Piece.WELEPHANT+pieceoffset
                     || popcount(pos.placement[tside] & tneighbors) > 1)
             {
@@ -379,7 +411,7 @@ class StaticEval
         const static int[] side_mul = [1, -1];
         const static ulong[][] side_rank = [[RANK_1, RANK_2], [RANK_8, RANK_7]];
         const static int FIRST_ROW = 3;
-        
+
         int score = 0;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
@@ -411,7 +443,7 @@ class StaticEval
               0.5, 0.6, 0.7, 0.8,
               1, 1, 1, 1,
               1, 1, 1, 1];
-        const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0], 
+        const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0],
              [0, 30, 40, 35, 30, 15, 0, 0]];
         const static int power_balance = 1000;
         const static real full_weak = 6000;
@@ -523,7 +555,7 @@ class StaticEval
               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
         const static int MAX_POWER = 4400; // == pieceval[Piece.WELEPHANT] * distval[0] * pmul;
         const static int MIN_POWER = -4400; // == pieceval[Piece.BELEPHANT] * distval[0] * pmul;
-        
+
         bitix[16] ixs;
         int value[16];
         Piece piece[16];
@@ -920,7 +952,7 @@ class StaticEval
                     } else {
                         val = valuable_value[i] * max_victim_per;
                     }
-                        
+
                     score -= val;
                 }
             }
@@ -1014,6 +1046,11 @@ class StaticEval
 
     int static_eval(Position pos)
     {
+        // check if the score is cached for this position
+        SCNode* sc_entry = sc_cache.get(pos);
+        if (sc_entry.zobrist == pos.zobrist)
+            return sc_entry.score;
+
         this.pos = pos;
         goals.set_start(pos);
         goals.find_goals();
@@ -1047,6 +1084,10 @@ class StaticEval
 
         // clamp the evaluation to be less than a win
         score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;
+
+        // Enter the score into the cache
+        sc_entry.zobrist = pos.zobrist;
+        sc_entry.score = score;
         return score;
     }
 
