@@ -581,14 +581,16 @@ class Engine : AEIEngine
                 }
                 if (search_depth > next_pos.last_depth)
                 {
-                    score = -searcher.alphabeta(pos, search_depth, -(best_score+1), -best_score);
+                    ulong sd = next_pos.last_depth;
+                    while (sd < search_depth)
+                        score = -searcher.alphabeta(pos, ++sd, -(best_score+1), -best_score);
                 } else {
                     score = next_pos.last_score;
                     search_depth = next_pos.last_depth;
                 }
             } else {
-                score = best_score + 1;
-                search_depth = depth - 1;
+                score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
+                search_depth = depth;
             }
 
             while (search_depth < depth
@@ -596,6 +598,8 @@ class Engine : AEIEngine
             {
                 score = -searcher.alphabeta(pos, ++search_depth, MIN_SCORE, -best_score);
             }
+            if (score != -ABORT_SCORE && score > best_score)
+                score = -searcher.alphabeta(pos, depth, MIN_SCORE, MAX_SCORE);
             if (score != -ABORT_SCORE)
             {
                 next_pos.last_score = score;
@@ -622,7 +626,7 @@ class Engine : AEIEngine
                 if (opening_book[key].position_key == pos.zobrist
                         && opening_book[key].total_seen)
                 {
-                    int val = (opening_book[key].gold_wins - 
+                    int val = (opening_book[key].gold_wins -
                             (opening_book[key].total_seen - opening_book[key].gold_wins)) * 10;
                     if (pos.side == Side.BLACK)
                         val = -val;
@@ -667,7 +671,7 @@ class Engine : AEIEngine
             if (score > best_score)
             {
                 best_score = score;
-                
+
                 if (next_pos !is pos_list)
                 {
                     PositionNode n = next_pos;
@@ -722,7 +726,7 @@ class Engine : AEIEngine
         TTNode* n = searcher.ttable.get(pos);
         for (int pvdepth = 0; pvdepth < depth * 2; pvdepth++)
         {
-            if (n.zobrist != pos.zobrist 
+            if (n.zobrist != pos.zobrist
                 || (n.beststep.frombit == 0 && n.beststep.tobit == 0))
             {
                 break;
@@ -872,7 +876,7 @@ int main(char[][] args)
 
     int tc_target_length = 0; // used to set different thinking times than the game timecontrol
     int tc_max_length = 0;
-    
+
     d_time search_time = 0;
     d_time search_max = 0;
     int search_num = 0;
@@ -962,7 +966,7 @@ int main(char[][] args)
                         real reserve_fill = cast(real)myreserve / maxuse;
                         tc_min_search = cast(int)(tc_permove * tc_min_search_per);
                         tc_min_search += cast(int)((tc_permove * (1-tc_min_search_per)) * reserve_fill);
-                        
+
                         tc_max_search = tc_permove + myreserve;
                         if (tc_maxmove && (tc_max_search > tc_maxmove))
                         {
