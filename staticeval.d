@@ -153,12 +153,12 @@ class StaticEval
             ulong neighbors = neighbors_of(trap);
             int trap_safe = 0;
             if (!(active_traps[Side.BLACK] & trap)
-                    || neighbors & pos.bitBoards[Piece.WELEPHANT]
-                    || (popcount(neighbors & pos.placement[Side.WHITE]) > 1))
+                    && (neighbors & pos.bitBoards[Piece.WELEPHANT]
+                        || popcount(neighbors & pos.placement[Side.WHITE]) > 1))
                 trap_safe |= 1;
             if (!(active_traps[Side.WHITE] & trap)
-                    || neighbors & pos.bitBoards[Piece.BELEPHANT]
-                    || (popcount(neighbors & pos.placement[Side.BLACK]) > 1))
+                    && (neighbors & pos.bitBoards[Piece.BELEPHANT]
+                        || popcount(neighbors & pos.placement[Side.BLACK]) > 1))
                 trap_safe |= 2;
             switch (trap_safe)
             {
