@@ -136,8 +136,8 @@ class StaticEval
     int trap_safety()
     {
         static const int[] BOTH_SAFE = [-1, 1];
-        static const int[] WHITE_SAFE = [2, 5];
-        static const int[] BLACK_SAFE = [-5, -2];
+        static const int[] WHITE_SAFE = [2, 10];
+        static const int[] BLACK_SAFE = [-10, -2];
 
         int score = 0;
 
@@ -148,16 +148,34 @@ class StaticEval
         {
             ulong trap = traps & -traps;
             traps ^= trap;
+            bitix tix = bitindex(trap);
             Side tside = (trap > TRAP_C3) ? Side.BLACK : Side.WHITE;
 
             ulong neighbors = neighbors_of(trap);
+            int[2] n_pop;
+            n_pop[Side.WHITE] = popcount(neighbors & pos.placement[Side.WHITE]);
+            n_pop[Side.BLACK] = popcount(neighbors & pos.placement[Side.BLACK]);
+            Piece[2] strongest_near;
+            strongest_near[Side.WHITE] = strongest_near[Side.BLACK] = Piece.EMPTY;
+            while (neighbors)
+            {
+                ulong nbit = neighbors & -neighbors;
+                neighbors ^= nbit;
+                bitix nix = bitindex(nbit);
+                if (pos.strongest[Side.WHITE][nix] > strongest_near[Side.WHITE])
+                    strongest_near[Side.WHITE] = pos.strongest[Side.WHITE][nix];
+                if (pos.strongest[Side.BLACK][nix] > strongest_near[Side.BLACK])
+                    strongest_near[Side.BLACK] = pos.strongest[Side.BLACK][nix];
+            }
             int trap_safe = 0;
             if (!(active_traps[Side.BLACK] & trap)
-                    && (neighbors & pos.bitBoards[Piece.WELEPHANT]
+                    && pos.strongest[Side.WHITE][tix] != Piece.EMPTY
+                    && (pos.strongest[Side.WHITE][tix] + 6 >= strongest_near[Side.BLACK]
                         || popcount(neighbors & pos.placement[Side.WHITE]) > 1))
                 trap_safe |= 1;
             if (!(active_traps[Side.WHITE] & trap)
-                    && (neighbors & pos.bitBoards[Piece.BELEPHANT]
+                    && pos.strongest[Side.BLACK][tix] != Piece.EMPTY
+                    && (pos.strongest[Side.BLACK][tix] - 6 >= strongest_near[Side.WHITE]
                         || popcount(neighbors & pos.placement[Side.BLACK]) > 1))
                 trap_safe |= 2;
             switch (trap_safe)
