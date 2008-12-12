@@ -467,7 +467,19 @@ class GoalSearchDT
                         ulong pn = neighbors_of(pbit) & bneighbors & ~gbit;
                         if (!(neighbors_of(pn) & start.bitBoards[Piece.EMPTY]
                                     & ~pbit))
+                        {
+                            if ((neighbors_of(pbit)
+                                        & start.bitBoards[Piece.EMPTY])
+                                    && !(bneighbors & start.placement[side^1]
+                                        & ~start.bitBoards[erabbit]
+                                        & ~pn)
+                                    && (start.pieces[gix] + enemyoffset >
+                                        start.strongest[side^1][pix]))
+                            {
+                                return 4;
+                            }
                             continue;
+                        }
                         bitix pnix = bitindex(pn);
                         if (start.pieces[gix] + enemyoffset
                                 > start.pieces[pnix])
@@ -569,7 +581,13 @@ class GoalSearchDT
                     // one neighbor is the goal, one is the rabbit,
                     // one is the freezing piece so there can only be one empty
                     ulong bn_empty = bneighbors & start.bitBoards[Piece.EMPTY];
-                    if (bn_empty && (gbit & ~start.frozen))
+                    if ((bn_empty & ~(TRAPS &
+                                    ~neighbors_of(start.placement[side])))
+                            && (gbit & ~start.frozen))
+                    {
+                        return 4;
+                    }
+                    if (bn_empty & neighbors_of(empty_sides))
                     {
                         return 4;
                     }
@@ -897,9 +915,15 @@ class GoalSearchDT
                     return NOT_FOUND;
 
                 // if there's a place for us to go we can goal
-                if (bneighbors & start.bitBoards[Piece.EMPTY]
-                        & ~(TRAPS & ~neighbors_of(start.placement[side])))
-                    return 4;
+                ulong to = bneighbors & start.bitBoards[Piece.EMPTY];
+                if (to)
+                {
+                    if (to & ~(TRAPS & ~neighbors_of(start.placement[side])))
+                        return 4;
+                    if (!(bneighbors & start.placement[side^1]
+                                & ~start.bitBoards[erabbit]))
+                        return 4;
+                }
             }
         }
         return NOT_FOUND;
@@ -1107,6 +1131,7 @@ class GoalSearchDT
                                     & neighbors_of(bneighbors
                                             & start.bitBoards[Piece.EMPTY]
                                             & ~bnb);
+                        assert(!(punfreezers & ~start.frozen));
                         while (punfreezers)
                         {
                             ulong punb = punfreezers & -punfreezers;
@@ -1117,7 +1142,10 @@ class GoalSearchDT
                                             start.placement[side] & ~punb)))
                                     && (bnb & ~(TRAPS & ~neighbors_of(
                                                 start.placement[side] & ~rbit
-                                                & ~punb))))
+                                                & ~punb)))
+                                    && (bnb & ~neighbors_of(
+                                            start.placement[side]
+                                            & ~start.bitBoards[erabbit])))
                             {
                                 return 4;
                             }
@@ -1460,15 +1488,44 @@ class GoalSearchDT
                     // if there are any completely safe then we know for sure
                     if (potentials & ~(TRAPS
                                 | neighbors_of(start.placement[side^1]
-                                    & ~start.bitBoards[erabbit])))
+                                    & ~start.bitBoards[erabbit]))
+                            & ~neighbors_of(neighbors_of(start.placement[side]
+                                    & TRAPS & neighbors_of(empty_bn
+                                        & (TRAPS | neighbors_of(
+                                                start.placement[side^1]
+                                                & ~start.bitBoards[erabbit]))))
+                                & start.placement[side]))
+                    {
                         return 4;
+                    }
                     while (potentials)
                     {
                         ulong pbit = potentials & -potentials;
                         potentials ^= pbit;
 
-                        if (popcount(neighbors_of(pbit)
-                                    & start.placement[side]) > 1)
+                        if ((pbit & (TRAPS
+                                        | neighbors_of(start.placement[side^1]
+                                            & ~start.bitBoards[erabbit])))
+                                && popcount(neighbors_of(pbit)
+                                    & start.placement[side]) < 2)
+                            continue;
+                        ulong prabbits = neighbors_of(pbit)
+                            & start.bitBoards[myrabbit] & ~start.frozen;
+                        if (prabbits & ~neighbors_of(start.placement[side]
+                                    & TRAPS & ebn_neighbors))
+                        {
+                            return 4;
+                        }
+                        assert (popcount(prabbits) == 1);
+                        ulong prh = neighbors_of(prabbits)
+                            & TRAPS & ebn_neighbors;
+                        ulong ebn = neighbors_of(prh) & neighbors_of(pbit)
+                            & bneighbors;
+                        if ((ebn & ~(TRAPS
+                                        | neighbors_of(start.placement[side^1]
+                                            & ~start.bitBoards[erabbit])))
+                                || (neighbors_of(prh) & start.placement[side]
+                                    & ~prabbits))
                         {
                             return 4;
                         }
@@ -2118,7 +2175,7 @@ class GoalSearchDT
                                         }
                                         if ((holder & bneighbors)
                                                 && !(bneighbors
-                                                    & start.placement[side]
+                                                    & start.placement[side^1]
                                                     & ~start.bitBoards[erabbit]
                                                     & ~holder))
                                         {
