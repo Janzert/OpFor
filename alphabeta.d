@@ -28,7 +28,7 @@ struct TTNode
 
     void set(Position pos, int newdepth, int newscore, SType newtype, Step newbstep)
     {
-        if (aged 
+        if (aged
                 || depth < newdepth
                 || zobrist == pos.zobrist)
         {
@@ -138,40 +138,40 @@ class HistoryHeuristic
 
 class KillerHeuristic
 {
-    const static int MAX_DEPTH = 20;
-    Step[2][2][MAX_DEPTH] steps;
-    uint[64][64][2][MAX_DEPTH] history;
-    uint[2][2][MAX_DEPTH] max_history;
+    const static int MAX_HEIGHT = 20;
+    Step[2][2][MAX_HEIGHT] steps;
+    uint[64][64][2][MAX_HEIGHT] history;
+    uint[2][2][MAX_HEIGHT] max_history;
 
-    void set_killer(int depth, Side side, Step step)
+    void set_killer(int height, Side side, Step step)
     {
-        int step_history = history[depth][side][step.fromix][step.toix]++;
-        if (step_history > max_history[depth][side][0])
+        int step_history = history[height][side][step.fromix][step.toix]++;
+        if (step_history > max_history[height][side][0])
         {
-            Step* first = &steps[depth][side][0];
+            Step* first = &steps[height][side][0];
             if (*first != step)
             {
                 if (first.frombit != 0 || first.tobit != 0)
                 {
-                    steps[depth][side][1] = *first;
-                    max_history[depth][side][1] = max_history[depth][side][0];
+                    steps[height][side][1] = *first;
+                    max_history[height][side][1] = max_history[height][side][0];
                 }
                 *first = step;
             }
-            max_history[depth][side][0] = step_history;
-        } else if (step_history > max_history[depth][side][1])
+            max_history[height][side][0] = step_history;
+        } else if (step_history > max_history[height][side][1])
         {
-            if (steps[depth][side][1] != step)
+            if (steps[height][side][1] != step)
             {
-                steps[depth][side][1] = step;
+                steps[height][side][1] = step;
             }
-            max_history[depth][side][1] = step_history;
+            max_history[height][side][1] = step_history;
         }
     }
 
     void age()
     {
-        for (int d=0; d < MAX_DEPTH; d++)
+        for (int d=0; d < MAX_HEIGHT; d++)
         {
             for (int s=0; s < 2; s++)
             {
@@ -239,7 +239,7 @@ class StepSorter
     static bool use_history = true;
     static bool capture_first = true;
 
-    int depth;
+    int height;
     Position pos;
     StepList steps;
     Step best;
@@ -259,9 +259,9 @@ class StepSorter
         init(d, p, b);
     }
 
-    void init(int d, Position p, Step* b)
+    void init(int h, Position p, Step* b)
     {
-        depth = d;
+        height = h;
         pos = p;
         steps = StepList.allocate();
         p.get_steps(steps);
@@ -296,7 +296,7 @@ class StepSorter
                     {
                         bix++;
                     }
-                    
+
                     if (bix < steps.numsteps)
                     {
                         steps.steps[bix] = steps.steps[0];
@@ -434,12 +434,12 @@ class StepSorter
                 }
                 stage++;
             case 2:
-                if (use_killers && !pos.inpush && depth < killers.MAX_DEPTH)
+                if (use_killers && !pos.inpush && height < killers.MAX_HEIGHT)
                 {
                     bool foundkiller = false;
                     while (sub_ix < 2)
                     {
-                        Step* possible = &killers.steps[depth][pos.side][sub_ix++];
+                        Step* possible = &killers.steps[height][pos.side][sub_ix++];
                         if (possible.frombit != 0 || possible.tobit != 0)
                         {
                             int bix = 0;
@@ -452,7 +452,7 @@ class StepSorter
                                 // step already searched
                                 continue;
                             }
-                            
+
                             if (bix < steps.numsteps)
                             {
                                 steps.steps[bix] = steps.steps[num];
@@ -504,7 +504,7 @@ class StepSorter
              default:
                 step = &steps.steps[num++];
         }
-        
+
         return step;
     }
 }
@@ -641,7 +641,7 @@ class ABSearch
                     sflag = SType.BETA;
                 }
             }
-            
+
             new_best.clear();
         } else {
             if (use_nmh && depth > 4 && !pos.inpush)
@@ -661,7 +661,7 @@ class ABSearch
                 if (score == -ABORT_SCORE
                         || score == ABORT_SCORE)
                     return ABORT_SCORE;
-                
+
                 if (null_score >= beta)
                     return null_score;
             }

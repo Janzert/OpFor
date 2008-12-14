@@ -1144,7 +1144,7 @@ class GoalSearchDT
                                                 start.placement[side] & ~rbit
                                                 & ~punb)))
                                     && (bnb & ~neighbors_of(
-                                            start.placement[side]
+                                            start.placement[side^1]
                                             & ~start.bitBoards[erabbit])))
                             {
                                 return 4;
@@ -1171,9 +1171,13 @@ class GoalSearchDT
                         return 3;
 
                     ulong unfsqs = ebnr_neighbors
-                        & start.bitBoards[Piece.EMPTY]
-                        & neighbors_of(start.placement[side]
-                                & ~start.frozen);
+                        & start.bitBoards[Piece.EMPTY];
+                    unfsqs &= neighbors_of(start.placement[side]
+                            & ~start.bitBoards[myrabbit]
+                            & ~start.frozen)
+                        | neighbors_of(start.bitBoards[myrabbit]
+                                & ~start.frozen
+                                & ~forward(unfsqs, side));
                     if (unfsqs)
                     {
                         if (unfsqs & ~(TRAPS
@@ -2096,10 +2100,12 @@ class GoalSearchDT
                         if (popcount(bneighbors & start.placement[side^1]
                                         & ~start.bitBoards[erabbit]) == 1)
                         {
-                            is_holder = fopn & neighbors_of(bneighbors
+                            is_holder = neighbors_of(bneighbors
                                     & start.placement[side^1]
                                     & ~start.bitBoards[erabbit]
-                                    & TRAPS);
+                                    & TRAPS) & start.placement[side^1];
+                            if ((is_holder & fopn) != is_holder)
+                                is_holder = 0;
                         }
                         if (popcount(fopn) == 1)
                         {
@@ -2395,11 +2401,11 @@ class GoalSearchDT
                                     & neighbors_of(forward(rabbits, side)));
                         if (unfreezers)
                         {
-                            if (unfreezers & ~en)
+                            if ((unfreezers & ~en)
+                                    || popcount(unfreezers) > 1)
                             {
                                 return 4;
                             }
-                            assert (popcount(unfreezers) == 1);
 
                             if (eb_safe || fnb_pop > 2)
                             {
@@ -3069,7 +3075,7 @@ class GoalSearchDT
                             & start.placement[side];
                         if (!(can_pull & ~start.frozen)
                                 && !(can_pull & ~neighbors_of(
-                                        start.placement[side]
+                                        start.placement[side^1]
                                         & ~start.bitBoards[erabbit]
                                         & ~o_bit)))
                         {
@@ -3484,7 +3490,7 @@ class GoalSearchDT
                         }
                     }
                     if ((neighbors_of(gbit) & start.bitBoards[Piece.EMPTY])
-                            && (!(bneighbors & start.placement[side]
+                            && (!(bneighbors & start.placement[side^1]
                                     & ~start.bitBoards[erabbit])
                                 || popcount(bneighbors
                                     & start.placement[side]) > 1))
