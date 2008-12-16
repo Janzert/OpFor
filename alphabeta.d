@@ -588,7 +588,7 @@ class ABSearch
         throw new Exception("eval must be implemented");
     }
 
-    int alphabeta(Position pos, int depth, int alpha, int beta)
+    int alphabeta(Position pos, int depth, int alpha, int beta, int height)
     {
         int score = MIN_SCORE;
         if (pos.is_endstate())
@@ -652,7 +652,7 @@ class ABSearch
                 n.do_step(NULL_STEP);
 
                 use_nmh = false;
-                int null_score = -alphabeta(n, depth-4, -beta, -alpha);
+                int null_score = -alphabeta(n, depth-4, -beta, -alpha, height+1);
                 use_nmh = true;
 
                 Position.free(n);
@@ -666,7 +666,7 @@ class ABSearch
                     return null_score;
             }
 
-            StepSorter sorted_steps = StepSorter.allocate(max_depth-depth, pos, prev_best);
+            StepSorter sorted_steps = StepSorter.allocate(height, pos, prev_best);
             if (sorted_steps.steps.numsteps == 0)
             {
                 // immobilized
@@ -698,12 +698,12 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha);
+                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha, height+1);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            first_val = alphabeta(npos, depth-2, alpha, alpha+1);
+                            first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1);
                         }
                         use_lmr = true;
                     } else {
@@ -718,12 +718,12 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            cal = -alphabeta(npos, depth-1, -beta, -alpha);
+                            cal = -alphabeta(npos, depth-1, -beta, -alpha, height+1);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            cal = alphabeta(npos, depth-1, alpha, beta);
+                            cal = alphabeta(npos, depth-1, alpha, beta, height+1);
                         }
                     } else {
                         cal = first_val;
@@ -761,7 +761,7 @@ class ABSearch
             if (sflag != SType.ALPHA && !pos.inpush)
             {
                 cuthistory.update(pos, new_best, depth);
-                killers.set_killer(max_depth-depth, pos.side, new_best);
+                killers.set_killer(height, pos.side, new_best);
             }
 
             StepSorter.free(sorted_steps);
@@ -793,7 +793,7 @@ class ABSearch
             if (guess == lowerbound)
                 beta = guess + 1;
 
-            guess = alphabeta(pos, depth, beta-1, beta);
+            guess = alphabeta(pos, depth, beta-1, beta, 0);
             if (guess < beta)
                 upperbound = guess;
             else

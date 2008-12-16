@@ -583,23 +583,23 @@ class Engine : AEIEngine
                 {
                     ulong sd = next_pos.last_depth;
                     while (sd < search_depth)
-                        score = -searcher.alphabeta(pos, ++sd, -(best_score+1), -best_score);
+                        score = -searcher.alphabeta(pos, ++sd, -(best_score+1), -best_score, 0);
                 } else {
                     score = next_pos.last_score;
                     search_depth = next_pos.last_depth;
                 }
             } else {
-                score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score);
+                score = -searcher.alphabeta(pos, depth, MIN_SCORE, -best_score, 0);
                 search_depth = depth;
             }
 
             while (search_depth < depth
                     && score > best_score)
             {
-                score = -searcher.alphabeta(pos, ++search_depth, MIN_SCORE, -best_score);
+                score = -searcher.alphabeta(pos, ++search_depth, MIN_SCORE, -best_score, 0);
             }
             if (score != -ABORT_SCORE && score > best_score)
-                score = -searcher.alphabeta(pos, depth, MIN_SCORE, MAX_SCORE);
+                score = -searcher.alphabeta(pos, depth, MIN_SCORE, MAX_SCORE, 0);
             if (score != -ABORT_SCORE)
             {
                 next_pos.last_score = score;
