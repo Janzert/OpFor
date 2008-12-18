@@ -672,6 +672,7 @@ class ABSearch
                 // immobilized
                 return -WIN_SCORE;
             }
+            bool in_pv = (alpha+1) != beta;
             Step* curstep;
             while ((curstep = sorted_steps.next_step()) !is null)
             {
@@ -686,8 +687,9 @@ class ABSearch
                     cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                             // loss since it's actually an illegal move
                 } else {
+                    bool had_nw = false;
                     int first_val;
-                    if (use_lmr && depth > 2
+                    if (use_lmr && !in_pv && depth > 2
                             && sorted_steps.num > 3
                             && sorted_steps.history_num > 1)
                     {
@@ -705,12 +707,28 @@ class ABSearch
                         } else {
                             first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1);
                         }
+                        had_nw = true;
                         use_lmr = true;
-                    } else {
-                        first_val = alpha + 1;
+                    }
+                    else if (in_pv && sorted_steps.num > 1) // NegaScout
+                    {
+                        if (npos.stepsLeft == 4)
+                        {
+                            Position mynull = nullmove;
+                            nullmove = npos.dup;
+                            nullmove.do_step(NULL_STEP);
+
+                            first_val = -alphabeta(npos, depth-1, -(alpha+1), -alpha, height+1);
+
+                            Position.free(nullmove);
+                            nullmove = mynull;
+                        } else {
+                            first_val = alphabeta(npos, depth-1, alpha, alpha+1, height+1);
+                        }
+                        had_nw = true;
                     }
 
-                    if (first_val > alpha)
+                    if (!had_nw)
                     {
                         if (npos.stepsLeft == 4)
                         {
@@ -725,6 +743,23 @@ class ABSearch
                         } else {
                             cal = alphabeta(npos, depth-1, alpha, beta, height+1);
                         }
+                    }
+                    else if (first_val > alpha)
+                    {
+                        if (npos.stepsLeft == 4)
+                        {
+                            Position mynull = nullmove;
+                            nullmove = npos.dup;
+                            nullmove.do_step(NULL_STEP);
+
+                            cal = -alphabeta(npos, depth-1, -beta, -(first_val-1), height+1);
+
+                            Position.free(nullmove);
+                            nullmove = mynull;
+                        } else {
+                            cal = alphabeta(npos, depth-1, first_val-1, beta, height+1);
+                        }
+                        assert (cal >= first_val);
                     } else {
                         cal = first_val;
                     }
