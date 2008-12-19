@@ -3046,8 +3046,13 @@ class GoalSearchDT
                         }
                         ulong unfreezers = p_neighbors
                             & start.bitBoards[Piece.EMPTY]
-                            & neighbors_of(start.placement[side]
-                                    & ~start.frozen);
+                            & (neighbors_of(start.placement[side]
+                                        & ~start.bitBoards[myrabbit]
+                                        & ~start.frozen)
+                                    | neighbors_of(start.bitBoards[myrabbit]
+                                        & ~start.frozen
+                                        & ~neighbors_of(
+                                            forward(p_bit, side))));
                         if (unfreezers)
                         {
                             if (can_push)
@@ -3062,7 +3067,9 @@ class GoalSearchDT
                                         & start.bitBoards[Piece.EMPTY]
                                         & ~unfreezers)
                                         || popcount(unfreezers) > 1))
+                            {
                                 shortest_goal = 4;
+                            }
                             continue;
                         }
                     }
