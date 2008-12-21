@@ -644,7 +644,7 @@ class ABSearch
 
             new_best.clear();
         } else {
-            if (use_nmh && depth > 4 && !pos.inpush)
+            if (use_nmh && depth > 4 && !pos.inpush && pos.stepsLeft < 4)
             {
                 Position mynull = nullmove;
                 nullmove = pos;
