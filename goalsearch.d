@@ -448,9 +448,13 @@ class GoalSearchDT
 
                 // if the unfreezers are all frozen check to see if another
                 // piece can unfreeze them
-                if ((neighbors_of(neighbors_of(unfreezers)
-                            & start.bitBoards[Piece.EMPTY]) & ~back_bit)
-                    & start.placement[side] & ~start.frozen)
+                if (neighbors_of(unfreezers)
+                        & start.bitBoards[Piece.EMPTY] & ~bneighbors
+                        & (neighbors_of(start.placement[side]
+                                & ~start.bitBoards[myrabbit] & ~start.frozen)
+                            | neighbors_of(start.bitBoards[myrabbit]
+                                & ~start.frozen
+                                & ~neighbors_of(forward(unfreezers, side)))))
                 {
                     return 4;
                 }
@@ -2638,6 +2642,39 @@ class GoalSearchDT
                                     && (start.pieces[pix] + enemyoffset
                                     > start.strongest[side^1][eix]
                                     || ef_pop > 1))
+                            {
+                                shortest_goal = 4;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if (obn & TRAPS)
+            {
+                ulong otr = obn & TRAPS;
+                ulong holder = neighbors_of(otr) & start.placement[side^1];
+                if (holder == (holder & -holder)) // popcount(holder) == 1
+                {
+                    bitix hix = bitindex(holder);
+                    if (start.strongest[side][hix] + enemyoffset
+                            > start.pieces[hix])
+                    {
+                        ulong h_neighbors = neighbors_of(holder);
+                        bool has_fn = popcount(h_neighbors
+                                & start.placement[side]) > 1;
+                        ulong pushers = h_neighbors & start.placement[side]
+                            & ~start.bitBoards[myrabbit] & ~start.frozen;
+                        while (pushers)
+                        {
+                            ulong pbit = pushers & -pushers;
+                            pushers ^= pbit;
+                            bitix pix = bitindex(pbit);
+                            if (start.pieces[pix] + enemyoffset
+                                    <= start.pieces[hix])
+                                continue;
+                            if (has_fn || (start.pieces[pix] + enemyoffset
+                                    >= start.strongest[side^1][hix]))
                             {
                                 shortest_goal = 4;
                                 break;
