@@ -297,6 +297,8 @@ class StepSorter
     {
         ulong to = s.tobit;
         ulong from = s.frombit;
+        if (from == INV_STEP)
+            return false;
         if ((((to | from) & (last.tobit | last_tneighbors))
                     && ((to == last.frombit) || (last.tobit == from)
                         || ((last_tneighbors & from)
