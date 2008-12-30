@@ -730,6 +730,7 @@ class ABSearch
             if ((curstep = sorted_steps.next_step()) is null)
             {
                 // immobilized
+                StepSorter.free(sorted_steps);
                 return -WIN_SCORE;
             }
             bool in_pv = (alpha+1) != beta;
