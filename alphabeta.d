@@ -312,7 +312,13 @@ class StepSorter
                             && (neighbors_of(from)
                                 & pos.placement[pos.side^1]))))
                 || (last_tneighbors & neighbors_of(from) & TRAPS
-                    & pos.placement[pos.side]))
+                    & pos.placement[pos.side])
+                || ((last.frombit & TRAPS)
+                    && (from & neighbors_of(last.frombit)
+                        & pos.placement[pos.side])
+                    && !(neighbors_of(last.frombit)
+                        & pos.placement[pos.side]
+                        & ~from & ~last.tobit)))
             return true;
         return false;
     }
