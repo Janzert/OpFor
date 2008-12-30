@@ -198,18 +198,18 @@ class StepSorter
     private static StepSorter[] reserve;
     private static int reservesize;
 
-    static StepSorter allocate(int d, Position p, Step* b)
+    static StepSorter allocate(int d, Position p, Step* b, Step* l)
     {
         if (reservesize)
         {
             reservesize--;
             StepSorter ss = reserve[reservesize];
             reserve[reservesize] = null;
-            ss.init(d, p, b);
+            ss.init(d, p, b, l);
             return ss;
         }
 
-        return new StepSorter(d, p, b);
+        return new StepSorter(d, p, b, l);
     }
 
     static void free(StepSorter s)
@@ -238,11 +238,16 @@ class StepSorter
     static bool use_killers = true;
     static bool use_history = true;
     static bool capture_first = true;
+    static bool prune_unrelated = true;
 
     int height;
     Position pos;
     StepList steps;
     Step best;
+
+    bool remove_unrelated;
+    Step* last;
+    private ulong last_tneighbors;
 
     StepList capture_steps;
     bool captures_generated;
@@ -254,12 +259,12 @@ class StepSorter
 
     int sub_ix;
 
-    this(int d, Position p, Step* b)
+    this(int d, Position p, Step* b, Step* l)
     {
-        init(d, p, b);
+        init(d, p, b, l);
     }
 
-    void init(int h, Position p, Step* b)
+    void init(int h, Position p, Step* b, Step* l)
     {
         height = h;
         pos = p;
@@ -271,11 +276,45 @@ class StepSorter
         } else {
             best.clear();
         }
+        last = l;
+        if (last !is null)
+            last_tneighbors = neighbors_of(last.tobit);
+        if (prune_unrelated
+                && pos.stepsLeft == 3
+                && !pos.inpush
+                && last !is null)
+            remove_unrelated = true;
+        else
+            remove_unrelated = false;
         num = 0;
         stage = 0;
         captures_generated = 0;
         history_num = 0;
         sub_ix = 0;
+    }
+
+    private bool is_related(Step* s)
+    {
+        ulong to = s.tobit;
+        ulong from = s.frombit;
+        if ((((to | from) & (last.tobit | last_tneighbors))
+                    && ((to == last.frombit) || (last.tobit == from)
+                        || ((last_tneighbors & from)
+                            && s.push)
+                        || ((to & TRAPS & last_tneighbors)
+                            && !(pos.placement[pos.side]
+                                & neighbors_of(to)
+                                & ~from & ~last.tobit))
+                        || ((from & last_tneighbors)
+                            && !(neighbors_of(from)
+                                & pos.placement[pos.side]
+                                & ~last.tobit)
+                            && (neighbors_of(from)
+                                & pos.placement[pos.side^1]))))
+                || (last_tneighbors & neighbors_of(from) & TRAPS
+                    & pos.placement[pos.side]))
+            return true;
+        return false;
     }
 
     Step* next_step()
@@ -345,6 +384,12 @@ class StepSorter
                     {
                         while (capture_num < capture_steps.numsteps)
                         {
+                            if (remove_unrelated
+                                    && !is_related(&capture_steps.steps[capture_num]))
+                            {
+                                capture_num++;
+                                continue;
+                            }
                             int bix = 0;
                             while ((bix < steps.numsteps)
                                     && (steps.steps[bix] != capture_steps.steps[capture_num]))
@@ -442,6 +487,8 @@ class StepSorter
                         Step* possible = &killers.steps[height][pos.side][sub_ix++];
                         if (possible.frombit != 0 || possible.tobit != 0)
                         {
+                            if (remove_unrelated && !is_related(possible))
+                                continue;
                             int bix = 0;
                             while (bix < steps.numsteps && steps.steps[bix] != *possible)
                             {
@@ -480,24 +527,33 @@ class StepSorter
             case 3:
                 if (use_history)
                 {
-                    uint score = cuthistory.get_score(pos, steps.steps[num]);
-                    int bix = num;
-                    for (int i = num+1; i < steps.numsteps; i++)
+                    do
                     {
-                        int t = cuthistory.get_score(pos, steps.steps[i]);
-                        if (t > score)
+                        uint score = cuthistory.get_score(pos, steps.steps[num]);
+                        int bix = num;
+                        for (int i = num+1; i < steps.numsteps; i++)
                         {
-                            score = t;
-                            bix = i;
+                            int t = cuthistory.get_score(pos, steps.steps[i]);
+                            if (t > score)
+                            {
+                                score = t;
+                                bix = i;
+                            }
                         }
+
+                        Step tmp = steps.steps[num];
+                        steps.steps[num] = steps.steps[bix];
+                        steps.steps[bix] = tmp;
+
+                        step = &steps.steps[num++];
+                    } while (remove_unrelated && num < steps.numsteps && !is_related(step))
+                    if (num == steps.numsteps
+                            && remove_unrelated
+                            && !is_related(step))
+                    {
+                        return null;
                     }
-
-                    Step tmp = steps.steps[num];
-                    steps.steps[num] = steps.steps[bix];
-                    steps.steps[bix] = tmp;
-
                     history_num++;
-                    step = &steps.steps[num++];
                     break;
                 }
                 stage++;
@@ -571,6 +627,9 @@ class ABSearch
             case "use_killers":
                 StepSorter.use_killers = cast(bool)(toInt(value));
                 break;
+            case "prune_unrelated":
+                StepSorter.prune_unrelated = cast(bool)(toInt(value));
+                break;
             default:
                 handled = false;
                 break;
@@ -588,7 +647,7 @@ class ABSearch
         throw new Exception("eval must be implemented");
     }
 
-    int alphabeta(Position pos, int depth, int alpha, int beta, int height)
+    int alphabeta(Position pos, int depth, int alpha, int beta, int height, Step* last_step = null)
     {
         int score = MIN_SCORE;
         if (pos.is_endstate())
@@ -666,15 +725,15 @@ class ABSearch
                     return null_score;
             }
 
-            StepSorter sorted_steps = StepSorter.allocate(height, pos, prev_best);
-            if (sorted_steps.steps.numsteps == 0)
+            StepSorter sorted_steps = StepSorter.allocate(height, pos, prev_best, last_step);
+            Step* curstep;
+            if ((curstep = sorted_steps.next_step()) is null)
             {
                 // immobilized
                 return -WIN_SCORE;
             }
             bool in_pv = (alpha+1) != beta;
-            Step* curstep;
-            while ((curstep = sorted_steps.next_step()) !is null)
+            while (curstep !is null)
             {
                 nodes_searched++;
                 int cal;
@@ -700,12 +759,12 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha, height+1);
+                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha, height+1, curstep);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1);
+                            first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1, curstep);
                         }
                         had_nw = true;
                         use_lmr = true;
@@ -718,12 +777,12 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            first_val = -alphabeta(npos, depth-1, -(alpha+1), -alpha, height+1);
+                            first_val = -alphabeta(npos, depth-1, -(alpha+1), -alpha, height+1, curstep);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            first_val = alphabeta(npos, depth-1, alpha, alpha+1, height+1);
+                            first_val = alphabeta(npos, depth-1, alpha, alpha+1, height+1, curstep);
                         }
                         had_nw = true;
                     }
@@ -736,12 +795,12 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            cal = -alphabeta(npos, depth-1, -beta, -alpha, height+1);
+                            cal = -alphabeta(npos, depth-1, -beta, -alpha, height+1, curstep);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            cal = alphabeta(npos, depth-1, alpha, beta, height+1);
+                            cal = alphabeta(npos, depth-1, alpha, beta, height+1, curstep);
                         }
                     }
                     else if (first_val > alpha)
@@ -752,14 +811,13 @@ class ABSearch
                             nullmove = npos.dup;
                             nullmove.do_step(NULL_STEP);
 
-                            cal = -alphabeta(npos, depth-1, -beta, -(first_val-1), height+1);
+                            cal = -alphabeta(npos, depth-1, -beta, -(first_val-1), height+1, curstep);
 
                             Position.free(nullmove);
                             nullmove = mynull;
                         } else {
-                            cal = alphabeta(npos, depth-1, first_val-1, beta, height+1);
+                            cal = alphabeta(npos, depth-1, first_val-1, beta, height+1, curstep);
                         }
-                        assert (cal >= first_val);
                     } else {
                         cal = first_val;
                     }
@@ -791,6 +849,7 @@ class ABSearch
                         }
                     }
                 }
+                curstep = sorted_steps.next_step();
             }
 
             if (sflag != SType.ALPHA && !pos.inpush)
