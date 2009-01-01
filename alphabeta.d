@@ -253,6 +253,8 @@ class StepSorter
     bool captures_generated;
     int capture_num;
 
+    private ulong considered[64];
+
     int num;
     int stage;
     int history_num;
@@ -291,6 +293,8 @@ class StepSorter
         captures_generated = 0;
         history_num = 0;
         sub_ix = 0;
+        for (int i=0; i < 64; i++)
+            considered[i] = 0UL;
     }
 
     private bool is_related(Step* s)
@@ -368,117 +372,107 @@ class StepSorter
                             if (trap_search.captures[i].length <= pos.stepsLeft
                                         && trap_search.captures[i].first_step != best)
                             {
-                                bool duplicate = false;
-                                for (int cix=0; cix < capture_steps.numsteps; cix++)
-                                {
-                                    if (trap_search.captures[i].first_step == capture_steps.steps[cix])
-                                    {
-                                        duplicate = true;
-                                        break;
-                                    }
-                                }
-                                if (!duplicate)
-                                {
-                                    Step* nstep = capture_steps.newstep();
-                                    *nstep = trap_search.captures[i].first_step;
-                                }
+                                Step* nstep = capture_steps.newstep();
+                                *nstep = trap_search.captures[i].first_step;
                             }
                         }
                         capture_num = 0;
                         captures_generated = true;
                     }
 
+                    while (capture_num < capture_steps.numsteps)
+                    {
+                        Step* cstep = &capture_steps.steps[capture_num];
+                        if (considered[cstep.fromix] & cstep.tobit)
+                        {
+                            capture_num++;
+                            continue;
+                        }
+                        if (remove_unrelated
+                                && !is_related(cstep))
+                        {
+                            if (cstep.frombit != INV_STEP)
+                                considered[cstep.fromix] |= cstep.tobit;
+                            capture_num++;
+                            continue;
+                        }
+                        int bix = num;
+                        while ((bix < steps.numsteps)
+                                && (steps.steps[bix] != *cstep))
+                        {
+                            bix++;
+                        }
+
+                        if (bix < steps.numsteps)
+                        {
+                            Step tmp = steps.steps[num];
+                            steps.steps[num] = steps.steps[bix];
+                            steps.steps[bix] = tmp;
+                            step = &steps.steps[num++];
+                            break;
+                        } else {
+                            bool had_pull = false; // had the move as a pull or already used in previous step
+                            for (int i=num; i < steps.numsteps; i++)
+                            {
+                                if (cstep.frombit == steps.steps[i].frombit
+                                        && (cstep.tobit == steps.steps[i].tobit))
+                                {
+                                    had_pull = true;
+                                    break;
+                                }
+                            }
+
+                            if (!had_pull)
+                            {
+                                debug
+                                {
+                                    writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                                    writefln("step %s, cnum %d, num %d, stepsleft %d lf %s%s",
+                                            cstep.toString(true),
+                                            capture_num-1, num, pos.stepsLeft,
+                                            "xRCDHMErcdhme"[pos.lastpiece], ix_to_alg(pos.lastfrom));
+                                    if (best.frombit != 0 || best.tobit != 0)
+                                        writefln("Have previous best");
+                                    else
+                                        writefln("No previous best");
+
+                                    writefln("Move steps:");
+                                    int sn = 0;
+                                    while (sn < steps.numsteps)
+                                    {
+                                        for (int i=0; i < 10; i++)
+                                        {
+                                            if (sn < steps.numsteps)
+                                                writef("%s ", steps.steps[sn++].toString(true));
+                                            else
+                                                break;
+                                        }
+                                        writef("\n");
+                                    }
+                                    writefln("Capture steps:");
+                                    sn = 0;
+                                    while (sn < capture_steps.numsteps)
+                                    {
+                                        for (int i=0; i < 10; i++)
+                                        {
+                                            if (sn < capture_steps.numsteps)
+                                                writef("%s ", capture_steps.steps[sn++].toString(true));
+                                            else
+                                                break;
+                                        }
+                                        writef("\n");
+                                    }
+                                    writefln("Did not find capture step in list");
+                                    assert (0);
+                                }
+                                logger.warn("Did not find capture step in legal step list.");
+                            }
+                            capture_num++;
+                        }
+                    }
                     if (capture_num < capture_steps.numsteps)
                     {
-                        while (capture_num < capture_steps.numsteps)
-                        {
-                            if (remove_unrelated
-                                    && !is_related(&capture_steps.steps[capture_num]))
-                            {
-                                capture_num++;
-                                continue;
-                            }
-                            int bix = 0;
-                            while ((bix < steps.numsteps)
-                                    && (steps.steps[bix] != capture_steps.steps[capture_num]))
-                            {
-                                bix++;
-                            }
-                            if (bix < num)
-                            {
-                                capture_num++;
-                                continue;
-                            }
-
-                            if (bix < steps.numsteps)
-                            {
-                                Step tmp = steps.steps[num];
-                                steps.steps[num] = steps.steps[bix];
-                                steps.steps[bix] = tmp;
-                                break;
-                            } else {
-                                bool had_pull = false; // had the move as a pull or already used in previous step
-                                for (int i=0; i < steps.numsteps; i++)
-                                {
-                                    if (capture_steps.steps[capture_num].frombit == steps.steps[i].frombit
-                                            && (capture_steps.steps[capture_num].tobit == steps.steps[i].tobit))
-                                    {
-                                        had_pull = true;
-                                        break;
-                                    }
-                                }
-
-                                if (!had_pull)
-                                {
-                                    debug
-                                    {
-                                        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                                        writefln("step %s, cnum %d, num %d, stepsleft %d lf %s%s",
-                                                        capture_steps.steps[capture_num].toString(true),
-                                                        capture_num, num, pos.stepsLeft,
-                                                        "xRCDHMErcdhme"[pos.lastpiece], ix_to_alg(pos.lastfrom));
-                                        if (best.frombit != 0 || best.tobit != 0)
-                                            writefln("Have previous best");
-                                        else
-                                            writefln("No previous best");
-
-                                        writefln("Move steps:");
-                                        int sn = 0;
-                                        while (sn < steps.numsteps)
-                                        {
-                                            for (int i=0; i < 10; i++)
-                                            {
-                                                if (sn < steps.numsteps)
-                                                    writef("%s ", steps.steps[sn++].toString(true));
-                                                else
-                                                    break;
-                                            }
-                                            writef("\n");
-                                        }
-                                        writefln("Capture steps:");
-                                        sn = 0;
-                                        while (sn < capture_steps.numsteps)
-                                        {
-                                            for (int i=0; i < 10; i++)
-                                            {
-                                                if (sn < capture_steps.numsteps)
-                                                    writef("%s ", capture_steps.steps[sn++].toString(true));
-                                                else
-                                                    break;
-                                            }
-                                            writef("\n");
-                                        }
-                                        writefln("Did not find capture step in list");
-                                        assert (0);
-                                    }
-                                    logger.warn("Did not find capture step in legal step list.");
-                                }
-
-                                capture_num++;
-                            }
-                        }
                         capture_num++;
-                        step = &steps.steps[num++];
                         break;
                     } else {
                         StepList.free(capture_steps);
@@ -495,19 +489,16 @@ class StepSorter
                         Step* possible = &killers.steps[height][pos.side][sub_ix++];
                         if (possible.frombit != 0 || possible.tobit != 0)
                         {
+                            if (possible.frombit != INV_STEP
+                                    && considered[possible.fromix] & possible.tobit)
+                                continue;
                             if (remove_unrelated && !is_related(possible))
                                 continue;
-                            int bix = 0;
+                            int bix = num;
                             while (bix < steps.numsteps && steps.steps[bix] != *possible)
                             {
                                 bix++;
                             }
-                            if (bix < num)
-                            {
-                                // step already searched
-                                continue;
-                            }
-
                             if (bix < steps.numsteps)
                             {
                                 steps.steps[bix] = steps.steps[num];
@@ -517,7 +508,6 @@ class StepSorter
 
                                 if (sub_ix > 1)
                                 {
-                                    sub_ix = 0;
                                     stage++;
                                 }
                                 foundkiller = true;
@@ -530,37 +520,49 @@ class StepSorter
                     if (foundkiller)
                         break;
                 }
-                sub_ix = 0;
                 stage++;
             case 3:
-                if (use_history)
+                if (remove_unrelated)
                 {
-                    do
+                    int s=num;
+                    while (s < steps.numsteps)
                     {
-                        uint score = cuthistory.get_score(pos, steps.steps[num]);
-                        int bix = num;
-                        for (int i = num+1; i < steps.numsteps; i++)
+                        Step* tstep = &steps.steps[s];
+                        if ((tstep.frombit != INV_STEP
+                                    && (considered[tstep.fromix] & tstep.tobit))
+                                || !is_related(tstep))
                         {
-                            int t = cuthistory.get_score(pos, steps.steps[i]);
-                            if (t > score)
-                            {
-                                score = t;
-                                bix = i;
-                            }
+                            steps.numsteps--;
+                            *tstep = steps.steps[steps.numsteps];
+                        } else {
+                            s++;
                         }
-
-                        Step tmp = steps.steps[num];
-                        steps.steps[num] = steps.steps[bix];
-                        steps.steps[bix] = tmp;
-
-                        step = &steps.steps[num++];
-                    } while (remove_unrelated && num < steps.numsteps && !is_related(step))
-                    if (num == steps.numsteps
-                            && remove_unrelated
-                            && !is_related(step))
+                    }
+                    remove_unrelated = false;
+                    if (num == steps.numsteps)
                     {
                         return null;
                     }
+                }
+                if (use_history)
+                {
+                    uint score = cuthistory.get_score(pos, steps.steps[num]);
+                    int bix = num;
+                    for (int i = num+1; i < steps.numsteps; i++)
+                    {
+                        int t = cuthistory.get_score(pos, steps.steps[i]);
+                        if (t > score)
+                        {
+                            score = t;
+                            bix = i;
+                        }
+                    }
+
+                    Step tmp = steps.steps[num];
+                    steps.steps[num] = steps.steps[bix];
+                    steps.steps[bix] = tmp;
+
+                    step = &steps.steps[num++];
                     history_num++;
                     break;
                 }
@@ -569,6 +571,8 @@ class StepSorter
                 step = &steps.steps[num++];
         }
 
+        if (step.frombit != INV_STEP)
+            considered[step.fromix] |= step.tobit;
         return step;
     }
 }
