@@ -110,15 +110,21 @@ class TransTable
 class HistoryHeuristic
 {
     uint[64][64][2] score;
+    uint[2] pass_score;
 
     uint get_score(Position pos, Step step)
     {
+        if (step.frombit == INV_STEP)
+            return pass_score[pos.side];
         return score[pos.side][step.fromix][step.toix];
     }
 
     void update(Position pos, Step step, int depth)
     {
-        score[pos.side][step.fromix][step.toix] += depth + 1;
+        if (step.frombit == INV_STEP)
+            pass_score[pos.side] += depth + 1;
+        else
+            score[pos.side][step.fromix][step.toix] += depth + 1;
     }
 
     void age()
@@ -132,6 +138,7 @@ class HistoryHeuristic
                     score[s][f][t] /= 10;
                 }
             }
+            pass_score[s] /= 10;
         }
     }
 }
@@ -424,7 +431,7 @@ class StepSorter
 
                             if (!had_pull)
                             {
-                                debug
+                                debug (missing_captures)
                                 {
                                     writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
                                     writefln("step %s, cnum %d, num %d, stepsleft %d lf %s%s",
