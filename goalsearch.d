@@ -1217,15 +1217,20 @@ class GoalSearchDT
                             }
                         }
                     }
-                    if (neighbors_of(neighbors_of(ebnr_neighbors
+                    ulong unfunf = neighbors_of(neighbors_of(ebnr_neighbors
                                     & start.placement[side])
                                 & start.bitBoards[Piece.EMPTY] & ~back_bit)
-                            & start.placement[side] & ~start.frozen
-                            & ~(start.bitBoards[myrabbit]
-                                & neighbors_of(forward(ebnr_neighbors,
-                                        side))))
+                            & start.placement[side] & ~start.frozen;
+                    if (unfunf)
                     {
-                        shortest_goal = 4;
+                        if ((unfunf & ~(start.bitBoards[myrabbit]
+                                    & neighbors_of(forward(ebnr_neighbors,
+                                            side))))
+                                || (neighbors_of(unfunf) & start.bitBoards[Piece.EMPTY]
+                                    & forward(ebnr_neighbors, side)))
+                        {
+                            shortest_goal = 4;
+                        }
                     }
                     ulong orn = neighbors_of(bn_rabbits)
                         & start.placement[side^1];
