@@ -1019,6 +1019,7 @@ class StaticEval
         {
             if (goals.shortest[s] != goals.NOT_FOUND)
             {
+                uint num_threats = 0;
                 uint dsteps = 4;
                 uint extrasteps = goals.shortest[s];
                 if (s == pos.side)
@@ -1042,6 +1043,9 @@ class StaticEval
                     if (goals.goal_squares & sector & GOAL_RANK[s])
                     {
                         sector_defenders[0] = popcount(sector & defenders);
+                        if (sector & (safe_traps[s^1] & ~safe_traps[s]))
+                            sector_defenders[0] >>= 1;
+                        num_threats++;
                     } else {
                         sector_defenders[0] = 8;
                     }
@@ -1049,12 +1053,34 @@ class StaticEval
                     if (goals.goal_squares & sector & GOAL_RANK[s])
                     {
                         sector_defenders[1] = popcount(sector & defenders);
+                        if (sector & (safe_traps[s^1] & ~safe_traps[s]))
+                            sector_defenders[1] >>= 1;
+                        num_threats++;
                     } else {
                         sector_defenders[1] = 8;
                     }
                     defender_num = sector_defenders[0] < sector_defenders[1] ? sector_defenders[0] : sector_defenders[1];
                 } else {
-                    defender_num = popcount(defenders & (0xFFFFFF << sector_shift));
+                    ulong sector = 0xFFFFFF << sector_shift;
+                    defender_num = popcount(defenders & sector);
+                    if (sector & (safe_traps[s^1] & ~safe_traps[s]))
+                        defender_num >>= 1;
+                    num_threats++;
+                    if (goals.goal_squares & (0x030303 << sector_shift))
+                        num_threats++;
+                    if (goals.goal_squares & (0xC0C0C0 << sector_shift))
+                        num_threats++;
+                }
+                switch (num_threats)
+                {
+                    case 2:
+                        dsteps >>= 1;
+                        break;
+                    case 3:
+                        dsteps >>= 1;
+                        defender_num >>= 1;
+                        break;
+                    default:
                 }
                 score += GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s];
             }
