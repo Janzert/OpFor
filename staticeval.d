@@ -1054,7 +1054,7 @@ class StaticEval
                     }
                     defender_num = sector_defenders[0] < sector_defenders[1] ? sector_defenders[0] : sector_defenders[1];
                 } else {
-                    defender_num = defenders & (0xFFFFFF << sector_shift);
+                    defender_num = popcount(defenders & (0xFFFFFF << sector_shift));
                 }
                 score += GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s];
             }
