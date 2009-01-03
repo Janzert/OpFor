@@ -23,55 +23,6 @@ const char[] BOT_AUTHOR = "Janzert";
 
 const int START_SEARCH_NODES = 30000;
 
-class ScoreSearch : ABSearch
-{
-    this(Logger l)
-    {
-        super(l);
-    }
-
-    int eval(Position pos)
-    {
-        float wscore = 0;
-        for (Piece i = Piece.WRABBIT; i <= Piece.WELEPHANT; i++)
-        {
-            wscore += popcount(pos.bitBoards[i]) * i;
-        }
-        wscore *= popcount(pos.bitBoards[Piece.WRABBIT]) + 1;
-        float wrpoints = 0;
-        for (int rank = 1; rank <= 8; rank++)
-        {
-            ulong rmask = position.RANK_1 << (8*(rank-1));
-            wrpoints += popcount(pos.bitBoards[Piece.WRABBIT] & rmask) * pow(cast(real)rank, 3);
-        }
-        wscore += wrpoints;
-
-        float bscore = 0;
-        for (Piece i = Piece.BRABBIT; i <= Piece.BELEPHANT; i++)
-        {
-            bscore += popcount(pos.bitBoards[i]) * (i - Piece.WELEPHANT);
-        }
-        bscore *= popcount(pos.bitBoards[Piece.BRABBIT]) + 1;
-        float brpoints = 0;
-        for (int rank = 1; rank <= 8; rank++)
-        {
-            ulong rmask = position.RANK_8 >> (8*(rank-1));
-            brpoints += popcount(pos.bitBoards[Piece.BRABBIT] & rmask) * pow(cast(real)rank, 3);
-        }
-        bscore += brpoints;
-
-        // Give a small random component so the bot won't always play the same move
-        int score = cast(int)(wscore - bscore) * 10;
-
-        score += rand() % 10;
-
-        if (pos.side == Side.BLACK)
-            score = -score;
-
-        return score;
-    }
-}
-
 struct PositionRecord
 {
     ulong position_key;
