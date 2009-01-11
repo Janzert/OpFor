@@ -795,6 +795,15 @@ class Position
         return false;
     }
 
+    bool is_goal(Side s)
+    {
+        ulong bb = bitBoards[Piece.WRABBIT + (s * 6)];
+        ulong rank = s == Side.WHITE ? RANK_8 : RANK_1;
+        if (bb & rank)
+            return true;
+        return false;
+    }
+
     int endscore()
     {
         ulong ggoal = bitBoards[Piece.WRABBIT] & RANK_8;
@@ -815,7 +824,7 @@ class Position
                     return -1;
             }
         }
-        
+
         ulong grabbits = bitBoards[Piece.WRABBIT];
         ulong srabbits = bitBoards[Piece.BRABBIT];
         if (!grabbits || !srabbits)

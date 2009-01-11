@@ -152,6 +152,9 @@ class KillerHeuristic
 
     void set_killer(int height, Side side, Step step)
     {
+        if (height >= MAX_HEIGHT)
+            return;
+
         int step_history = history[height][side][step.fromix][step.toix]++;
         if (step_history > max_history[height][side][0])
         {
@@ -669,7 +672,7 @@ class ABSearch
     int alphabeta(Position pos, int depth, int alpha, int beta, int height, Step* last_step = null)
     {
         int score = MIN_SCORE;
-        if (pos.is_endstate())
+        if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1)) || pos.stepsLeft < 2))
         {
             // This is actually technically incorrect as it disallows 
             // pushing a rabbit onto then back off of the goal line

@@ -1095,19 +1095,33 @@ class StaticEval
         if (sc_entry.zobrist == pos.zobrist)
             return sc_entry.score;
 
+        int score;
+        if (pos.is_endstate() && pos.is_goal(cast(Side)(pos.side^1)))
+        {
+            // the only time static eval should end up called with a endstate is when there is an opposing rabbit
+            // on the goal line that might still get pulled back off before the end of the turn
+            score = -(WIN_SCORE - pos.stepsLeft);
+            sc_entry.zobrist = pos.zobrist;
+            sc_entry.score = score;
+            return score;
+        }
+
         this.pos = pos;
         goals.set_start(pos);
         goals.find_goals();
         if ((goals.shortest[pos.side] != goals.NOT_FOUND)
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
-            return WIN_SCORE - goals.shortest[pos.side];
+            score = WIN_SCORE - goals.shortest[pos.side];
+            sc_entry.zobrist = pos.zobrist;
+            sc_entry.score = score;
+            return score;
         }
 
         int pop = population(pos);
         int fscore = fame.score(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
-        int score = fscore;
+        score = fscore;
         score += static_trap_eval(cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
         score += static_trap_eval(pos.side, pop, fscore) * static_strap_w;
 
@@ -1137,6 +1151,11 @@ class StaticEval
 
     int logged_eval(Position pos)
     {
+        if (pos.is_endstate() && pos.is_goal(cast(Side)(pos.side^1)))
+        {
+            return -(WIN_SCORE - pos.stepsLeft);
+        }
+
         this.pos = pos;
         goals.set_start(pos);
         goals.find_goals();
