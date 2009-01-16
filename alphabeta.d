@@ -309,10 +309,20 @@ class StepSorter
 
     private bool is_related(Step* s)
     {
+        // using this to check only the second step in a move still misses
+        // some 3 step combos where the 3rd step depends on the first 2 steps
+        // but neither of the first two depend on each other
         ulong to = s.tobit;
         ulong from = s.frombit;
         if (from == INV_STEP)
             return false;
+        // Allow a step if:
+        // Piece steps into last from
+        // Same piece as last step
+        // A push neighboring the last to
+        // Last step suported this step onto a trap
+        // Last step might have unfrozen this piece
+        // Last step allowed this piece to step away from a trap
         if ((((to | from) & (last.tobit | last_tneighbors))
                     && ((to == last.frombit) || (last.tobit == from)
                         || ((last_tneighbors & from)
@@ -398,14 +408,7 @@ class StepSorter
                             capture_num++;
                             continue;
                         }
-                        if (remove_unrelated
-                                && !is_related(cstep))
-                        {
-                            if (cstep.frombit != INV_STEP)
-                                considered[cstep.fromix] |= cstep.tobit;
-                            capture_num++;
-                            continue;
-                        }
+
                         int bix = num;
                         while ((bix < steps.numsteps)
                                 && (steps.steps[bix] != *cstep))
