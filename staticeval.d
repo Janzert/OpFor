@@ -156,7 +156,8 @@ class StaticEval
             n_pop[Side.WHITE] = popcount(neighbors & pos.placement[Side.WHITE]);
             n_pop[Side.BLACK] = popcount(neighbors & pos.placement[Side.BLACK]);
             Piece[2] strongest_near;
-            strongest_near[Side.WHITE] = strongest_near[Side.BLACK] = Piece.EMPTY;
+            strongest_near[Side.WHITE] = pos.strongest[Side.WHITE][tix];
+            strongest_near[Side.BLACK] = pos.strongest[Side.BLACK][tix];
             while (neighbors)
             {
                 ulong nbit = neighbors & -neighbors;
@@ -171,12 +172,12 @@ class StaticEval
             if (!(active_traps[Side.BLACK] & trap)
                     && pos.strongest[Side.WHITE][tix] != Piece.EMPTY
                     && (pos.strongest[Side.WHITE][tix] + 6 >= strongest_near[Side.BLACK]
-                        || popcount(neighbors & pos.placement[Side.WHITE]) > 1))
+                        || n_pop[Side.WHITE] > 1))
                 trap_safe |= 1;
             if (!(active_traps[Side.WHITE] & trap)
                     && pos.strongest[Side.BLACK][tix] != Piece.EMPTY
                     && (pos.strongest[Side.BLACK][tix] - 6 >= strongest_near[Side.WHITE]
-                        || popcount(neighbors & pos.placement[Side.BLACK]) > 1))
+                        || n_pop[Side.BLACK] > 1))
                 trap_safe |= 2;
             switch (trap_safe)
             {
