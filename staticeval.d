@@ -204,8 +204,9 @@ class StaticEval
     // penalty for piece on trap, pinned or framed
     int on_trap()
     {
-        const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33,
-              -88, 6, 9, 12, 18, 33, 88];
+        const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+        const int FRAMED[13] = [0, -50, -75, -100, -150, -225, -400,
+              50, 75, 100, 150, 225, 400];
         const int PINNED[13] = [0, 0, -2, -3, -5, -8, -22, 0, 2, 3, 5, 8, 22];
         const int FRAMER[13] = [0, 0, -1, -2, -3, -4, -11, 0, 1, 2, 3, 4, 11];
 
@@ -221,8 +222,7 @@ class StaticEval
             Side tside = (tpiece > Piece.WELEPHANT) ? Side.BLACK : Side.WHITE;
             int pieceoffset = (tside == Side.WHITE) ? 6 : -6;
 
-            if (pos.strongest[tside][tix] == Piece.WELEPHANT+pieceoffset
-                    || popcount(pos.placement[tside] & tneighbors) > 1)
+            if (safe_traps[tside] & tbit)
             {
                 score += ON_TRAP[tpiece] / 2;
             } else {
@@ -262,7 +262,7 @@ class StaticEval
                     }
                     if (framed)
                     {
-                        score += ON_TRAP[tpiece];
+                        score += FRAMED[tpiece];
                         score += framing_score;
                     }
                 }
