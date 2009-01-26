@@ -538,7 +538,7 @@ class StaticEval
                     {
                         sector <<= 40;
                     }
-                    if (safe_traps[s^1] & sector)
+                    if (!((safe_traps[s] & ~safe_traps[s^1]) & sector))
                         rval /= 2;
                     debug (rabbit_strength)
                     {
@@ -549,7 +549,6 @@ class StaticEval
                 }
             }
         }
-
         return (wscore * rweak_w) + (sscore * rstrong_w);
     }
 
