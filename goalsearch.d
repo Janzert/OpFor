@@ -970,7 +970,7 @@ class GoalSearchDT
             // potentially pull the opponent out of the way
             if (!(bneighbors & start.bitBoards[myrabbit]))
                 return NOT_FOUND;
-            ulong safe_bb = ((bneighbors | back_bit) & start.placement[side^1]
+            bool safe_bb = !((bneighbors | back_bit) & start.placement[side^1]
                         & ~start.bitBoards[erabbit]);
             bitix bix = bitindex(back_bit);
             if (((1UL << start.lastfrom) & bneighbors)
@@ -992,7 +992,7 @@ class GoalSearchDT
                 return NOT_FOUND;
 
             // check that the rabbit won't freeze when moving into the square
-            if (!safe_bb || popcount(bneighbors & start.placement[side]) != 3)
+            if (!safe_bb && popcount(bneighbors & start.placement[side]) != 3)
             {
                 pullers &= TRAPS & ~neighbors_of(start.placement[side^1]
                         & ~back_bit);
