@@ -977,7 +977,10 @@ class GoalSearchDT
                     && (start.lastpiece + enemyoffset
                         > start.pieces[bix])
                     && (safe_bb
-                        || popcount(bneighbors & start.placement[side]) > 1))
+                        || popcount(bneighbors & start.placement[side]) > 1
+                        || ((1UL << start.lastfrom) & TRAPS &
+                            ~neighbors_of(start.placement[side^1]
+                                & ~back_bit))))
             {
                 return 3;
             }
