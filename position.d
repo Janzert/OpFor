@@ -1965,7 +1965,7 @@ real FAME(Position pos, real scale = 33.695652173913032)
 
     if (pos.placement[Side.WHITE])
     {
-        int wpieces = popcount(pos.placement[Side.WHITE] 
+        int wpieces = popcount(pos.placement[Side.WHITE]
             & ~pos.bitBoards[Piece.WRABBIT]);
         famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
     } else {
@@ -1999,11 +1999,14 @@ int population(Position pos)
     count |= popcount(pos.bitBoards[Piece.BCAT]) << pop_offset[Piece.BCAT];
     count |= popcount(pos.bitBoards[Piece.BRABBIT]) << pop_offset[Piece.BRABBIT];
 
-    for (Piece p = Piece.WRABBIT; p < Piece.BELEPHANT; p++)
+    debug
     {
-        int p2c = pop2count(count, p);
-        int pc = popcount(pos.bitBoards[p]);
-        assert(p2c == pc, format("p2c %d != pc %d for %d from %X", p2c, pc, p, count));
+        for (Piece p = Piece.WRABBIT; p < Piece.BELEPHANT; p++)
+        {
+            int p2c = pop2count(count, p);
+            int pc = popcount(pos.bitBoards[p]);
+            assert(p2c == pc, format("p2c %d != pc %d for %d from %X", p2c, pc, p, count));
+        }
     }
 
     return count;
