@@ -4,8 +4,10 @@ import std.stdio;
 
 import position;
 import trapmoves;
+import trap_check;
 
-ulong random_bit(ulong bits)
+
+private ulong random_bit(ulong bits)
 {
     int num = popcount(bits);
     int bix = rand() % num;
@@ -47,41 +49,11 @@ void gen_position(inout Position pos)
     pos.set_steps_left(4);
 }
 
-int get_captures(Position pos)
-{
-    int start_pop = population(pos);
-    int[Piece.max+1] piece_count;
-    for (Piece p=Piece.WRABBIT; p <= Piece.BELEPHANT; p++)
-    {
-        piece_count[p] = pop2count(start_pop, p);
-    }
-    PosStore moves = pos.get_moves();
-    int pieceoffset = (pos.side^1) * 6;
-    int victims = 0;
-    foreach (Position res; moves)
-    {
-        int rpop = population(res);
-        if (rpop != start_pop)
-        {
-            for (int p=Piece.WRABBIT + pieceoffset; p <= Piece.WELEPHANT + pieceoffset; p++)
-            {
-                if (piece_count[p] != pop2count(rpop, cast(Piece)(p)))
-                {
-                    victims |= 1 << p;
-                }
-            }
-        }
-    }
-    moves.free_items();
-    delete moves;
-
-    return victims;
-}
-
 int main(char[][] args)
 {
     Position pos = new Position();
-    TrapGenerator trap_gen = new TrapGenerator();
+    StepList steps = StepList.allocate();
+    TrapCheck cap_checker = new TrapCheck();
     int pos_count;
     while (true)
     {
@@ -89,33 +61,11 @@ int main(char[][] args)
         pos_count += 1;
         writefln("%dw", pos_count);
         writefln(pos.to_long_str());
-        int victims = get_captures(pos);
-        int svictims = 0;
-        trap_gen.find_captures(pos, pos.side);
-        for (int i=0; i < trap_gen.num_captures; i++)
-        {
-            if (trap_gen.captures[i].length <= pos.stepsLeft)
-            {
-                svictims |= 1 << trap_gen.captures[i].victim;
-            }
-        }
-        if (victims != svictims)
-        {
-            for (Piece pt=Piece.WRABBIT; pt <= Piece.BELEPHANT; pt++)
-            {
-                if ((victims & (1 << pt)) && !(svictims & (1 << pt)))
-                {
-                    writefln("Capture of %s missed by static capture", "xRCDHMErcdhme"[pt]);
-                }
-                else if (!(victims & (1 << pt)) && (svictims & (1 << pt)))
-                {
-                    writefln("Incorrect capture of %s reported by static capture", "xRCDHMErcdhme"[pt]);
-                }
-            }
-            return 0;
-        }
+        cap_checker.check_captures(pos, pos, steps);
+        assert (steps.numsteps == 0);
         pos.clear();
     }
+    return 0;
 }
 
 

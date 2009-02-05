@@ -7,8 +7,10 @@ import std.perf;
 import std.gc;
 
 import goalsearch;
+import trap_check;
 import trapmoves;
 import position;
+
 
 int main(char[][] args)
 {
@@ -162,6 +164,10 @@ int main(char[][] args)
             }*/
         }
     }
+    TrapCheck tcheck = new TrapCheck();
+    StepList sl = StepList.allocate();
+    tcheck.check_captures(pos, pos, sl);
+    StepList.free(sl);
 
     Timer = new ProcessTimesCounter();
     Timer.start();
