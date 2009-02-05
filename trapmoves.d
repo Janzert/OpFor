@@ -29,18 +29,18 @@ class TrapGenerator
     }
     body
     {
-        captures[num_captures].victim = piece;
-        captures[num_captures].victim_bit = vbit;
-        captures[num_captures].length = steps;
-        captures[num_captures].trap_bit = tbit;
-        captures[num_captures].first_step.set(frombit, tobit, ispush);
-        num_captures++;
         debug (static_captures)
         {
             writefln("cap %s at %s in %d steps %s trap step from %s to %s is push %d",
                     ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)), steps, ix_to_alg(bitindex(tbit)),
                     ix_to_alg(bitindex(frombit)), ix_to_alg(bitindex(tobit)), ispush);
         }
+        captures[num_captures].victim = piece;
+        captures[num_captures].victim_bit = vbit;
+        captures[num_captures].length = steps;
+        captures[num_captures].trap_bit = tbit;
+        captures[num_captures].first_step.set(frombit, tobit, ispush);
+        num_captures++;
     }
 
     void add_capture(Piece piece, ulong vbit, int steps, ulong tbit, Step* step)
@@ -51,18 +51,18 @@ class TrapGenerator
     }
     body
     {
-        captures[num_captures].victim = piece;
-        captures[num_captures].victim_bit = vbit;
-        captures[num_captures].length = steps;
-        captures[num_captures].trap_bit = tbit;
-        captures[num_captures].first_step = *step;
-        num_captures++;
         debug (static_captures)
         {
             writefln("cap %s at %s in %d steps %s trap using step %s to %s is push %d",
                     ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)), steps, ix_to_alg(bitindex(tbit)),
                     ix_to_alg(bitindex(step.frombit)), ix_to_alg(bitindex(step.tobit)), step.push);
         }
+        captures[num_captures].victim = piece;
+        captures[num_captures].victim_bit = vbit;
+        captures[num_captures].length = steps;
+        captures[num_captures].trap_bit = tbit;
+        captures[num_captures].first_step = *step;
+        num_captures++;
     }
 
     private void gen_0n(Position pos, ulong tbit, Side side)
@@ -1788,16 +1788,19 @@ class TrapGenerator
         neighbors[0] = neighbors_of(pbit[0]);
         neighbors[1] = neighbors_of(pbit[1]);
 
+        assert (popcount(pbit[0]) == 1);
+        assert (popcount(pbit[1]) == 1);
+
         if (side == pos.side)
         {
             if ((neighbors[0] & (1UL << pos.lastfrom))
                     && (pos.lastpiece > pos.pieces[pix[0]] + enemyoffset)
                     && (pos.strongest[side][pix[1]] > pos.pieces[pix[1]] + enemyoffset))
-                gen_2n_pull(pos, tbit, pix[0], pix[1]);
+                gen_2n_pull(pos, tbit, pbit[0], pbit[1]);
             if ((neighbors[1] & (1UL << pos.lastfrom))
                     && (pos.lastpiece > pos.pieces[pix[1]] + enemyoffset)
                     && (pos.strongest[side][pix[0]] > pos.pieces[pix[0]] + enemyoffset))
-                gen_2n_pull(pos, tbit, pix[1], pix[0]);
+                gen_2n_pull(pos, tbit, pbit[1], pbit[0]);
         }
 
         if ((pos.strongest[side][pix[0]] > pos.pieces[pix[0]] + enemyoffset)
@@ -1919,8 +1922,8 @@ class TrapGenerator
                 Piece papiece = cast(Piece)(pos.pieces[bitindex(pabit)]);
 
                 ulong posfreezers = neighbors_of(pabit) & pos.placement[side^1] & ~p1bit
-                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset + enemyoffset]
-                    & ~pos.bitBoards[Piece.WCAT + pieceoffset + enemyoffset];
+                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset - enemyoffset]
+                    & ~pos.bitBoards[Piece.WCAT + pieceoffset - enemyoffset];
                 while (posfreezers)
                 {
                     ulong pfbit = posfreezers & -posfreezers;
@@ -1997,14 +2000,14 @@ class TrapGenerator
             posattackers = tbit;
         while (posattackers)
         {
-            ulong abit = attackers & -attackers;
-            attackers ^= abit;
+            ulong abit = posattackers & -posattackers;
+            posattackers ^= abit;
             Piece apiece = pos.pieces[bitindex(abit)];
             if (abit & pos.frozen)
             {
                 ulong freezers = neighbors_of(abit) & pos.placement[side^1] & ~p1bit & ~p2bit
-                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset + enemyoffset]
-                    & ~pos.bitBoards[Piece.WCAT + pieceoffset + enemyoffset];
+                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset - enemyoffset]
+                    & ~pos.bitBoards[Piece.WCAT + pieceoffset - enemyoffset];
                 while (freezers)
                 {
                     ulong fbit = freezers & -freezers;
@@ -2022,9 +2025,8 @@ class TrapGenerator
                 attackers |= abit;
         }
         if (!attackers)
-        {
             return;
-        }
+
         ulong postos = neighbors_of(attackers);
         if (attackers != tbit)
             postos |= neighbors_of(p2bit);

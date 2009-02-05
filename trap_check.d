@@ -116,7 +116,10 @@ class TrapCheck
                     bool illegal_step = true;
                     for (int s=0; s < legal_steps.numsteps; s++)
                     {
-                        if (cap.first_step == legal_steps.steps[s])
+                        if (cap.first_step == legal_steps.steps[s]
+                                || (cap.first_step.push
+                                    && cap.first_step.frombit == legal_steps.steps[s].frombit
+                                    && cap.first_step.tobit == legal_steps.steps[s].tobit))
                         {
                             illegal_step = false;
                             break;
@@ -132,7 +135,6 @@ class TrapCheck
                         } else {
                             writefln("Tried to capture %s with illegal step %s",
                                     "xRCDHMErcdhme"[cap.victim], cap.first_step.toString(true));
-                            writefln("Current pos:\n%s", pos.to_long_str());
                         }
                         throw new BadCaptureException();
                     }
