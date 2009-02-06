@@ -117,7 +117,7 @@ class TrapCheck
                     for (int s=0; s < legal_steps.numsteps; s++)
                     {
                         if (cap.first_step == legal_steps.steps[s]
-                                || (cap.first_step.push
+                                || (cap.first_step.push && pos.stepsLeft > 1
                                     && cap.first_step.frombit == legal_steps.steps[s].frombit
                                     && cap.first_step.tobit == legal_steps.steps[s].tobit))
                         {
@@ -146,7 +146,8 @@ class TrapCheck
                     npos.do_step(cap.first_step);
                     Step* nstep = steps.newstep();
                     *nstep = cap.first_step;
-                    if (cap.length == 1)
+                    if (cap.length == 1
+                            || (npos.inpush && cap.length == 2))
                     {
                         int pop = pop2count(population(pos), cap.victim);
                         int npop = pop2count(population(npos), cap.victim);
@@ -157,12 +158,50 @@ class TrapCheck
                             writefln("Current pos:\n%s", npos.to_long_str());
                             throw new BadCaptureException();
                         }
+                        if (npos.inpush)
+                        {
+                            StepList psteps = StepList.allocate();
+                            npos.get_steps(psteps);
+                            if (psteps.numsteps == 0)
+                            {
+                                writefln("Could not find piece to finish capture push of %s after %s",
+                                        "xRCDHMErcdhme"[cap.victim], npos.to_long_str());
+                                writefln("Current pos:\n%s", npos.to_long_str());
+                                throw new BadCaptureException();
+                            }
+                            StepList.free(psteps);
+                        }
                     }
                     else if (!npos.inpush)
                     {
                         if (check_captures(start, npos, steps, victim) == Status.LOST)
                         {
                             writefln("Capture of %s lost after %s",
+                                    "xRCDHMErcdhme"[cap.victim], steps.to_move_str(start));
+                            writefln("Current pos:\n%s", npos.to_long_str());
+                            throw new BadCaptureException();
+                        }
+                    }
+                    else if (cap.length > 2)
+                    {
+                        // is a push step
+                        bool found_capture = false;
+                        StepList psteps = StepList.allocate();
+                        npos.get_steps(psteps);
+                        for (int p=0; p < psteps.numsteps; p++)
+                        {
+                            Position ppos = npos.dup;
+                            ppos.do_step(psteps.steps[p]);
+                            (*steps.newstep()) = psteps.steps[p];
+                            if (check_captures(start, ppos, steps, victim) != Status.LOST)
+                                found_capture = true;
+                            steps.pop();
+                            Position.free(ppos);
+                        }
+                        StepList.free(psteps);
+                        if (!found_capture)
+                        {
+                            writefln("Capture of %s lost in push after %s",
                                     "xRCDHMErcdhme"[cap.victim], steps.to_move_str(start));
                             writefln("Current pos:\n%s", npos.to_long_str());
                             throw new BadCaptureException();

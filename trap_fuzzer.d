@@ -62,6 +62,11 @@ int main(char[][] args)
         writefln("%dw", pos_count);
         writefln(pos.to_long_str());
         cap_checker.check_captures(pos, pos, steps);
+        Position bpos = pos.reverse();
+        writefln("%db", pos_count);
+        writefln(bpos.to_long_str());
+        cap_checker.check_captures(bpos, bpos, steps);
+        Position.free(bpos);
         assert (steps.numsteps == 0);
         pos.clear();
     }
