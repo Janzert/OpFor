@@ -61,7 +61,7 @@ class StaticEval
     real pstrength_w = 0.0001;
     real goal_w = 0.3;
     real static_otrap_w = 0.8;
-    real static_strap_w = 0.8;
+    real static_strap_w = 0.6;
     real blockade_w = 1;
     real hostage_w = 1;
 
