@@ -92,6 +92,11 @@ class FullSearch : ABSearch
         }
     }
 
+    int static_eval(Position pos)
+    {
+        return evaluator.static_eval(pos);
+    }
+
     int quiesce(Position pos, int depth, int alpha, int beta)
     {
         int score = MIN_SCORE;

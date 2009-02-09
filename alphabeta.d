@@ -4,6 +4,7 @@ import std.stdio;
 
 import tango.core.Memory;
 
+import goalsearch;
 import logging;
 import position;
 import trapmoves;
@@ -597,6 +598,7 @@ class ABSearch
     HistoryHeuristic cuthistory;
     KillerHeuristic killers;
     TrapGenerator trap_search;
+    GoalSearchDT goal_search;
 
     Position nullmove;
     int max_depth;
@@ -620,6 +622,7 @@ class ABSearch
         StepSorter.cuthistory = cuthistory;
         trap_search = new TrapGenerator();
         StepSorter.trap_search = trap_search;
+        goal_search = new GoalSearchDT();
         killers = new KillerHeuristic();
         StepSorter.killers = killers;
         nodes_searched = 0;
@@ -667,6 +670,11 @@ class ABSearch
         throw new Exception("eval must be implemented");
     }
 
+    int static_eval(Position pos)
+    {
+        throw new Exception("eval must be implemented");
+    }
+
     int logged_eval(Position pos)
     {
         throw new Exception("eval must be implemented");
@@ -705,8 +713,24 @@ class ABSearch
             prev_best = &node.beststep;
         }
 
+        bool in_pv = (alpha+1) != beta;
         Step new_best;
-        if (depth < 1 && !pos.inpush)
+        bool stop_search = false;
+        if (!pos.inpush && depth < 1)
+        {
+            if (in_pv && height <= max_depth + 8)
+            {
+                goal_search.set_start(pos);
+                goal_search.find_goals();
+
+                if (goal_search.shortest[pos.side^1] == goal_search.NOT_FOUND
+                        || goal_search.shortest[pos.side] <= pos.stepsLeft)
+                    stop_search = true;
+            } else {
+                stop_search = true;
+            }
+        }
+        if (stop_search)
         {
             score = eval(pos, alpha, beta);
 
@@ -757,7 +781,6 @@ class ABSearch
                 StepSorter.free(sorted_steps);
                 return -WIN_SCORE;
             }
-            bool in_pv = (alpha+1) != beta;
             while (curstep !is null)
             {
                 nodes_searched++;

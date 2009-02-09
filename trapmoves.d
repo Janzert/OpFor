@@ -657,6 +657,45 @@ class TrapGenerator
                                 }
                             }
 
+                            // can we pull an opponent away from p so pn can push it
+                            clear = neighbors_of(pbit) & pos.placement[side^1] & ~tbit;
+                            while (clear)
+                            {
+                                ulong cbit = clear & -clear;
+                                clear ^= cbit;
+                                bitix cix = bitindex(cbit);
+
+                                ulong c_neighbors = neighbors_of(cbit);
+                                if ((c_neighbors & lastbit) && (lastbit & ~t_neighbors)
+                                        && pos.lastpiece > pos.pieces[cix] + enemyoffset)
+                                {
+                                    add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
+                                    if (!findall)
+                                        return;
+                                }
+                                ulong pullers = c_neighbors & ~t_neighbors & ~pos.frozen
+                                    & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
+                                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
+                                while (pullers)
+                                {
+                                    ulong pullbit = pullers & -pullers;
+                                    pullers ^= pullbit;
+                                    bitix pullix = bitindex(pullbit);
+                                    if (pos.pieces[pullix] > pos.pieces[cix] + enemyoffset)
+                                    {
+                                        ulong tobits = neighbors_of(pullbit) & pos.bitBoards[Piece.EMPTY];
+                                        while (tobits)
+                                        {
+                                            ulong tobit = tobits & -tobits;
+                                            tobits ^= tobit;
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
+                                            if (!findall)
+                                                return;
+                                        }
+                                    }
+                                }
+                            }
+
                             clear = neighbors_of(pnbit) & pos.placement[side];
                             if (pos.pieces[pnix] >= pos.strongest[side^1][pnix] + enemyoffset
                                     || (clear != (clear & -clear)))
@@ -720,6 +759,45 @@ class TrapGenerator
                                                         return;
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // can we pull an opponent away from pn so it has space to pull
+                            clear = neighbors_of(pnbit) & pos.placement[side^1] & ~pbit;
+                            while (clear)
+                            {
+                                ulong cbit = clear & -clear;
+                                clear ^= cbit;
+                                bitix cix = bitindex(cbit);
+
+                                ulong c_neighbors = neighbors_of(cbit);
+                                if ((c_neighbors & lastbit)
+                                        && pos.lastpiece > pos.pieces[cix] + enemyoffset)
+                                {
+                                    add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
+                                    if (!findall)
+                                        return;
+                                }
+                                ulong pullers = c_neighbors & ~pnbit & ~pos.frozen
+                                    & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
+                                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
+                                while (pullers)
+                                {
+                                    ulong pullbit = pullers & -pullers;
+                                    pullers ^= pullbit;
+                                    bitix pullix = bitindex(pullbit);
+                                    if (pos.pieces[pullix] > pos.pieces[cix] + enemyoffset)
+                                    {
+                                        ulong tobits = neighbors_of(pullbit) & pos.bitBoards[Piece.EMPTY];
+                                        while (tobits)
+                                        {
+                                            ulong tobit = tobits & -tobits;
+                                            tobits ^= tobit;
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
+                                            if (!findall)
+                                                return;
                                         }
                                     }
                                 }
@@ -1082,7 +1160,8 @@ class TrapGenerator
                                     }
                                     if (tobits && ((unfbit & ~pnn_neighbors)
                                                 || (pnn_neighbors & pos.placement[side] & ~unfbit)
-                                                || (pos.pieces[pnnix] >= pos.strongest[side^1][pnnix] + enemyoffset)))
+                                                || ((pos.pieces[pnnix] >= pos.strongest[side^1][pnnix] + enemyoffset)
+                                                    && (pnnbit & ~TRAPS))))
                                     {
                                         // unfreezer can move first
                                         while (tobits)
@@ -1610,7 +1689,7 @@ class TrapGenerator
                                     potentialsteps ^= tobit;
                                     if ((tobit & ~TRAPS)
                                             || (pos.pieces[fix] >= pos.strongest[side^1][pnix] + enemyoffset)
-                                            || (neighbors_of(tobit) & pos.placement[side]))
+                                            || (neighbors_of(tobit) & pos.placement[side] & ~pnbit))
                                     {
                                         // finisher won't be frozen once moving into the neighbor square
                                         real_finish = true;
@@ -1671,12 +1750,6 @@ class TrapGenerator
                                         ulong sbit = supporters & -supporters;
                                         supporters ^= sbit;
 
-                                        if ((sbit & neighbors_of(abit))
-                                                && !(neighbors_of(abit) & pos.placement[side] & ~sbit)
-                                                && (pos.pieces[aix] < pos.strongest[side^1][aix] + enemyoffset
-                                                    || (abit & TRAPS)))
-                                            continue;
-
                                         ulong tobits = neighbors_of(sbit) & neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
                                         if (pos.bitBoards[Piece.WRABBIT + pieceoffset] & sbit)
                                         {
@@ -1688,6 +1761,21 @@ class TrapGenerator
                                                 rabbitsteps &= ~((sbit & NOT_RANK_8) << 8);
                                             }
                                             tobits &= rabbitsteps;
+                                        }
+                                        if ((sbit & neighbors_of(abit))
+                                                && !(neighbors_of(abit) & pos.placement[side] & ~sbit)
+                                                && (pos.pieces[aix] < pos.strongest[side^1][aix] + enemyoffset
+                                                    || (abit & TRAPS)))
+                                        {
+                                            bitix six = bitindex(sbit);
+                                            if (tobits
+                                                    && (neighbors_of(sbit) & pos.placement[side] & ~abit
+                                                        || ((abit & ~TRAPS)
+                                                            && pos.pieces[six] >= pos.strongest[side^1][six] + enemyoffset)))
+                                            {
+                                                ab_first = true;
+                                            }
+                                            continue;
                                         }
                                         if (tobits & (TRAPS & ~neighbors_of(pos.placement[side] & ~sbit)))
                                         {
@@ -1704,7 +1792,7 @@ class TrapGenerator
                                                 return;
                                         }
                                     }
-                                    if (ab_first)
+                                    if (ab_first && (pnbit & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~abit))))
                                     {
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, abit, pnbit);
                                         if (!findall)
@@ -1789,7 +1877,10 @@ class TrapGenerator
                             else if (!(((pnbit & TRAPS)
                                         || (pos.pieces[aix] < pos.strongest[side^1][pnix] + enemyoffset))
                                     && !(neighbors_of(pnbit) & pos.placement[side] & ~abit))
-                                    && (min_clear_steps == 0))
+                                    && (min_clear_steps == 0 || (popcount(t_neighbors & pos.placement[side]) == 1
+                                            && (t_neighbors & pos.placement[side]
+                                                & neighbors_of(neighbors_of(abit) & pos.bitBoards[Piece.EMPTY])
+                                                & ~pos.frozen))))
                             {
                                 // attacker is frozen, intermediate space is safe
                                 ulong supporters = neighbors_of(neighbors_of(abit) & pos.bitBoards[Piece.EMPTY] & ~pnbit)
@@ -1798,6 +1889,8 @@ class TrapGenerator
                                             || pos.pieces[aix] < pos.strongest[side^1][pnix] + enemyoffset)
                                         && popcount(neighbors_of(pnbit) & pos.placement[side] & ~abit) == 1)
                                     supporters &= ~neighbors_of(pnbit);
+                                if (min_clear_steps)
+                                    supporters &= t_neighbors;
                                 while (supporters)
                                 {
                                     ulong sbit = supporters & -supporters;
@@ -1881,21 +1974,38 @@ class TrapGenerator
                         bitix aix = bitindex(abit);
 
                         if ((pos.pieces[aix] > pos.pieces[pnix] + enemyoffset)
-                                && (pos.pieces[aix] > pos.pieces[pix] + enemyoffset)
-                                && ((pos.pieces[aix] >= pos.strongest[side^1][pnix] + enemyoffset)
-                                    || (neighbors_of(pnbit) & pos.placement[side] & ~abit)))
+                                && (pos.pieces[aix] > pos.pieces[pix] + enemyoffset))
                         {
-                            // attacker is strong enough to push both pieces
-                            // and won't be frozen after first push
+                            if (!(neighbors_of(pnbit) & pos.placement[side] & ~abit)
+                                    && pos.pieces[aix] < pos.strongest[side^1][pnix] + enemyoffset)
+                            {
+                                // attacker will freeze unless freezer is trapped by first step
+                                ulong freezers = neighbors_of(pnbit) & pos.placement[side^1];
+                                if (!(freezers & (TRAPS & ~neighbors_of(pos.placement[side^1] & ~pnbit))))
+                                    continue;
+                                freezers &= ~(TRAPS & ~neighbors_of(pos.placement[side^1] & ~pnbit));
+                                while (freezers)
+                                {
+                                    ulong fbit = freezers & -freezers;
+                                    bitix fix = bitindex(fbit);
+                                    if (pos.pieces[aix] < pos.pieces[fix] + enemyoffset)
+                                        break;
+                                    freezers ^= fbit;
+                                }
+                                if (freezers)
+                                    continue;
+                            }
+
+                            // attacker can finish it
                             ulong tobits = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~neighbors_of(tbit);
                             while (tobits)
                             {
                                 ulong tobit = tobits & -tobits;
                                 tobits ^= tobit;
-
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, pnbit, tobit, true);
                                 if (!findall)
                                     return;
+                                attackers = 0UL;
                             }
                         }
                     }
@@ -2022,7 +2132,7 @@ class TrapGenerator
         }
         else if ((tbit & pos.placement[side^1])
                 && p2rattackers && (p2pushto || p2pullto
-                    || (p1neighbors & p2attackers)))
+                    || (p2neighbors & p1attackers)))
         {
             Piece tpiece = pos.pieces[bitindex(tbit)];
             ulong pushtos = p1neighbors & pos.bitBoards[Piece.EMPTY];
