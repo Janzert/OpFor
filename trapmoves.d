@@ -2204,16 +2204,18 @@ class TrapGenerator
                     return;
             }
         }
-        if ((tbit & pos.bitBoards[Piece.EMPTY])
-                && (!(p1neighbors & pos.bitBoards[Piece.EMPTY] & ~tbit)
-                    && p2rattackers && ((p2pushto | p2pullto)
-                        || (p2neighbors & p1attackers))
-                    || (!(p2rattackers & ~pos.frozen)
+        if ((tbit & pos.bitBoards[Piece.EMPTY])     // trap is empty
+                && ((!(p1neighbors & pos.bitBoards[Piece.EMPTY] & ~tbit) // no empty space by p1
+                        && p2rattackers
+                        && ((p2pushto | p2pullto)   // p2 to square or p1 attacker can open space
+                            || ((p2neighbors & p1attackers)
+                                && (p2rattackers & ~p1attackers & ~pos.frozen)))) // p2 attacker after space is open
+                    || (!(p2rattackers & ~pos.frozen) // no unfrozen p2 attacker until p1 is pushed away
                         && (p2attackers & p1neighbors)
                         && (p2pushto
                             || (neighbors_of(p2attackers & p1neighbors)
                                 & pos.bitBoards[Piece.EMPTY])))
-                    || (p2rattackers && (p2neighbors & p1attackers)
+                    || (p2rattackers && (p2neighbors & p1attackers) // no place to put p2 until p1 is out of the way
                         && !p2pushto && !p2pullto)))
         {
             add_capture(p1piece, p1bit, 4, tbit, p1bit, tbit, true);

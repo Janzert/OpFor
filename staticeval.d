@@ -1003,7 +1003,7 @@ class StaticEval
     int goal_threat()
     {
         // Depends on goal search being done first
-        const int[18] GOAL_THREAT = [10000, 10000, 10000, 8000, 6000,
+        const int[18] GOAL_THREAT = [10000, 8000, 7500, 7000, 6000,
               1000, 1000, 800, 600,
               100, 100, 80, 60,
               10, 10, 8, 6, 0];
