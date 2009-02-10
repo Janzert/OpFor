@@ -1004,7 +1004,7 @@ class TrapGenerator
                                 }
                                 if (!ofreezers || (neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY]))
                                 {
-                                    bool did_push = false;
+                                    bool can_push = false;
                                     ulong pushers = neighbors_of(pnnbit) & pos.placement[side] & ~pos.frozen;
                                     while (pushers)
                                     {
@@ -1014,20 +1014,7 @@ class TrapGenerator
 
                                         if (pos.pieces[perix] > pos.pieces[pnnix] + enemyoffset)
                                         {
-                                            if (!did_push)
-                                            {
-                                                ulong pushtos = neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY];
-                                                while (pushtos)
-                                                {
-                                                    ulong tobit = pushtos & -pushtos;
-                                                    pushtos ^= tobit;
-
-                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, tobit, true);
-                                                    if (!findall)
-                                                        return;
-                                                }
-                                                did_push = true;
-                                            }
+                                            can_push = true;
                                             if (!ofreezers)
                                             {
                                                 ulong pulltos = neighbors_of(perbit) & pos.bitBoards[Piece.EMPTY];
@@ -1041,6 +1028,76 @@ class TrapGenerator
                                                         return;
                                                 }
                                             }
+                                        }
+                                    }
+                                    if (can_push)
+                                    {
+                                        ulong pushtos = neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY];
+                                        if (popcount(neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY]) == 1
+                                                && !(neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY]))
+                                            pushtos &= ~neighbors_of(pbit);
+                                        while (pushtos)
+                                        {
+                                            ulong tobit = pushtos & -pushtos;
+                                            pushtos ^= tobit;
+
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, tobit, true);
+                                            if (!findall)
+                                                return;
+                                        }
+                                    }
+                                }
+                                if (!ofreezers && (pnnbit & TRAPS)
+                                        && popcount(neighbors_of(pnnbit) & pos.placement[side^1]) == 1)
+                                {
+                                    ulong holder = neighbors_of(pnnbit) & pos.placement[side^1];
+                                    bitix hix = bitindex(holder);
+
+                                    if ((neighbors_of(holder) & (1UL << pos.lastfrom))
+                                            && pos.lastpiece > pos.pieces[hix] + enemyoffset)
+                                    {
+                                        add_capture(pos.pieces[tix], tbit, 3, tbit,
+                                                holder, (1UL << pos.lastfrom));
+                                        if (!findall)
+                                            return;
+                                    }
+
+                                    bool can_push = false;
+                                    ulong pushers = neighbors_of(holder) & pos.placement[side] & ~pos.frozen
+                                        & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
+                                    while (pushers)
+                                    {
+                                        ulong pubit = pushers & -pushers;
+                                        pushers ^= pubit;
+                                        bitix puix = bitindex(pubit);
+
+                                        if (pos.pieces[puix] > pos.pieces[hix] + enemyoffset)
+                                        {
+                                            can_push = true;
+                                            ulong tobits = neighbors_of(pubit) & pos.bitBoards[Piece.EMPTY];
+                                            while (tobits)
+                                            {
+                                                ulong tobit = tobits & -tobits;
+                                                tobits ^= tobit;
+
+                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pubit, tobit);
+                                                if (!findall)
+                                                    return;
+                                            }
+                                        }
+                                    }
+                                    if (can_push)
+                                    {
+                                        ulong tobits = neighbors_of(holder) & pos.bitBoards[Piece.EMPTY];
+                                        if (pos.pieces[pnix] < pos.pieces[hix] + enemyoffset)
+                                            tobits &= ~neighbors_of(pnbit);
+                                        while (tobits)
+                                        {
+                                            ulong tobit = tobits & -tobits;
+                                            tobits ^= tobit;
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, holder, tobit, true);
+                                            if (!findall)
+                                                return;
                                         }
                                     }
                                 }
@@ -2118,7 +2175,7 @@ class TrapGenerator
 
         if (((tbit & pos.bitBoards[Piece.EMPTY]) && p2rattackers)
                 || ((tbit & p2attackers) && (neighbors_of(tbit) & pos.bitBoards[Piece.EMPTY]))
-                || ((tbit & p1attackers) && (p2rattackers || (p1neighbors & p2attackers))))
+                || ((tbit & p1attackers) && ((p2rattackers | (p1neighbors & p2attackers)) & ~tbit)))
         {
             ulong pushtos = p1neighbors & pos.bitBoards[Piece.EMPTY] & ~tbit;
             while (pushtos)

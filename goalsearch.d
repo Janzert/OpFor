@@ -1919,22 +1919,23 @@ class GoalSearchDT
                         {
                             ulong bneb = bne & -bne;
                             bne ^= bneb;
-
-                            ulong bnen = neighbors_of(bneb);
-                            // has to be a place to push it to
-                            if (!(bnen & start.bitBoards[Piece.EMPTY]
-                                        & ~back_bit))
-                                continue;
-                            // and at least a possible piece to push it
-                            ulong bnep = bnen & start.placement[side]
-                                & ~start.frozen;
-                            if (!bnep)
-                                continue;
-
                             bitix bneix = bitindex(bneb);
                             if (start.strongest[side][bneix] + enemyoffset
                                     <= start.pieces[bneix])
                                 continue;
+
+                            ulong bnen = neighbors_of(bneb);
+                            // has to be a place to push it to
+                            if (!(bnen & start.bitBoards[Piece.EMPTY]
+                                        & ~back_bit)
+                                    && !(neighbors_of(rbit)
+                                        & start.placement[side]
+                                        & (TRAPS & ~neighbors_of(start.placement[side] & ~rbit))
+                                        & bnen))
+                                continue;
+
+                            ulong bnep = bnen & start.placement[side]
+                                & ~start.frozen;
                             while (bnep)
                             {
                                 ulong bnepb = bnep & -bnep;
