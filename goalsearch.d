@@ -1721,7 +1721,8 @@ class GoalSearchDT
                                                     & start.bitBoards[Piece.EMPTY])
                                                     & start.placement[side]
                                                     & ~start.frozen
-                                                    & ~rbit))
+                                                    & ~rbit)
+                                            && (rbit & ~TRAPS))
                                     {
                                         shortest_goal = 4;
                                     }

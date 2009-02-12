@@ -16,7 +16,7 @@ int main(char[][] args)
 {
     if (args.length < 2)
     {
-        writefln("usage: %s boardfile", getBaseName(args[0]));
+        writefln("usage: %s boardfile [run_playouts]", getBaseName(args[0]));
         return 1;
     }
     char[] boardstr;
@@ -28,6 +28,9 @@ int main(char[][] args)
         writefln("A file exception occured: " ~ fx.toString());
         return 2;
     }
+    bool run_playouts = false;
+    if (args.length > 2)
+        run_playouts = true;
 
     Position pos = position.parse_long_str(boardstr);
     writefln("wb"[pos.side]);
@@ -49,7 +52,7 @@ int main(char[][] args)
     StepList shortest_move;
     foreach (Position res; moves)
     {
-        if (res.endscore() == 1)
+        if (res.is_goal(pos.side))
         {
             StepList move = moves.getpos(res);
             int goal_len = 0;
@@ -103,6 +106,14 @@ int main(char[][] args)
         writefln("DT: Black has a goal in %d steps.",
                 gsdt.shortest[Side.BLACK]);
 
+    if (shortest_goal != gsdt.shortest[pos.side])
+    {
+        writefln("Goal detection error.");
+        if (shortest_goal != gsdt.NOT_FOUND)
+            writefln("shortest move %s", shortest_move.to_move_str(pos));
+        return 1;
+    }
+
     if ((shortest_goal != gsdt.NOT_FOUND)
             && (gsdt.shortest[pos.side] != gsdt.NOT_FOUND))
     {
@@ -122,7 +133,7 @@ int main(char[][] args)
                 writefln(mpos.to_long_str());
                 writefln("Is goal in %d", (shortest_goal - (i+1)));
                 writefln("Search found goal in %d", gsdt.shortest[mpos.side]);
-                break;
+                return 1;
             }
         }
         Position.free(mpos);
@@ -169,33 +180,35 @@ int main(char[][] args)
     tcheck.check_captures(pos, pos, sl);
     StepList.free(sl);
 
-    Timer = new ProcessTimesCounter();
-    Timer.start();
-    Position gamepos = Position.allocate();
-    PlayoutResult result;
-    const int tests = 10000;
-    int wins = 0;
-    int totalsteps = 0;
-    for (int plays = 0; plays < tests; plays++)
+    if (run_playouts)
     {
-        gamepos.copy(pos);
-        result = playout_steps(gamepos);
-        if (pos.side == Side.WHITE)
+        Timer = new ProcessTimesCounter();
+        Timer.start();
+        Position gamepos = Position.allocate();
+        PlayoutResult result;
+        const int tests = 10000;
+        int wins = 0;
+        int totalsteps = 0;
+        for (int plays = 0; plays < tests; plays++)
         {
-            if (result.endscore == 1)
-                wins += 1;
-        } else
-        {
-            if (result.endscore == -1)
-                wins += 1;
+            gamepos.copy(pos);
+            result = playout_steps(gamepos);
+            if (pos.side == Side.WHITE)
+            {
+                if (result.endscore == 1)
+                    wins += 1;
+            } else
+            {
+                if (result.endscore == -1)
+                    wins += 1;
+            }
+            totalsteps += result.length;
         }
-        totalsteps += result.length;
+        Position.free(gamepos);
+        Timer.stop();
+        writefln("Win percentage for side to move %.2f%% with random play.", (cast(double)wins / tests) *100.0);
+        writefln("%d playouts took %.2f seconds and averaged %d moves with %d total wins.",  tests, cast(double)Timer.milliseconds / 1000, totalsteps/tests, wins);
     }
-    Position.free(gamepos);
-    Timer.stop();
-    writefln("Win percentage for side to move %.2f%% with random play.", (cast(double)wins / tests) *100.0);
-    writefln("%d playouts took %.2f seconds and averaged %d moves with %d total wins.",  tests, cast(double)Timer.milliseconds / 1000, totalsteps/tests, wins);
-
 
     return 0;
 }
