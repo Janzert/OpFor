@@ -1706,16 +1706,16 @@ class TrapGenerator
                                         }
                                     }
                                 }
-                                else if ((neighbors_of(anbit) & (1UL << pos.lastfrom))
-                                        && (pos.lastpiece > pos.pieces[anix] + enemyoffset)
-                                        && !ofreezers)
+                                if (!ofreezers
+                                        && (neighbors_of(anbit) & (1UL << pos.lastfrom))
+                                        && (pos.lastpiece > pos.pieces[anix] + enemyoffset))
                                 {
                                     add_capture(pos.pieces[pix], pbit, 3 + min_clear_steps,
                                             tbit, anbit, (1UL << pos.lastfrom));
                                     if (!findall)
                                         return;
                                 }
-                                else if (!ofreezers
+                                if (!ofreezers
                                         && (anbit & TRAPS)
                                         && popcount(neighbors_of(anbit) & pos.placement[side^1]) == 1
                                         && (neighbors_of(neighbors_of(anbit) & pos.placement[side^1])

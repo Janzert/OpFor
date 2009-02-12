@@ -1,18 +1,42 @@
 #!/usr/bin/python
 
+import os
 import sys
 
 from subprocess import Popen
 
+
+library_path = os.path.expanduser("~/dmd/lib")
+
 sourcefiles = ["bot_opfor.d", "aeibot.d", "alphabeta.d", "logging.d",
         "goalsearch.d", "position.d", "setupboard.d", "staticeval.d",
         "trapmoves.d", "zobristkeys.d", "Arguments.d"]
-if len(sys.argv) > 1:
-    cmd = ["dmd"] + sys.argv[1:] + sourcefiles
-else:
-    cmd = ["dmd", "-release", "-O", "-inline"] + sourcefiles
-print " ".join(cmd)
 
-p = Popen(cmd)
-p.wait()
+
+args = sys.argv[1:]
+build_static = False
+if len(args) and ("-static" in args):
+    for i, arg in enumerate(args):
+        if arg == "-static":
+            args[i] = "-c"
+            build_static = True
+            break
+
+if len(args) == 0 or (len(args) == 1
+        and args[0] == "-c"):
+    args += ["-release", "-O", "-inline"]
+
+cmd = ["dmd"] + args + sourcefiles
+
+print " ".join(cmd)
+Popen(cmd).wait()
+
+if build_static:
+    cmd = ["gcc"]
+    cmd += [f.replace(".d", ".o") for f in sourcefiles]
+    cmd += ["-o", "bot_opfor", "-m32", "-static", "-Xlinker",
+            "-L"+library_path, "-ltangobos", "-ltango-user-dmd",
+            "-ltango-base-dmd", "-lpthread", "-lm"]
+    print " ".join(cmd)
+    Popen(cmd).wait()
 
