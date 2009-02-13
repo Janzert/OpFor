@@ -59,6 +59,7 @@ class TransTable
         store.length = 0;
         store.length = (size*1024*1024) / TTNode.sizeof;
         GC.setAttr(cast(void*)store, GC.BlkAttr.NO_SCAN);
+        age();
         log.log("Set transposition table size to %dMB (%d entries)", size, store.length);
     }
 
@@ -87,9 +88,8 @@ class TransTable
                         node = &store[key];
                     }
                     key = (key + 1) % store.length;
-                    if (node.aged
-                            || store[key].zobrist == pos.zobrist
-                            || node.depth > store[key].depth)
+                    if (store[key].zobrist == pos.zobrist
+                            || (!node.aged && node.depth > store[key].depth))
                     {
                         node = &store[key];
                     }
@@ -695,7 +695,7 @@ class ABSearch
         }
 
         SType sflag = SType.ALPHA;
-        TTNode* node = ttable.get(pos);
+        TTNode node = *ttable.get(pos);
         Step* prev_best;
         if (node.zobrist == pos.zobrist)
         {
@@ -707,6 +707,7 @@ class ABSearch
                     || (node.type == SType.BETA && node.score >= beta))
                 {
                     tthits++;
+                    (*ttable.get(pos)) = node;
                     return node.score;
                 }
             }
@@ -913,6 +914,7 @@ class ABSearch
         }
 
         node.set(pos, depth, score, sflag, new_best);
+        (*ttable.get(pos)) = node;
 
         if (nodes_searched > check_nodes)
         {

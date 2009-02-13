@@ -1171,7 +1171,8 @@ class TrapGenerator
 
                                 if ((pos.pieces[perix] > pos.pieces[pix] + enemyoffset)
                                         && ((pos.pieces[perix] >= pos.strongest[side^1][pnix] + enemyoffset)
-                                            || (pos.placement[side] & neighbors_of(pnbit)))
+                                            || (pos.placement[side] & neighbors_of(pnbit)
+                                                & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~perbit))))
                                         && ((pos.placement[side] & neighbors_of(pnnbit) & ~perbit)
                                             || !((pnnbit & TRAPS)
                                                 || (pos.pieces[perix] < pos.strongest[side^1][pnnix] + enemyoffset))))
