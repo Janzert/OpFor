@@ -1735,9 +1735,29 @@ class TrapGenerator
                                                 return;
                                         }
                                     }
+                                    bool can_push = false;
                                     ulong unfreezers = neighbors_of(holder) & pos.placement[side] & ~pos.frozen
                                         & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
-                                    if (unfreezers)
+                                    while (unfreezers)
+                                    {
+                                        ulong unfbit = unfreezers & -unfreezers;
+                                        unfreezers ^= unfbit;
+                                        bitix unfix = bitindex(unfbit);
+
+                                        if (pos.pieces[unfix] > hpiece + enemyoffset)
+                                        {
+                                            can_push = true;
+                                            ulong tobits = neighbors_of(unfbit) & pos.bitBoards[Piece.EMPTY];
+                                            while (tobits)
+                                            {
+                                                ulong tobit = tobits & -tobits;
+                                                tobits ^= tobit;
+                                                add_capture(pos.pieces[pix], pbit, 4 + min_clear_steps,
+                                                        tbit, unfbit, tobit);
+                                            }
+                                        }
+                                    }
+                                    if (can_push)
                                     {
                                         ulong pushtos = neighbors_of(holder) & pos.bitBoards[Piece.EMPTY];
                                         if (pos.pieces[pnix] < hpiece + enemyoffset)
@@ -1748,20 +1768,6 @@ class TrapGenerator
                                             pushtos ^= tobit;
                                             add_capture(pos.pieces[pix], pbit, 4 + min_clear_steps,
                                                     tbit, holder, tobit, true);
-                                        }
-                                    }
-                                    while (unfreezers)
-                                    {
-                                        ulong unfbit = unfreezers & -unfreezers;
-                                        unfreezers ^= unfbit;
-
-                                        ulong tobits = neighbors_of(unfbit) & pos.bitBoards[Piece.EMPTY];
-                                        while (tobits)
-                                        {
-                                            ulong tobit = tobits & -tobits;
-                                            tobits ^= tobit;
-                                            add_capture(pos.pieces[pix], pbit, 4 + min_clear_steps,
-                                                    tbit, unfbit, tobit);
                                         }
                                     }
                                 }
@@ -2277,12 +2283,17 @@ class TrapGenerator
                     return;
             }
         }
+        p2pullto = neighbors_of(p2attackers & ~pos.frozen) & pos.bitBoards[Piece.EMPTY];
         if ((tbit & pos.bitBoards[Piece.EMPTY])     // trap is empty
                 && ((!(p1neighbors & pos.bitBoards[Piece.EMPTY] & ~tbit) // no empty space by p1
                         && p2rattackers
                         && ((p2pushto | p2pullto)   // p2 to square or p1 attacker can open space
                             || ((p2neighbors & p1attackers)
                                 && (p2rattackers & ~p1attackers & ~pos.frozen)))) // p2 attacker after space is open
+                    || ((p1attackers & ~p2neighbors) // none of the unfrozen p2 attackers can push or pull
+                        && (neighbors_of(p2attackers & p1neighbors)
+                            & pos.bitBoards[Piece.EMPTY])
+                        && !(p2pushto || p2pullto))
                     || (!(p2rattackers & ~pos.frozen) // no unfrozen p2 attacker until p1 is pushed away
                         && (p2attackers & p1neighbors)
                         && (p2pushto

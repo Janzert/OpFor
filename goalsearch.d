@@ -523,13 +523,16 @@ class GoalSearchDT
                 ulong obn = bneighbors & start.placement[side^1];
                 bool can_pull = popcount(bneighbors & start.placement[side^1]
                         & ~start.bitBoards[erabbit]) < 2;
-                if (can_pull && (neighbors_of(obn) & (1UL << start.lastfrom)))
+                if (can_pull && start.lastpiece != Piece.EMPTY
+                        && (neighbors_of(obn) & (1UL << start.lastfrom)))
                 {
                     ulong freezer = obn & ~start.bitBoards[erabbit];
                     assert (popcount(freezer) == 1);
                     ulong fpiece = start.pieces[bitindex(freezer)];
                     if (start.lastpiece + enemyoffset > fpiece)
+                    {
                         return 3;
+                    }
                 }
                 obn &= neighbors_of(start.placement[side]
                         & ~start.bitBoards[myrabbit]);
