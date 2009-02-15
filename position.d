@@ -11,7 +11,7 @@ import zobristkeys;
 typedef byte bitix;
 
 enum Side : byte { WHITE, BLACK }
-enum Piece : byte { EMPTY, WRABBIT, WCAT, WDOG, WHORSE, WCAMEL, WELEPHANT, 
+enum Piece : byte { EMPTY, WRABBIT, WCAT, WDOG, WHORSE, WCAMEL, WELEPHANT,
                     BRABBIT, BCAT, BDOG, BHORSE, BCAMEL, BELEPHANT }
 
 const ulong A_FILE = 0x8080808080808080UL;
@@ -75,7 +75,7 @@ bitix msbindex(ulong value)
 int popcount(ulong value)
 {
     value -= (value >> 1) & 0x5555555555555555UL;
-    value = (value & 0x3333333333333333UL) + 
+    value = (value & 0x3333333333333333UL) +
             ((value >> 2) & 0x3333333333333333UL);
     value = (value + (value >> 4)) & 0x0F0F0F0F0F0F0F0FUL;
     value = (value * 0x0101010101010101UL) >> 56;
@@ -107,7 +107,7 @@ char[] ix_to_alg(bitix index)
     char[] alg;
     alg ~= "hgfedcba"[index % 8];
     alg ~= toString((index / 8) + 1);
-    
+
     return alg;
 }
 
@@ -336,7 +336,7 @@ class StepList
                 Position previous = current.dup;
                 Side pside = (current.pieces[step.fromix] < Piece.BRABBIT ) ? Side.WHITE : Side.BLACK;
                 current.do_step(step);
-                int prevpop = popcount(previous.placement[0] 
+                int prevpop = popcount(previous.placement[0]
                         | previous.placement[1]);
                 int curpop = popcount(current.placement[0]
                         | current.placement[1]);
@@ -349,7 +349,7 @@ class StepList
                     {
                         move ~= ".RCDHMErcdhme"[previous.pieces[ntrapix]];
                         move ~= ix_to_alg(ntrapix);
-                    } else if ((step.tobit & TRAPS) 
+                    } else if ((step.tobit & TRAPS)
                             && !(current.placement[pside] & step.tobit))
                     {
                         move ~= ".RCDHMErcdhme"[previous.pieces[step.fromix]];
@@ -502,7 +502,7 @@ class Position
                         if (pieces[nix] > strong)
                             strong = pieces[nix];
                     }
-                    assert (strongest[sideix][sqix] == strong, 
+                    assert (strongest[sideix][sqix] == strong,
                             format("Incorrect strongest neighbor encountered. %d %d %d %d",
                                    sideix, sqix, strong, strongest[sideix][sqix]));
                 }
@@ -645,13 +645,13 @@ class Position
         frozen = 0;
         placement[0] = 0;
         placement[1] = 0;
-        
+
         bitBoards[0] = ALL_BITS_SET;
         for (int i=1; i < bitBoards.length; i++)
         {
             bitBoards[i] = 0;
         }
-        
+
         for (int i=0; i < pieces.length; i++)
         {
             pieces[i] = Piece.EMPTY;
@@ -961,7 +961,7 @@ class Position
                     ulong pbit = pieces & -pieces;
                     pieces ^= pbit;
                     bitix pix = bitindex(pbit);
-                    
+
                     mstr ~= piece_char[p];
                     mstr ~= ix_to_alg(pix);
                     mstr ~= " ";
@@ -1026,7 +1026,7 @@ class Position
     {
         Side oside = cast(Side)(side ^ 1);
         frozen &= ~frombit;     // make sure from is unfrozen.
-        
+
         ulong fromneighbors = neighbors_of(frombit);
         while (fromneighbors)
         {
@@ -1135,8 +1135,8 @@ class Position
             inpush = step.push;
             zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
         }
-        
-        if (stepsLeft < 1 || 
+
+        if (stepsLeft < 1 ||
             (step.frombit == INV_STEP && step.tobit == INV_STEP)) // pass step
         {
             assert (!inpush, format("stepsleft %d, step.from %d, step.to %d", stepsLeft, step.fromix, step.toix));
@@ -1175,7 +1175,7 @@ class Position
             {
                 throw new ValueException(format("Step column is invalid. %s", step));
             }
-            
+
             bitix fromix = cast(bitix)((rank*8) + (8-column));
             ulong from = 1UL << fromix;
             if (step.length > 3)
@@ -1250,14 +1250,13 @@ class Position
                 placement[(piece < Piece.BRABBIT) ? Side.WHITE : Side.BLACK] |= from;
             }
         }
-        
+
         side = cast(Side)(start_side ^ 1);
         stepsLeft = 4;
         lastpiece = Piece.EMPTY;
         lastfrom = 64;
         inpush = false;
         update_derived();
-        
     }
 
     void place_piece(Piece p, ulong squares, bool clear_other = false)
@@ -1286,7 +1285,6 @@ class Position
     void get_steps(StepList steps)
     {
         Step* step;
-        
         int pieceoffset = 0;
         int enemyoffset = 6;
         if (side)
@@ -1314,7 +1312,7 @@ class Position
             ulong pullmap = 0UL;
 
             // Finish any pulls
-            if (lastpiece > pieceoffset && 
+            if (lastpiece > pieceoffset &&
                 lastpiece <= pieceoffset+6 &&
                 lastpiece-pieceoffset > Piece.WRABBIT)
             // last to move was friendly and stronger than a rabbit
@@ -1642,7 +1640,7 @@ class PosStore
         {
             assert(positions[key].zobrist != pos.zobrist || positions[key] == pos, "Zobrist key collision");
 
-            if (positions[key] !is DELETED_ENTRY && 
+            if (positions[key] !is DELETED_ENTRY &&
                     positions[key].zobrist == pos.zobrist && positions[key] == pos)
                 return true;
             key = (key + keystep) & keymask;
@@ -1754,7 +1752,7 @@ Position parse_long_str(char[] boardstr)
     {
         throw new InvalidBoardException("Invalid side to move.");
     }
-    
+
     if (!std.string.cmp(rowstrs[1], "+-----------------+"))
         throw new InvalidBoardException("Invalid board header.");
 
@@ -1792,7 +1790,7 @@ Position parse_short_str(Side side, int steps, char[] boardstr)
     boardstr = std.string.strip(boardstr);
     if (boardstr.length < 66)
         throw new InvalidBoardException("Not long enough for full board.");
-    
+
     ulong[Piece.max+1] bitboards;
     foreach (int squareix, char piecech; boardstr[1..65])
     {
@@ -1835,7 +1833,7 @@ char[] random_setup_move(Side side)
     return setup;
 }
 
-struct PlayoutResult 
+struct PlayoutResult
 {
     int endscore;
     int length;
@@ -1901,7 +1899,7 @@ real FAME(Position pos, real scale = 33.695652173913032)
         Piece wpiece = Piece.EMPTY;
         while (wpiece == Piece.EMPTY)
         {
-            if (wp_ix != Piece.EMPTY 
+            if (wp_ix != Piece.EMPTY
                     && popcount(pos.bitBoards[wp_ix]) - wused > 0)
             {
                 wpiece = wp_ix;
@@ -1916,7 +1914,7 @@ real FAME(Position pos, real scale = 33.695652173913032)
                 }
             }
         }
-        
+
         Piece bpiece = Piece.EMPTY;
         while (bpiece == Piece.EMPTY)
         {
@@ -1956,7 +1954,7 @@ real FAME(Position pos, real scale = 33.695652173913032)
 
     if (pos.placement[Side.BLACK])
     {
-        int bpieces = popcount(pos.placement[Side.BLACK] 
+        int bpieces = popcount(pos.placement[Side.BLACK]
             & ~pos.bitBoards[Piece.BRABBIT]);
         famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
     } else {
@@ -2065,7 +2063,7 @@ class FastFAME
             Piece wpiece = Piece.EMPTY;
             while (wpiece == Piece.EMPTY)
             {
-                if (wp_ix != Piece.EMPTY 
+                if (wp_ix != Piece.EMPTY
                         && (pop2count(population, wp_ix) - wused) > 0)
                 {
                     wpiece = wp_ix;
@@ -2080,7 +2078,7 @@ class FastFAME
                     }
                 }
             }
-            
+
             Piece bpiece = Piece.EMPTY;
             while (bpiece == Piece.EMPTY)
             {
