@@ -446,6 +446,7 @@ class GoalSearchDT
                 if (unfreezers & ~start.frozen)
                     return 3;
 
+                int shortest_goal = NOT_FOUND;
                 // if the unfreezers are all frozen check to see if another
                 // piece can unfreeze them
                 if (neighbors_of(unfreezers)
@@ -456,7 +457,7 @@ class GoalSearchDT
                                 & ~start.frozen
                                 & ~neighbors_of(forward(unfreezers, side)))))
                 {
-                    return 4;
+                    shortest_goal = 4;
                 }
 
                 ulong pushsq = neighbors_of(bneighbors
@@ -480,7 +481,7 @@ class GoalSearchDT
                                     && (start.pieces[gix] + enemyoffset >
                                         start.strongest[side^1][pix]))
                             {
-                                return 4;
+                                shortest_goal = 4;
                             }
                             continue;
                         }
@@ -488,7 +489,7 @@ class GoalSearchDT
                         if (start.pieces[gix] + enemyoffset
                                 > start.pieces[pnix])
                         {
-                            return 4;
+                            shortest_goal = 4;
                         }
                     }
                 }
@@ -500,7 +501,7 @@ class GoalSearchDT
                 if (unfsq & ~(TRAPS
                             | neighbors_of(start.placement[side^1]
                                 & ~start.placement[side])))
-                    return 4;
+                    shortest_goal = 4;
                 while (unfsq)
                 {
                     ulong unfsqb = unfsq & -unfsq;
@@ -508,24 +509,34 @@ class GoalSearchDT
 
                     ulong unfsq_neighbors = neighbors_of(unfsqb);
                     if (popcount(unfsq_neighbors & start.placement[side]) > 1)
-                        return 4;
+                        shortest_goal = 4;
                     if (unfsqb & TRAPS)
                         continue;
                     bitix unfsqix = bitindex(unfsqb);
                     if (start.strongest[side][unfsqix] + enemyoffset
                             >= start.strongest[side^1][unfsqix])
-                        return 4;
+                        shortest_goal = 4;
                 }
                 ulong push_to = start.bitBoards[Piece.EMPTY];
                 if (popcount(empty_sides) < 2)
                     push_to &= ~empty_sides;
-                ulong obn = bneighbors & start.placement[side^1]
-                    & neighbors_of(start.placement[side]
-                            & ~start.bitBoards[myrabbit]);
+                ulong obn = bneighbors & start.placement[side^1];
                 bool can_pull = popcount(bneighbors & start.placement[side^1]
                         & ~start.bitBoards[erabbit]) < 2;
-                if (!can_pull && !push_to)
-                    return NOT_FOUND;
+                if (can_pull && (neighbors_of(obn) & (1UL << start.lastfrom)))
+                {
+                    ulong freezer = obn & ~start.bitBoards[erabbit];
+                    assert (popcount(freezer) == 1);
+                    ulong fpiece = start.pieces[bitindex(freezer)];
+                    if (start.lastpiece + enemyoffset > fpiece)
+                        return 3;
+                }
+                obn &= neighbors_of(start.placement[side]
+                        & ~start.bitBoards[myrabbit]);
+                push_to &= neighbors_of(obn);
+                if (shortest_goal != NOT_FOUND
+                        || (!can_pull && !push_to))
+                    return shortest_goal;
                 while (obn)
                 {
                     ulong obit = obn & -obn;

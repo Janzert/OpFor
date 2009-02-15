@@ -1,6 +1,7 @@
 
 import re
 import sys
+import time
 
 from subprocess import Popen
 
@@ -19,7 +20,13 @@ while True:
     if next_line == "":
         break
     board_name = next_line
-    check_file = open("regression_board", "w")
+    while True:
+        try:
+            check_file = open("regression_board", "w")
+            break
+        except IOError:
+            print "Could not open regression_board"
+            time.sleep(1)
     for i in range(12):
         check_file.write(next_line)
         next_line = test_boards.readline()
