@@ -914,7 +914,7 @@ int main(char[][] args)
                     } else {
                         pondering = false;
                     }
-                    if (tc_permove)
+                    if (tc_permove && engine.max_depth != -1)
                     {
                         Side myside = engine.position.side;
                         int myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;

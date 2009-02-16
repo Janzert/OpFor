@@ -59,7 +59,7 @@ class StaticEval
     real rweak_w = 1;
     real rstrong_w = 0.04;
     real pstrength_w = 0.0001;
-    real goal_w = 0.3;
+    real goal_w = 1;
     real static_otrap_w = 0.8;
     real static_strap_w = 0.6;
     real blockade_w = 1;
@@ -1003,10 +1003,10 @@ class StaticEval
     int goal_threat()
     {
         // Depends on goal search being done first
-        const int[18] GOAL_THREAT = [10000, 8000, 7500, 7000, 6000,
-              1000, 1000, 800, 600,
-              100, 100, 80, 60,
-              10, 10, 8, 6, 0];
+        const int[18] GOAL_THREAT = [10000, 800, 750, 650, 600,
+              100, 100, 80, 80,
+              40, 40, 30, 30,
+              10, 10, 5, 5, 0];
         const real[] DEFENSE_STEPS = [1.0, 0.8, 0.66, 0.5, 0.33];
         const real[] DEFENSE_NUM = [1.0, 0.8, 0.5, 0.2, 0.1, 0.1, 0.05, 0.01, 0.01];
         const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];

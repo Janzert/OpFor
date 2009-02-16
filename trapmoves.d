@@ -1956,6 +1956,31 @@ class TrapGenerator
                                             break;
                                         }
                                     }
+
+                                    // maybe the freezing piece is on a trap and we can capture it.
+                                    ulong trap_freezer = neighbors_of(pnbit) & pos.placement[side^1] & TRAPS;
+                                    ulong holder = neighbors_of(trap_freezer) & pos.placement[side^1];
+                                    if (trap_freezer && popcount(holder) == 1 && (neighbors_of(abit) & holder))
+                                    {
+                                        Piece hpiece = pos.pieces[bitindex(holder)];
+                                        ulong ofreezers = neighbors_of(pnbit) & pos.placement[side^1] & ~trap_freezer
+                                            & ~pos.bitBoards[Piece.WRABBIT + pieceoffset - enemyoffset]
+                                            & ~pos.bitBoards[Piece.WCAT + pieceoffset - enemyoffset];
+                                        while (ofreezers)
+                                        {
+                                            ulong ofbit = ofreezers & -ofreezers;
+                                            Piece ofpiece = pos.pieces[bitindex(ofbit)];
+                                            if (pos.pieces[aix] < ofpiece + enemyoffset)
+                                                break;
+                                            ofreezers ^= ofbit;
+                                        }
+                                        if (!ofreezers && pos.pieces[aix] > hpiece + enemyoffset)
+                                        {
+                                            add_capture(pos.pieces[pix], pbit, 4, tbit, abit, pnbit);
+                                            if (!findall)
+                                                return;
+                                        }
+                                    }
                                 } else {
                                     switch (min_clear_steps)
                                     {
