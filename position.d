@@ -1282,6 +1282,12 @@ class Position
         update_derived();
     }
 
+    void set_side(Side s)
+    {
+        side = s;
+        update_derived();
+    }
+
     void get_steps(StepList steps)
     {
         Step* step;

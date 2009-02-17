@@ -33,6 +33,12 @@ while True:
     check_file.close()
 
     board_num += 1
+    print "Checking movement on #%d, %s" % (board_num, board_name)
+    movement = Popen(["movement", "regression_board"])
+    if movement.wait():
+        print "Movement error found"
+        sys.exit(0)
+    print
     print "Checking #%d, %s" % (board_num, board_name)
     parseboard = Popen(["parseboard", "regression_board"])
     if parseboard.wait():
