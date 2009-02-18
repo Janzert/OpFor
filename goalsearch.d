@@ -2463,20 +2463,28 @@ class GoalSearchDT
                     ulong safe_sq = ~(TRAPS
                         | neighbors_of(start.placement[side^1]
                                 & ~start.bitBoards[erabbit]));
-                    en &= neighbors_of(start.bitBoards[myrabbit]
-                            & ~start.frozen)
-                        & start.bitBoards[Piece.EMPTY];
-                    if (en & safe_sq)
+                    ulong enn_rabbits = start.bitBoards[myrabbit] & ~start.frozen;
+                    en &= neighbors_of(enn_rabbits) & start.bitBoards[Piece.EMPTY];
+                    enn_rabbits &= neighbors_of(en);
+                    ulong held = neighbors_of(empty_bn)
+                        & neighbors_of(enn_rabbits)
+                        & start.placement[side] & (TRAPS
+                                & ~neighbors_of(start.placement[side]
+                                    & ~enn_rabbits));
+                    if (!held || eb_safe)
                     {
-                        return 4;
-                    }
-                    while (en)
-                    {
-                        ulong enbit = en & -en;
-                        en ^= enbit;
-                        if (popcount(neighbors_of(enbit)
-                                    & start.placement[side]) > 1)
+                        if (en & safe_sq)
+                        {
                             return 4;
+                        }
+                        while (en)
+                        {
+                            ulong enbit = en & -en;
+                            en ^= enbit;
+                            if (popcount(neighbors_of(enbit)
+                                        & start.placement[side]) > 1)
+                                return 4;
+                        }
                     }
                 } // if (empty_bn)
                 if ((shortest_goal != NOT_FOUND)

@@ -1,7 +1,7 @@
 
 import position;
 
-void movement(Position pos, ulong pbit, ulong[] reachable,
+void piece_mobility(Position pos, ulong pbit, ulong[] reachable,
         out ulong frozen)
 in
 {
@@ -252,7 +252,7 @@ debug (test_movement)
                 pbits ^= pbit;
                 ulong[5] move_sq;
                 ulong frozen;
-                movement(pos, pbit, move_sq, frozen);
+                piece_mobility(pos, pbit, move_sq, frozen);
                 reported_movement[p] |= move_sq[4];
             }
         }

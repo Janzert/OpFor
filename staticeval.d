@@ -5,6 +5,7 @@ import std.stdio;
 import alphabeta;
 import goalsearch;
 import logging;
+import movement;
 import position;
 import trapmoves;
 
@@ -46,6 +47,7 @@ class StaticEval
     ulong[2] safe_traps;
     ulong[2] active_traps;
     int[64] pstrengths;
+    ulong hostages;
 
     ScoreCache sc_cache;
 
@@ -64,6 +66,7 @@ class StaticEval
     real static_strap_w = 0.6;
     real blockade_w = 1;
     real hostage_w = 1;
+    real mobility_w = 1;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
@@ -123,6 +126,9 @@ class StaticEval
                 break;
             case "eval_hostage":
                 hostage_w = toReal(value);
+                break;
+            case "eval_mobility":
+                mobility_w = toReal(value);
                 break;
             case "eval_cache_size":
                 sc_cache.set_size(toInt(value));
@@ -669,7 +675,7 @@ class StaticEval
         return cast(int)(score * pop_mul);
     }
 
-    int mobility()
+    int block_and_hostage()
     {
         // Depends on piece strength done first
         static const int[] BLOCKADE_VAL = [0, -5, -12, -16, -30, -55, -132,
@@ -785,6 +791,7 @@ class StaticEval
                     }
                     hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
                     hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3; // magic number is frozen_w
+                    hostages |= pbit;
                 }
             }
 
@@ -820,12 +827,71 @@ class StaticEval
 
                         Piece strong_holder = pos.strongest[side^1][pix];
                         hscore += HOLDER_PENALTY[strong_holder];
+                        hostages |= pbit;
                     }
                 }
             }
         }
 
         return cast(int)((bscore * blockade_w) + (hscore * hostage_w));
+    }
+
+    int mobility()
+    {
+        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -350,
+                     1, 5, 10, 50, 150, 350];
+        static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
+        static const int[] MOBILE_VAL = [0, 10, 3, 1];
+        static const real[] SIDE_MUL = [0.3, -0.3];
+
+        real score = 0;
+        for (Side side = Side.WHITE; side <= Side.BLACK; side++)
+        {
+            int pieces_checked;
+            int pieceoffset = 0;
+            if (side == Side.BLACK)
+            {
+                pieceoffset = 6;
+            }
+
+            for (int p = Piece.WELEPHANT + pieceoffset; p > Piece.WRABBIT + pieceoffset; p--)
+            {
+                ulong pieces = pos.bitBoards[p];
+                if (pieces)
+                {
+                    pieces_checked++;
+                    if (pieces_checked > 3)
+                        break;
+                }
+                while (pieces)
+                {
+                    ulong pbit = pieces & -pieces;
+                    pieces ^= pbit;
+
+                    ulong[5] tosquares;
+                    ulong frozen;
+                    piece_mobility(pos, pbit, tosquares, frozen);
+                    int mobility = popcount(tosquares[4] & ~frozen);
+                    if (mobility > 4)
+                    {
+                        ulong neighbor_trap = neighbors_of(pbit) & TRAPS;
+                        ulong trap_area = neighbors_of(neighbor_trap);
+                        trap_area |= neighbors_of(trap_area);
+                        bitix ntix = bitindex(neighbor_trap);
+                        if (!neighbor_trap || pos.strongest[side][ntix] != p
+                                    || popcount(neighbors_of(neighbor_trap)
+                                        & pos.placement[side] & ~pos.frozen) > 2
+                                    || !(hostages & trap_area & pos.placement[side]))
+                        {
+                            score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
+                        }
+                    } else {
+                        score += BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
+                    }
+                }
+            }
+        }
+        return cast(int)score;
     }
 
     int static_trap_eval(Side side, int pop, int fscore)
@@ -1127,7 +1193,8 @@ class StaticEval
 
         score += trap_safety() * tsafety_w;
         score += piece_strength() * pstrength_w;
-        score += mobility();
+        score += block_and_hostage();
+        score += mobility() * mobility_w;
         score += rabbit_strength();
         score += rabbit_wall() * rwall_w;
         score += rabbit_open() * ropen_w;
@@ -1185,7 +1252,10 @@ class StaticEval
         score += piece_strength() * pstrength_w;
         logger.log("piece strength %d", score-pscore);
         pscore = score;
-        score += mobility();
+        score += block_and_hostage();
+        logger.log("blockade and hostage %d", score-pscore);
+        pscore = score;
+        score += mobility() * mobility_w;
         logger.log("mobility %d", score-pscore);
         pscore = score;
         score += rabbit_strength();

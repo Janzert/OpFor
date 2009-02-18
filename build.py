@@ -9,8 +9,8 @@ from subprocess import Popen
 library_path = os.path.expanduser("~/dmd/lib")
 
 sourcefiles = ["bot_opfor.d", "aeibot.d", "alphabeta.d", "logging.d",
-        "goalsearch.d", "position.d", "setupboard.d", "staticeval.d",
-        "trapmoves.d", "zobristkeys.d", "Arguments.d"]
+        "movement.d", "goalsearch.d", "position.d", "setupboard.d",
+        "staticeval.d", "trapmoves.d", "zobristkeys.d", "Arguments.d"]
 
 
 args = sys.argv[1:]
