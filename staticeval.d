@@ -881,7 +881,8 @@ class StaticEval
                         if (!neighbor_trap || pos.strongest[side][ntix] != p
                                     || popcount(neighbors_of(neighbor_trap)
                                         & pos.placement[side] & ~pos.frozen) > 2
-                                    || !(hostages & trap_area & pos.placement[side]))
+                                    || !((hostages & trap_area & pos.placement[side])
+                                        || (neighbors_of(pbit) & hostages & pos.placement[side^1])))
                         {
                             score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
                         }
