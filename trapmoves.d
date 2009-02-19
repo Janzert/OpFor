@@ -791,6 +791,23 @@ class TrapGenerator
                                     if (!findall)
                                         return;
                                 }
+                                if ((cbit & TRAPS)
+                                        && (neighbors_of(neighbors_of(cbit) & pos.placement[side^1])
+                                            & lastbit))
+                                {
+                                    ulong holder = neighbors_of(cbit) & pos.placement[side^1];
+                                    if (holder == (holder & -holder))
+                                    {
+                                        assert (neighbors_of(holder) & lastbit);
+                                        Piece hpiece = pos.pieces[bitindex(holder)];
+                                        if (pos.lastpiece > hpiece + enemyoffset)
+                                        {
+                                            add_capture(pos.pieces[tix], tbit, 3, tbit, holder, lastbit);
+                                            if (!findall)
+                                                return;
+                                        }
+                                    }
+                                }
                                 ulong pullers = c_neighbors & ~pnbit & ~pos.frozen
                                     & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
                                     & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];

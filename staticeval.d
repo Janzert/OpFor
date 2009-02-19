@@ -842,7 +842,7 @@ class StaticEval
                      1, 5, 10, 50, 150, 350];
         static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
         static const int[] MOBILE_VAL = [0, 10, 3, 1];
-        static const real[] SIDE_MUL = [0.3, -0.3];
+        static const real[] SIDE_MUL = [0.2, -0.2];
 
         real score = 0;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
@@ -874,18 +874,7 @@ class StaticEval
                     int mobility = popcount(tosquares[4] & ~frozen);
                     if (mobility > 4)
                     {
-                        ulong neighbor_trap = neighbors_of(pbit) & TRAPS;
-                        ulong trap_area = neighbors_of(neighbor_trap);
-                        trap_area |= neighbors_of(trap_area);
-                        bitix ntix = bitindex(neighbor_trap);
-                        if (!neighbor_trap || pos.strongest[side][ntix] != p
-                                    || popcount(neighbors_of(neighbor_trap)
-                                        & pos.placement[side] & ~pos.frozen) > 2
-                                    || !((hostages & trap_area & pos.placement[side])
-                                        || (neighbors_of(pbit) & hostages & pos.placement[side^1])))
-                        {
-                            score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
-                        }
+                        score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
                     } else {
                         score += BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
                     }
