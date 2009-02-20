@@ -1631,45 +1631,55 @@ class TrapGenerator
                                     }
                                 }
 
-                                if (min_clear_steps == 0)
+                                ulong tobits = neighbors_of(anbit) & pos.bitBoards[Piece.EMPTY];
+                                while (tobits)
                                 {
-                                    ulong tobits = neighbors_of(anbit) & pos.bitBoards[Piece.EMPTY];
-                                    while (tobits)
+                                    ulong tobit = tobits & -tobits;
+                                    tobits ^= tobit;
+                                    bitix toix = bitindex(tobit);
+
+                                    unfreezers = neighbors_of(tobit) & pos.placement[side] & ~pos.frozen;
+                                    while (unfreezers)
                                     {
-                                        ulong tobit = tobits & -tobits;
-                                        tobits ^= tobit;
-                                        bitix toix = bitindex(tobit);
+                                        ulong unfbit = unfreezers & -unfreezers;
+                                        unfreezers ^= unfbit;
+                                        bitix unfix = bitindex(unfbit);
 
-                                        unfreezers = neighbors_of(tobit) & pos.placement[side] & ~pos.frozen;
-                                        while (unfreezers)
+                                        if ((pos.pieces[unfix] == Piece.WRABBIT
+                                                    && unfbit >> 8 == tobit)
+                                                || (pos.pieces[unfix] == Piece.BRABBIT
+                                                    && unfbit << 8 == tobit))
                                         {
-                                            ulong unfbit = unfreezers & -unfreezers;
-                                            unfreezers ^= unfbit;
-                                            bitix unfix = bitindex(unfbit);
+                                            continue;
+                                        }
 
-                                            if ((pos.pieces[unfix] == Piece.WRABBIT
-                                                        && unfbit >> 8 == tobit)
-                                                    || (pos.pieces[unfix] == Piece.BRABBIT
-                                                        && unfbit << 8 == tobit))
+                                        if (((pos.pieces[unfix] >= pos.strongest[side^1][toix] + enemyoffset)
+                                                    && !(tobit & TRAPS))
+                                                || (neighbors_of(tobit) & pos.placement[side] & ~unfbit))
+                                        {
+                                            if (unfbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
                                             {
-                                                continue;
+                                                ulong backward = unfbit | tobit;
+                                                backward = (side == Side.WHITE) ? backward >> 8 : backward << 8;
+                                                if ((tobit | anbit) & backward)
+                                                    continue;
                                             }
-
-                                            if (((pos.pieces[unfix] >= pos.strongest[side^1][toix] + enemyoffset)
-                                                        && !(tobit & TRAPS))
-                                                    || (neighbors_of(tobit) & pos.placement[side] & ~unfbit))
+                                            if (min_clear_steps && (neighbors_of(unfbit) & tbit)
+                                                    && !(neighbors_of(tbit) & pos.placement[side] & ~unfbit))
                                             {
-                                                if (unfbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                                {
-                                                    ulong backward = unfbit | tobit;
-                                                    backward = (side == Side.WHITE) ? backward >> 8 : backward << 8;
-                                                    if ((tobit | anbit) & backward)
-                                                        continue;
-                                                }
                                                 add_capture(pos.pieces[pix], pbit, 4, tbit, unfbit, tobit);
-                                                if (!findall)
-                                                    return;
                                             }
+                                            if (min_clear_steps)
+                                            {
+                                                for (int i=0; i < num_clears; i++)
+                                                {
+                                                    add_capture(pos.pieces[pix], pbit, 4 + clear_length[i], tbit, &clear_first_step[i]);
+                                                }
+                                            } else {
+                                                add_capture(pos.pieces[pix], pbit, 4, tbit, unfbit, tobit);
+                                            }
+                                            if (!findall)
+                                                return;
                                         }
                                     }
                                 }
@@ -2399,8 +2409,10 @@ class TrapGenerator
         {
             ulong tobit = neighbors_of(tbit) & pos.bitBoards[Piece.EMPTY];
             assert (popcount(tobit) == 1);
-            if (p2to || (neighbors_of(p2rattackers) & (pos.bitBoards[Piece.EMPTY] | p1bit) & ~tobit)
-                || (neighbors_of(tobit) & p2attackers & neighbors_of((pos.bitBoards[Piece.EMPTY] | p1bit)
+            if (p2to || (neighbors_of(p2rattackers & ~tbit)
+                        & (pos.bitBoards[Piece.EMPTY] | p1bit) & ~tobit)
+                || (neighbors_of(tobit) & (p2attackers & ~tbit)
+                    & neighbors_of((pos.bitBoards[Piece.EMPTY] | p1bit)
                         & ~tobit)))
             {
                 add_capture(p1piece, p1bit, 4, tbit, tbit, tobit);
@@ -2439,7 +2451,7 @@ class TrapGenerator
                 {
                     ulong pbit = pulls & -pulls;
                     pulls ^= pbit;
-                    if (!(p2to & ~pbit) && !((neighbors_of(neighbors_of(pbit) & p2attackers)
+                    if (!(p2to & ~pbit) && !((neighbors_of(neighbors_of(pbit) & p2attackers & ~abit)
                                     & (pos.bitBoards[Piece.EMPTY] | p1bit) & ~pbit)
                                 || (neighbors_of(p2rattackers & ~abit)
                                     & (pos.bitBoards[Piece.EMPTY] | p1bit) & ~pbit)))

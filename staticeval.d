@@ -48,6 +48,7 @@ class StaticEval
     ulong[2] active_traps;
     int[64] pstrengths;
     ulong hostages;
+    ulong frames;
 
     ScoreCache sc_cache;
 
@@ -268,6 +269,7 @@ class StaticEval
                     }
                     if (framed)
                     {
+                        frames |= tbit;
                         score += FRAMED[tpiece];
                         score += framing_score;
                     }
@@ -844,7 +846,22 @@ class StaticEval
         static const int[] MOBILE_VAL = [0, 10, 3, 1];
         static const real[] SIDE_MUL = [0.2, -0.2];
 
+        static const int[] NK_TOUCH_THREAT = [0, -10, -30, -40, -60, -122, -200,
+                     10, 30, 40, 60, 122, 400];
+        static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -56, -100,
+                     5, 15, 20, 30, 56, 100];
+        static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -28, -50,
+                     2, 7, 10, 15, 28, 50];
+        static const int[] KP_THREAT = [0, -1, -4, -5, -7, -14, -25,
+                     1, 4, 5, 7, 14, 25];
+
         real score = 0;
+        ulong blockades;
+        ulong[2][2] blockaders;
+        ulong[5][8][2] tosquares;
+        ulong[8][2] frozen;
+        Piece[8][2] type;
+        int[2] num_pieces;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
             int pieces_checked;
@@ -860,27 +877,146 @@ class StaticEval
                 if (pieces)
                 {
                     pieces_checked++;
-                    if (pieces_checked > 3)
-                        break;
                 }
                 while (pieces)
                 {
                     ulong pbit = pieces & -pieces;
                     pieces ^= pbit;
 
-                    ulong[5] tosquares;
-                    ulong frozen;
-                    piece_mobility(pos, pbit, tosquares, frozen);
-                    int mobility = popcount(tosquares[4] & ~frozen);
-                    if (mobility > 4)
+                    ulong[5] ptosquares;
+                    ulong pfrozen;
+                    piece_mobility(pos, pbit, ptosquares, pfrozen);
+                    int mobility = popcount(ptosquares[4] & ~pfrozen);
+                    if (pieces_checked < 4)
                     {
-                        score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
+                        if (mobility > 4)
+                        {
+                            score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
+                        }
+                        else if (pbit & ~pos.frozen)
+                        {
+                            score += BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
+                            blockades |= pbit;
+                            blockaders[side^1][0] |= neighbors_of(ptosquares[4]);
+                            blockaders[side^1][1] |= neighbors_of(blockaders[side^1][0]);
+                        }
+                    }
+                    tosquares[side][num_pieces[side]][0] = pbit;
+                    for (int i=1; i < 5; i++)
+                        tosquares[side][num_pieces[side]][i] = ptosquares[i];
+                    frozen[side][num_pieces[side]] = pfrozen;
+                    type[side][num_pieces[side]] = cast(Piece)p;
+                    num_pieces[side]++;
+                }
+            }
+        }
+        ulong[8][2] kept_piece;
+        for (Side side = Side.WHITE; side <= Side.BLACK; side++)
+        {
+            int myoffset = (side == Side.WHITE) ? 6 : -6;
+            int enemyoffset = (side == Side.WHITE) ? -6: 6;
+            for (int p = 0; p < num_pieces[side]; p++)
+            {
+                ulong pbit = tosquares[side][p][0];
+                ulong p_neighbors = neighbors_of(pbit);
+                ulong held = p_neighbors & hostages & pos.placement[side^1];
+                while (held)
+                {
+                    ulong hbit = held & -held;
+                    held ^= hbit;
+                    Piece hpiece = pos.pieces[bitindex(hbit)];
+                    if (kept_piece[side][p] < hpiece)
+                        kept_piece[side][p] = hpiece;
+                }
+                held = p_neighbors & frames & pos.placement[side^1];
+                if (held)
+                {
+                    assert(popcount(held)==1);
+                    Piece hpiece = pos.pieces[bitindex(held)];
+                    if (kept_piece[side][p] < hpiece)
+                        kept_piece[side][p] = hpiece;
+                }
+                held = neighbors_of(p_neighbors) & frames & pos.placement[side^1];
+                while (held)
+                {
+                    ulong hbit = held & -held;
+                    held ^= hbit;
+                    Piece hpiece = pos.pieces[bitindex(hbit)];
+                    ulong pholders = p_neighbors & neighbors_of(hbit);
+                    while (pholders)
+                    {
+                        ulong phbit = pholders & -pholders;
+                        Piece phpiece = pos.pieces[bitindex(phbit)];
+                        if (phpiece < hpiece + enemyoffset)
+                            break;
+                        pholders ^= phbit;
+                    }
+                    if (pholders && kept_piece[side][p] < hpiece)
+                        kept_piece[side][p] = hpiece;
+                }
+                held = TRAPS & p_neighbors;
+                held = (neighbors_of(held) | neighbors_of(neighbors_of(held)))
+                    & hostages & pos.placement[side];
+                while (held)
+                {
+                    ulong hbit = held & -held;
+                    held ^= hbit;
+                    Piece hpiece = pos.pieces[bitindex(hbit)];
+                    if (kept_piece[side][p] < hpiece + myoffset)
+                        kept_piece[side][p] = hpiece + myoffset;
+                }
+                held = p_neighbors & frames & pos.placement[side];
+                if (held)
+                {
+                    assert(popcount(held)==1);
+                    Piece hpiece = pos.pieces[bitindex(held)];
+                    if (kept_piece[side][p] < hpiece + myoffset)
+                        kept_piece[side][p] = hpiece + myoffset;
+                }
+            }
+        }
+
+        for (Side side = Side.WHITE; side <= Side.BLACK; side++)
+        {
+            int eside = side^1;
+
+            for (int p = 0; p < num_pieces[side]; p++)
+            {
+                ulong pbit = tosquares[side][p][0];
+                ulong p_neighbors = neighbors_of(pbit);
+                Piece piece = type[side][p];
+
+                for (int op = 0; op < num_pieces[eside]; op++)
+                {
+                    if (piece >= type[eside][op])
+                        break;
+                    if (!(p_neighbors & tosquares[eside][op][4]))
+                        continue;
+                    ulong opbit = tosquares[eside][op][0];
+
+                    if (kept_piece[eside][op] < piece)
+                    {
+                        if (p_neighbors & tosquares[eside][op][0])
+                            score += NK_TOUCH_THREAT[piece];
+                        else if (p_neighbors & tosquares[eside][op][2])
+                            score += NK_CLOSE_THREAT[piece];
+                        else if (p_neighbors & tosquares[eside][op][4])
+                        {
+                            int sc = NK_FAR_THREAT[piece];
+                            if (p_neighbors & pos.placement[side])
+                                sc /= 2;
+                            score += sc;
+                        }
                     } else {
-                        score += BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
+                        if (!(neighbors_of(frames & pos.placement[eside])
+                                    & opbit)
+                                && (p_neighbors & tosquares[eside][op][1]))
+                            score += KP_THREAT[piece];
                     }
                 }
             }
         }
+
         return cast(int)score;
     }
 
@@ -1183,6 +1319,7 @@ class StaticEval
 
         score += trap_safety() * tsafety_w;
         score += piece_strength() * pstrength_w;
+        score += on_trap() * ontrap_w;
         score += block_and_hostage();
         score += mobility() * mobility_w;
         score += rabbit_strength();
@@ -1191,7 +1328,6 @@ class StaticEval
         score += rabbit_home() * rhome_w;
         score += frozen_pieces() * frozen_w;
         score += map_elephant() * map_e_w;
-        score += on_trap() * ontrap_w;
         score += goal_threat() * goal_w;
 
         if (pos.side == Side.BLACK)
@@ -1242,6 +1378,8 @@ class StaticEval
         score += piece_strength() * pstrength_w;
         logger.log("piece strength %d", score-pscore);
         pscore = score;
+        score += on_trap() * ontrap_w;
+        logger.log("on trap %d", score-pscore);
         score += block_and_hostage();
         logger.log("blockade and hostage %d", score-pscore);
         pscore = score;
@@ -1266,8 +1404,6 @@ class StaticEval
         score += map_elephant() * map_e_w;
         logger.log("map elephant %d", score-pscore);
         pscore = score;
-        score += on_trap() * ontrap_w;
-        logger.log("on trap %d", score-pscore);
 
         if (pos.side == Side.BLACK)
             score = -score;
