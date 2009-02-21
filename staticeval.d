@@ -976,9 +976,15 @@ class StaticEval
             }
         }
 
+        debug (mobility)
+        {
+            logger.log("Mobility only: %f", score);
+        }
+
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
             int eside = side^1;
+            int enemyoffset = (side == Side.WHITE) ? -6 : 6;
 
             for (int p = 0; p < num_pieces[side]; p++)
             {
@@ -988,7 +994,7 @@ class StaticEval
 
                 for (int op = 0; op < num_pieces[eside]; op++)
                 {
-                    if (piece >= type[eside][op])
+                    if (piece >= type[eside][op] + enemyoffset)
                         break;
                     if (!(p_neighbors & tosquares[eside][op][4]))
                         continue;
@@ -997,24 +1003,59 @@ class StaticEval
                     if (kept_piece[eside][op] < piece)
                     {
                         if (p_neighbors & tosquares[eside][op][0])
+                        {
+                            debug (mobility)
+                            {
+                                logger.log("NK_TOUCH_THREAT to %s%s from %s of %d",
+                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                        ".RCDHMErcdhme"[type[eside][op]], NK_TOUCH_THREAT[piece]);
+                            }
                             score += NK_TOUCH_THREAT[piece];
+                        }
                         else if (p_neighbors & tosquares[eside][op][2])
+                        {
+                            debug (mobility)
+                            {
+                                logger.log("NK_CLOSE_THREAT to %s%s from %s of %d",
+                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                        ".RCDHMErcdhme"[type[eside][op]], NK_CLOSE_THREAT[piece]);
+                            }
                             score += NK_CLOSE_THREAT[piece];
+                        }
                         else if (p_neighbors & tosquares[eside][op][4])
                         {
                             int sc = NK_FAR_THREAT[piece];
                             if (p_neighbors & pos.placement[side])
                                 sc /= 2;
                             score += sc;
+                            debug (mobility)
+                            {
+                                logger.log("NK_FAR_THREAT to %s%s from %s of %d",
+                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                        ".RCDHMErcdhme"[type[eside][op]], NK_FAR_THREAT[piece]);
+                            }
                         }
                     } else {
                         if (!(neighbors_of(frames & pos.placement[eside])
                                     & opbit)
                                 && (p_neighbors & tosquares[eside][op][1]))
+                        {
+                            debug (mobility)
+                            {
+                                logger.log("KP_THREAT to %s%s from %s of %d",
+                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                        ".RCDHMErcdhme"[type[eside][op]], KP_THREAT[piece]);
+                            }
                             score += KP_THREAT[piece];
+                        }
                     }
                 }
             }
+        }
+
+        debug (mobility)
+        {
+            logger.log("Final mobility and threat: %f", score);
         }
 
         return cast(int)score;

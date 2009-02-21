@@ -1300,7 +1300,8 @@ class TrapGenerator
                                                 return;
                                         }
                                     }
-                                    else if ((unf_neighbors & (pnnbit | (TRAPS & pnb_neighbors)) & ~backward)
+                                    else if ((unf_neighbors & (pnnbit
+                                                    | (TRAPS & pnb_neighbors & pos.bitBoards[Piece.EMPTY])) & ~backward)
                                             && ((unf_neighbors & pos.placement[side] & ~pnnbit)
                                                 || ((unfbit & ~TRAPS)
                                                     && (pos.pieces[unfix] >= pos.strongest[side^1][unfix] + enemyoffset))))
