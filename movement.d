@@ -159,42 +159,6 @@ debug (test_movement)
     import std.path;
     import std.stdio;
 
-    char[] bits_to_str(ulong bits)
-    {
-        char[] boardstr = " +-----------------+\n".dup;
-        for (int rownum = 8; rownum > 0; rownum--)
-        {
-            char[] rowstr = std.string.toString(rownum) ~ "| ";
-            int rowix = 8 * (rownum - 1);
-            for (int colnum = 0; colnum < 8; colnum++)
-            {
-                int index = rowix + (7 - colnum);
-                ulong squarebit = 1UL << index;
-                char[] piecestr;
-                if (squarebit & bits)
-                {
-                    piecestr = "* ";
-                } else
-                {
-                    if (squarebit & TRAPS)
-                    {
-                        piecestr = "x ";
-                    } else
-                    {
-                        piecestr = ". ";
-                    }
-                }
-                rowstr ~= piecestr;
-            }
-            rowstr ~= "|\n";
-            boardstr ~= rowstr;
-        }
-        boardstr ~= " +-----------------+\n";
-        boardstr ~= "   a b c d e f g h\n";
-        return boardstr;
-    }
-
-
     int main(char[][] args)
     {
         if (args.length < 2)

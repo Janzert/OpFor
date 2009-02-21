@@ -910,34 +910,42 @@ class StaticEval
                 }
             }
         }
-        ulong[8][2] kept_piece;
+        debug (mobility)
+        {
+            logger.log("Mobility only: %f", score);
+        }
+
+        ulong[4][4][2] threat_map;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
-            int myoffset = (side == Side.WHITE) ? 6 : -6;
             int enemyoffset = (side == Side.WHITE) ? -6: 6;
+            int pcorr = (side == Side.WHITE) ? -6 : 0;
+            int mcorr = (side == Side.WHITE) ? 0 : -6;
             for (int p = 0; p < num_pieces[side]; p++)
             {
+                int kept_piece;
+                int cutpiece = type[side][p] + mcorr - 1;
                 ulong pbit = tosquares[side][p][0];
                 ulong p_neighbors = neighbors_of(pbit);
                 ulong held = p_neighbors & hostages & pos.placement[side^1];
-                while (held)
+                while (held && kept_piece < cutpiece)
                 {
                     ulong hbit = held & -held;
                     held ^= hbit;
                     Piece hpiece = pos.pieces[bitindex(hbit)];
-                    if (kept_piece[side][p] < hpiece)
-                        kept_piece[side][p] = hpiece;
+                    if (kept_piece < hpiece + pcorr)
+                        kept_piece = hpiece + pcorr;
                 }
                 held = p_neighbors & frames & pos.placement[side^1];
-                if (held)
+                if (held && kept_piece < cutpiece)
                 {
                     assert(popcount(held)==1);
                     Piece hpiece = pos.pieces[bitindex(held)];
-                    if (kept_piece[side][p] < hpiece)
-                        kept_piece[side][p] = hpiece;
+                    if (kept_piece < hpiece + pcorr)
+                        kept_piece = hpiece + pcorr;
                 }
                 held = neighbors_of(p_neighbors) & frames & pos.placement[side^1];
-                while (held)
+                while (held && kept_piece < cutpiece)
                 {
                     ulong hbit = held & -held;
                     held ^= hbit;
@@ -951,40 +959,53 @@ class StaticEval
                             break;
                         pholders ^= phbit;
                     }
-                    if (pholders && kept_piece[side][p] < hpiece)
-                        kept_piece[side][p] = hpiece;
+                    if (pholders && kept_piece < hpiece + pcorr)
+                        kept_piece = hpiece + pcorr;
                 }
                 held = TRAPS & p_neighbors;
                 held = (neighbors_of(held) | neighbors_of(neighbors_of(held)))
                     & hostages & pos.placement[side];
-                while (held)
+                while (held && kept_piece < cutpiece)
                 {
                     ulong hbit = held & -held;
                     held ^= hbit;
                     Piece hpiece = pos.pieces[bitindex(hbit)];
-                    if (kept_piece[side][p] < hpiece + myoffset)
-                        kept_piece[side][p] = hpiece + myoffset;
+                    if (kept_piece < hpiece + mcorr)
+                        kept_piece = hpiece + mcorr;
                 }
                 held = p_neighbors & frames & pos.placement[side];
-                if (held)
+                if (held && kept_piece < cutpiece)
                 {
                     assert(popcount(held)==1);
                     Piece hpiece = pos.pieces[bitindex(held)];
-                    if (kept_piece[side][p] < hpiece + myoffset)
-                        kept_piece[side][p] = hpiece + myoffset;
+                    if (kept_piece < hpiece + mcorr)
+                        kept_piece = hpiece + mcorr;
+                }
+
+                int spiece = kept_piece + 1;
+                int epiece = type[side][p] + mcorr;
+                for (int tp = Piece.WCAT; tp < epiece; tp++)
+                {
+                    if (tp < spiece)
+                    {
+                        if (!(p_neighbors & frames & pos.placement[side]))
+                            threat_map[side^1][tp-2][3] |= tosquares[side][p][1];
+                    } else {
+                        threat_map[side^1][tp-Piece.WCAT][0] |= tosquares[side][p][0];
+                        threat_map[side^1][tp-Piece.WCAT][1] |= tosquares[side][p][2]
+                            & ~tosquares[side][p][0];
+                        threat_map[side^1][tp-Piece.WCAT][2] |= tosquares[side][p][4]
+                            & ~tosquares[side][p][2];
+                    }
                 }
             }
-        }
-
-        debug (mobility)
-        {
-            logger.log("Mobility only: %f", score);
         }
 
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
             int eside = side^1;
             int enemyoffset = (side == Side.WHITE) ? -6 : 6;
+            int pcorr = (side == Side.WHITE) ? 0 : -6;
 
             for (int p = 0; p < num_pieces[side]; p++)
             {
@@ -992,63 +1013,52 @@ class StaticEval
                 ulong p_neighbors = neighbors_of(pbit);
                 Piece piece = type[side][p];
 
-                for (int op = 0; op < num_pieces[eside]; op++)
-                {
-                    if (piece >= type[eside][op] + enemyoffset)
-                        break;
-                    if (!(p_neighbors & tosquares[eside][op][4]))
-                        continue;
-                    ulong opbit = tosquares[eside][op][0];
+                int threat_ix = (piece + pcorr) - 2;
+                if (threat_ix > 3)
+                    continue;
 
-                    if (kept_piece[eside][op] < piece)
+                if (threat_map[side][threat_ix][0] & p_neighbors)
+                {
+                    debug (mobility)
                     {
-                        if (p_neighbors & tosquares[eside][op][0])
-                        {
-                            debug (mobility)
-                            {
-                                logger.log("NK_TOUCH_THREAT to %s%s from %s of %d",
-                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                        ".RCDHMErcdhme"[type[eside][op]], NK_TOUCH_THREAT[piece]);
-                            }
-                            score += NK_TOUCH_THREAT[piece];
-                        }
-                        else if (p_neighbors & tosquares[eside][op][2])
-                        {
-                            debug (mobility)
-                            {
-                                logger.log("NK_CLOSE_THREAT to %s%s from %s of %d",
-                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                        ".RCDHMErcdhme"[type[eside][op]], NK_CLOSE_THREAT[piece]);
-                            }
-                            score += NK_CLOSE_THREAT[piece];
-                        }
-                        else if (p_neighbors & tosquares[eside][op][4])
-                        {
-                            int sc = NK_FAR_THREAT[piece];
-                            if (p_neighbors & pos.placement[side])
-                                sc /= 2;
-                            score += sc;
-                            debug (mobility)
-                            {
-                                logger.log("NK_FAR_THREAT to %s%s from %s of %d",
-                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                        ".RCDHMErcdhme"[type[eside][op]], NK_FAR_THREAT[piece]);
-                            }
-                        }
-                    } else {
-                        if (!(neighbors_of(frames & pos.placement[eside])
-                                    & opbit)
-                                && (p_neighbors & tosquares[eside][op][1]))
-                        {
-                            debug (mobility)
-                            {
-                                logger.log("KP_THREAT to %s%s from %s of %d",
-                                        ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                        ".RCDHMErcdhme"[type[eside][op]], KP_THREAT[piece]);
-                            }
-                            score += KP_THREAT[piece];
-                        }
+                        logger.log("NK_TOUCH_THREAT to %s%s of %d",
+                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                NK_TOUCH_THREAT[piece]);
                     }
+                    score += NK_TOUCH_THREAT[piece];
+                }
+                else if (threat_map[side][threat_ix][1] & p_neighbors)
+                {
+                    debug (mobility)
+                    {
+                        logger.log("NK_CLOSE_THREAT to %s%s of %d",
+                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                NK_CLOSE_THREAT[piece]);
+                    }
+                    score += NK_CLOSE_THREAT[piece];
+                }
+                else if (threat_map[side][threat_ix][2] & p_neighbors)
+                {
+                    int sc = NK_FAR_THREAT[piece];
+                    if (p_neighbors & pos.placement[side])
+                        sc /= 2;
+                    score += sc;
+                    debug (mobility)
+                    {
+                        logger.log("NK_FAR_THREAT to %s%s of %d",
+                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                NK_FAR_THREAT[piece]);
+                    }
+                }
+                else if (threat_map[side][threat_ix][3] & p_neighbors)
+                {
+                    debug (mobility)
+                    {
+                        logger.log("KP_THREAT to %s%s of %d",
+                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
+                                KP_THREAT[piece]);
+                    }
+                    score += KP_THREAT[piece];
                 }
             }
         }
