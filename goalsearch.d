@@ -2302,10 +2302,9 @@ class GoalSearchDT
                             ulong unfp = neighbors_of(unfsqb)
                                 & start.placement[side] & ~start.frozen;
                             if (!(unfp & ~start.bitBoards[myrabbit])
-                                    && !(neighbors_of(unfp)
-                                        & ~backward(unfp, side)
-                                        & unfsqb))
+                                    && !(unfp & ~forward(unfsqb, side)))
                                 continue;
+
                             if ((unfsqb & ~(TRAPS
                                             | neighbors_of(start.placement[side^1]
                                                 & ~start.bitBoards[erabbit])))
