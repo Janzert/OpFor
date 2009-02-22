@@ -49,6 +49,7 @@ class StaticEval
     int[64] pstrengths;
     ulong hostages;
     ulong frames;
+    ulong weakframers;
 
     ScoreCache sc_cache;
 
@@ -217,6 +218,8 @@ class StaticEval
         const int PINNED[13] = [0, 0, -2, -3, -5, -8, -22, 0, 2, 3, 5, 8, 22];
         const int FRAMER[13] = [0, 0, -1, -2, -3, -4, -11, 0, 1, 2, 3, 4, 11];
 
+        frames = 0;
+        weakframers = 0;
         int score = 0;
         ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
         while (occupied_traps)
@@ -251,17 +254,21 @@ class StaticEval
                 if (!(tneighbors & pos.bitBoards[Piece.EMPTY]))
                 {
                     bool framed = true;
+                    ulong wframers;
                     real framing_score = 0;
                     while (tneighbors)
                     {
                         ulong ebit = tneighbors & -tneighbors;
                         tneighbors ^= ebit;
                         bitix eix = bitindex(ebit);
-                        if (tpiece + pieceoffset > pos.pieces[eix]
-                                && (neighbors_of(ebit) & pos.bitBoards[Piece.EMPTY]))
+                        if (tpiece + pieceoffset > pos.pieces[eix])
                         {
-                            framed = false;
-                            break;
+                            wframers |= ebit;
+                            if (neighbors_of(ebit) & pos.bitBoards[Piece.EMPTY])
+                            {
+                                framed = false;
+                                break;
+                            }
                         }
                         Piece epiece;
                         epiece = pos.pieces[eix];
@@ -269,6 +276,7 @@ class StaticEval
                     }
                     if (framed)
                     {
+                        weakframers |= wframers;
                         frames |= tbit;
                         score += FRAMED[tpiece];
                         score += framing_score;
@@ -697,6 +705,7 @@ class StaticEval
              1, 2, 2, 2, 2, 2, 2, 1,
              1, 1, 2, 1, 1, 2, 1, 1];
 
+        hostages = 0;
         real bscore = 0;
         real hscore = 0;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
@@ -871,7 +880,7 @@ class StaticEval
                 pieceoffset = 6;
             }
 
-            for (int p = Piece.WELEPHANT + pieceoffset; p > Piece.WRABBIT + pieceoffset; p--)
+            for (int p = Piece.WELEPHANT + pieceoffset; p > Piece.WCAT + pieceoffset; p--)
             {
                 ulong pieces = pos.bitBoards[p];
                 if (pieces)
@@ -944,22 +953,13 @@ class StaticEval
                     if (kept_piece < hpiece + pcorr)
                         kept_piece = hpiece + pcorr;
                 }
-                held = neighbors_of(p_neighbors) & frames & pos.placement[side^1];
+                held = neighbors_of(p_neighbors & weakframers) & frames & pos.placement[side^1];
                 while (held && kept_piece < cutpiece)
                 {
                     ulong hbit = held & -held;
                     held ^= hbit;
                     Piece hpiece = pos.pieces[bitindex(hbit)];
-                    ulong pholders = p_neighbors & neighbors_of(hbit);
-                    while (pholders)
-                    {
-                        ulong phbit = pholders & -pholders;
-                        Piece phpiece = pos.pieces[bitindex(phbit)];
-                        if (phpiece < hpiece + enemyoffset)
-                            break;
-                        pholders ^= phbit;
-                    }
-                    if (pholders && kept_piece < hpiece + pcorr)
+                    if (kept_piece < hpiece + pcorr)
                         kept_piece = hpiece + pcorr;
                 }
                 held = TRAPS & p_neighbors;
@@ -1005,60 +1005,58 @@ class StaticEval
         {
             int eside = side^1;
             int enemyoffset = (side == Side.WHITE) ? -6 : 6;
-            int pcorr = (side == Side.WHITE) ? 0 : -6;
+            int pcorr = (side == Side.WHITE) ? 0 : 6;
 
-            for (int p = 0; p < num_pieces[side]; p++)
+            for (int p = Piece.WCAT; p < Piece.WELEPHANT; p++)
             {
-                ulong pbit = tosquares[side][p][0];
-                ulong p_neighbors = neighbors_of(pbit);
-                Piece piece = type[side][p];
+                int threat_ix = p - Piece.WCAT;
+                ulong pieces = pos.bitBoards[p + pcorr];
+                ulong handled;
+                ulong threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
+                score += NK_TOUCH_THREAT[p + pcorr] * popcount(threatened);
+                handled = threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][1]) & pieces & ~handled;
+                score += NK_CLOSE_THREAT[p + pcorr] * popcount(threatened);
+                handled |= threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][2]) & pieces & ~handled;
+                score += KP_THREAT[p + pcorr] * popcount(threatened & neighbors_of(pos.placement[side]));
+                score += NK_FAR_THREAT[p + pcorr] * popcount(threatened & ~neighbors_of(pos.placement[side]));
+                handled |= threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][3]) & pieces & ~handled;
+                score += KP_THREAT[p + pcorr] * popcount(threatened);
 
-                int threat_ix = (piece + pcorr) - 2;
-                if (threat_ix > 3)
-                    continue;
-
-                if (threat_map[side][threat_ix][0] & p_neighbors)
+                debug (mobility)
                 {
-                    debug (mobility)
-                    {
-                        logger.log("NK_TOUCH_THREAT to %s%s of %d",
-                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                NK_TOUCH_THREAT[piece]);
-                    }
-                    score += NK_TOUCH_THREAT[piece];
-                }
-                else if (threat_map[side][threat_ix][1] & p_neighbors)
-                {
-                    debug (mobility)
-                    {
-                        logger.log("NK_CLOSE_THREAT to %s%s of %d",
-                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                NK_CLOSE_THREAT[piece]);
-                    }
-                    score += NK_CLOSE_THREAT[piece];
-                }
-                else if (threat_map[side][threat_ix][2] & p_neighbors)
-                {
-                    int sc = NK_FAR_THREAT[piece];
-                    if (p_neighbors & pos.placement[side])
-                        sc /= 2;
-                    score += sc;
-                    debug (mobility)
-                    {
-                        logger.log("NK_FAR_THREAT to %s%s of %d",
-                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                NK_FAR_THREAT[piece]);
-                    }
-                }
-                else if (threat_map[side][threat_ix][3] & p_neighbors)
-                {
-                    debug (mobility)
-                    {
-                        logger.log("KP_THREAT to %s%s of %d",
-                                ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(pbit)),
-                                KP_THREAT[piece]);
-                    }
-                    score += KP_THREAT[piece];
+                    handled = 0;
+                    threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
+                    int threatened_pop = popcount(threatened);
+                    if (threatened_pop)
+                        logger.log("NK_TOUCH_THREAT to %d %s for %d", threatened_pop,
+                                ".RCDHMErcdhme"[p + pcorr],
+                                NK_TOUCH_THREAT[p + pcorr] * threatened_pop);
+                    handled = threatened;
+                    threatened = neighbors_of(threat_map[side][threat_ix][1])
+                        & pieces & ~handled;
+                    threatened_pop = popcount(threatened);
+                    if (threatened_pop)
+                        logger.log("NK_CLOSE_THREAT to %d %s for %d", threatened_pop,
+                                ".RCDHMErcdhme"[p + pcorr],
+                                NK_CLOSE_THREAT[p + pcorr] * threatened_pop);
+                    handled |= threatened;
+                    threatened = neighbors_of(threat_map[side][threat_ix][2])
+                        & pieces & ~handled;
+                    threatened_pop = popcount(threatened);
+                    if (threatened_pop)
+                        logger.log("NK_FAR_THREAT to %d %s", threatened_pop,
+                                ".RCDHMErcdhme"[p + pcorr]);
+                    handled |= threatened;
+                    threatened = neighbors_of(threat_map[side][threat_ix][3])
+                        & pieces & ~handled;
+                    threatened_pop = popcount(threatened);
+                    if (threatened_pop)
+                        logger.log("KP_THREAT to %d %s for %d", threatened_pop,
+                                ".RCDHMErcdhme"[p + pcorr],
+                                KP_THREAT[p + pcorr] * threatened_pop);
                 }
             }
         }
