@@ -989,13 +989,14 @@ class StaticEval
                     if (tp < spiece)
                     {
                         if (!(p_neighbors & frames & pos.placement[side]))
-                            threat_map[side^1][tp-2][3] |= tosquares[side][p][1];
+                            threat_map[side^1][tp-2][3] |= tosquares[side][p][1]
+                                & ~frozen[side][p];
                     } else {
                         threat_map[side^1][tp-Piece.WCAT][0] |= tosquares[side][p][0];
                         threat_map[side^1][tp-Piece.WCAT][1] |= tosquares[side][p][2]
-                            & ~tosquares[side][p][0];
+                            & ~frozen[side][p] & ~tosquares[side][p][0];
                         threat_map[side^1][tp-Piece.WCAT][2] |= tosquares[side][p][4]
-                            & ~tosquares[side][p][2];
+                            & ~frozen[side][p] & ~tosquares[side][p][2];
                     }
                 }
             }
