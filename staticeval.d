@@ -849,9 +849,16 @@ class StaticEval
 
     int mobility()
     {
-        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -350,
-                     1, 5, 10, 50, 150, 350];
+        static const int[] BLOCKADE_VAL = [0, -1, -10, -15, -120, -200, -450,
+                     1, 10, 15, 120, 200, 450];
         static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
+        static const real[] BLOCK_STRONGER_CL = [1.0, 0.4, 0.2, 0.1, 0.1];
+        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.6, 0.4, 0.3, 0.1];
+        static const real[] BLOCK_EVEN_CL = [1.0, 0.6, 0.4];
+        static const real[] BLOCK_EVEN_FAR = [1.0, 0.8, 0.6];
+        static const real[] BLOCK_WEAK_CL = [1.0, 0.8, 0.6];
+        static const real[] BLOCK_WEAK_FAR = [1.0, 0.9, 0.8];
+
         static const int[] MOBILE_VAL = [0, 10, 3, 1];
         static const real[] SIDE_MUL = [0.2, -0.2];
 
@@ -865,26 +872,27 @@ class StaticEval
                      1, 4, 5, 7, 14, 25];
 
         real score = 0;
-        ulong blockades;
-        ulong[2][2] blockaders;
-        ulong[5][8][2] tosquares;
-        ulong[8][2] frozen;
-        Piece[8][2] type;
-        int[2] num_pieces;
+        ulong[4][4][2] threat_map;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
             int pieces_checked;
             int pieceoffset = 0;
             int enemyoffset = -6;
+            int pcorr = -6;
+            int mcorr = 0;
             if (side == Side.BLACK)
             {
                 pieceoffset = 6;
                 enemyoffset = 6;
+                pcorr = 0;
+                mcorr = -6;
             }
 
             ulong freezers;
             for (int p = Piece.WELEPHANT + pieceoffset; p > Piece.WCAT + pieceoffset; p--)
             {
+                int epiece = p + mcorr;
+                int cutpiece = p + mcorr - 1;
                 ulong pieces = pos.bitBoards[p];
                 if (pieces)
                 {
@@ -895,11 +903,12 @@ class StaticEval
                 {
                     ulong pbit = pieces & -pieces;
                     pieces ^= pbit;
+                    ulong p_neighbors = neighbors_of(pbit);
 
-                    ulong[5] ptosquares;
+                    ulong[5] tosquares;
                     ulong pfrozen;
-                    piece_mobility(pos, pbit, freezers, ptosquares, pfrozen);
-                    int mobility = popcount(ptosquares[4] & ~pfrozen);
+                    piece_mobility(pos, pbit, freezers, tosquares, pfrozen);
+                    int mobility = popcount(tosquares[4] & ~pfrozen);
                     if (pieces_checked < 4)
                     {
                         if (mobility > 4)
@@ -908,107 +917,102 @@ class StaticEval
                         }
                         else if (pbit & ~pos.frozen)
                         {
-                            score += BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
-                            blockades |= pbit;
-                            blockaders[side^1][0] |= neighbors_of(ptosquares[4]);
-                            blockaders[side^1][1] |= neighbors_of(blockaders[side^1][0]);
+                            real sc = BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
+                            ulong[2] blockaders;
+                            blockaders[0] = neighbors_of(tosquares[4]);
+                            blockaders[1] = neighbors_of(blockaders[0]);
+                            int blk_num = popcount(blockaders[0] & freezers);
+                            blk_num = blk_num > 4 ? 4 : blk_num;
+                            sc *= BLOCK_STRONGER_CL[blk_num];
+                            blk_num = popcount(blockaders[1] & freezers);
+                            blk_num = blk_num > 4 ? 4 : blk_num;
+                            sc *= BLOCK_STRONGER_FAR[blk_num];
+                            blk_num = popcount(blockaders[0] & pos.pieces[epiece]);
+                            assert (blk_num < 3);
+                            sc *= BLOCK_EVEN_CL[blk_num];
+                            blk_num = popcount(blockaders[1] & pos.pieces[epiece]);
+                            assert (blk_num < 3);
+                            sc *= BLOCK_EVEN_FAR[blk_num];
+                            blk_num = popcount(blockaders[0] & pos.pieces[epiece-1]);
+                            blk_num = blk_num > 2 ? 2 : blk_num;
+                            sc *= BLOCK_WEAK_CL[blk_num];
+                            blk_num = popcount(blockaders[1] & pos.pieces[epiece-1]);
+                            blk_num = blk_num > 2 ? 2 : blk_num;
+                            sc *= BLOCK_WEAK_FAR[blk_num];
+                            score += sc;
                         }
                     }
 
-                    int np = num_pieces[side];
-                    tosquares[side][np][0] = ptosquares[0];
-                    tosquares[side][np][1] = ptosquares[1];
-                    tosquares[side][np][2] = ptosquares[2];
-                    tosquares[side][np][3] = ptosquares[3];
-                    tosquares[side][np][4] = ptosquares[4];
-                    frozen[side][np] = pfrozen;
-                    type[side][np] = cast(Piece)p;
-                    num_pieces[side]++;
+                    int kept_piece;
+                    ulong held = p_neighbors & hostages & pos.placement[side^1];
+                    while (held && kept_piece < cutpiece)
+                    {
+                        ulong hbit = held & -held;
+                        held ^= hbit;
+                        Piece hpiece = pos.pieces[bitindex(hbit)];
+                        if (kept_piece < hpiece + pcorr)
+                            kept_piece = hpiece + pcorr;
+                    }
+                    held = p_neighbors & frames & pos.placement[side^1];
+                    if (held && kept_piece < cutpiece)
+                    {
+                        assert(popcount(held)==1);
+                        Piece hpiece = pos.pieces[bitindex(held)];
+                        if (kept_piece < hpiece + pcorr)
+                            kept_piece = hpiece + pcorr;
+                    }
+                    held = neighbors_of(p_neighbors & weakframers) & frames & pos.placement[side^1];
+                    while (held && kept_piece < cutpiece)
+                    {
+                        ulong hbit = held & -held;
+                        held ^= hbit;
+                        Piece hpiece = pos.pieces[bitindex(hbit)];
+                        if (kept_piece < hpiece + pcorr)
+                            kept_piece = hpiece + pcorr;
+                    }
+                    held = TRAPS & p_neighbors;
+                    held = (neighbors_of(held) | neighbors_of(neighbors_of(held)))
+                        & hostages & pos.placement[side];
+                    while (held && kept_piece < cutpiece)
+                    {
+                        ulong hbit = held & -held;
+                        held ^= hbit;
+                        Piece hpiece = pos.pieces[bitindex(hbit)];
+                        if (kept_piece < hpiece + mcorr)
+                            kept_piece = hpiece + mcorr;
+                    }
+                    held = p_neighbors & frames & pos.placement[side];
+                    if (held && kept_piece < cutpiece)
+                    {
+                        assert(popcount(held)==1);
+                        Piece hpiece = pos.pieces[bitindex(held)];
+                        if (kept_piece < hpiece + mcorr)
+                            kept_piece = hpiece + mcorr;
+                    }
+
+                    int spiece = kept_piece + 1;
+                    for (int tp = Piece.WCAT; tp < epiece; tp++)
+                    {
+                        if (tp < spiece)
+                        {
+                            if (!(p_neighbors & frames & pos.placement[side]))
+                                threat_map[side^1][tp-2][3] |= tosquares[1]
+                                    & ~pfrozen;
+                        } else {
+                            threat_map[side^1][tp-Piece.WCAT][0] |= tosquares[0];
+                            threat_map[side^1][tp-Piece.WCAT][1] |= tosquares[2]
+                                & ~pfrozen & ~tosquares[0];
+                            threat_map[side^1][tp-Piece.WCAT][2] |= tosquares[4]
+                                & ~pfrozen & ~tosquares[2];
+                        }
+                    }
                 }
                 freezers |= pos.bitBoards[p - enemyoffset];
             }
         }
         debug (mobility)
         {
-            logger.log("Mobility only: %f", score);
-        }
-
-        ulong[4][4][2] threat_map;
-        for (Side side = Side.WHITE; side <= Side.BLACK; side++)
-        {
-            int enemyoffset = (side == Side.WHITE) ? -6: 6;
-            int pcorr = (side == Side.WHITE) ? -6 : 0;
-            int mcorr = (side == Side.WHITE) ? 0 : -6;
-            for (int p = 0; p < num_pieces[side]; p++)
-            {
-                int kept_piece;
-                int cutpiece = type[side][p] + mcorr - 1;
-                ulong pbit = tosquares[side][p][0];
-                ulong p_neighbors = neighbors_of(pbit);
-                ulong held = p_neighbors & hostages & pos.placement[side^1];
-                while (held && kept_piece < cutpiece)
-                {
-                    ulong hbit = held & -held;
-                    held ^= hbit;
-                    Piece hpiece = pos.pieces[bitindex(hbit)];
-                    if (kept_piece < hpiece + pcorr)
-                        kept_piece = hpiece + pcorr;
-                }
-                held = p_neighbors & frames & pos.placement[side^1];
-                if (held && kept_piece < cutpiece)
-                {
-                    assert(popcount(held)==1);
-                    Piece hpiece = pos.pieces[bitindex(held)];
-                    if (kept_piece < hpiece + pcorr)
-                        kept_piece = hpiece + pcorr;
-                }
-                held = neighbors_of(p_neighbors & weakframers) & frames & pos.placement[side^1];
-                while (held && kept_piece < cutpiece)
-                {
-                    ulong hbit = held & -held;
-                    held ^= hbit;
-                    Piece hpiece = pos.pieces[bitindex(hbit)];
-                    if (kept_piece < hpiece + pcorr)
-                        kept_piece = hpiece + pcorr;
-                }
-                held = TRAPS & p_neighbors;
-                held = (neighbors_of(held) | neighbors_of(neighbors_of(held)))
-                    & hostages & pos.placement[side];
-                while (held && kept_piece < cutpiece)
-                {
-                    ulong hbit = held & -held;
-                    held ^= hbit;
-                    Piece hpiece = pos.pieces[bitindex(hbit)];
-                    if (kept_piece < hpiece + mcorr)
-                        kept_piece = hpiece + mcorr;
-                }
-                held = p_neighbors & frames & pos.placement[side];
-                if (held && kept_piece < cutpiece)
-                {
-                    assert(popcount(held)==1);
-                    Piece hpiece = pos.pieces[bitindex(held)];
-                    if (kept_piece < hpiece + mcorr)
-                        kept_piece = hpiece + mcorr;
-                }
-
-                int spiece = kept_piece + 1;
-                int epiece = type[side][p] + mcorr;
-                for (int tp = Piece.WCAT; tp < epiece; tp++)
-                {
-                    if (tp < spiece)
-                    {
-                        if (!(p_neighbors & frames & pos.placement[side]))
-                            threat_map[side^1][tp-2][3] |= tosquares[side][p][1]
-                                & ~frozen[side][p];
-                    } else {
-                        threat_map[side^1][tp-Piece.WCAT][0] |= tosquares[side][p][0];
-                        threat_map[side^1][tp-Piece.WCAT][1] |= tosquares[side][p][2]
-                            & ~frozen[side][p] & ~tosquares[side][p][0];
-                        threat_map[side^1][tp-Piece.WCAT][2] |= tosquares[side][p][4]
-                            & ~frozen[side][p] & ~tosquares[side][p][2];
-                    }
-                }
-            }
+            logger.log("Mobility and blockade only: %f", score);
         }
 
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
