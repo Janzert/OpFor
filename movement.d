@@ -1,8 +1,8 @@
 
 import position;
 
-void piece_mobility(Position pos, ulong pbit, ulong[] reachable,
-        out ulong frozen)
+void piece_mobility(Position pos, ulong pbit, ulong freezers,
+        ulong[] reachable, out ulong frozen)
 in
 {
     assert (popcount(pbit) == 1);
@@ -12,6 +12,7 @@ in
 }
 body
 {
+    reachable[0] = pbit;
     if (pbit & pos.frozen)
     {
         frozen = pbit;
@@ -35,19 +36,12 @@ body
         opieceoffset = 0;
     }
 
-    ulong weaker;
-    for (int w = Piece.WRABBIT + opieceoffset; w < piece - enemyoffset; w++)
-    {
-        weaker |= pos.bitBoards[w];
-    }
     ulong empties = pos.bitBoards[Piece.EMPTY];
-    ulong safe_empties = pos.bitBoards[Piece.EMPTY]
-        & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~pbit));
-    ulong trapped = neighbors_of(pbit) & pos.placement[side]
-        & (TRAPS & ~neighbors_of(pos.placement[side] & ~pbit));
-    ulong freeze_sq = neighbors_of(pos.placement[side^1] & ~weaker
-            & ~pos.bitBoards[piece - enemyoffset])
-        & ~neighbors_of(pos.placement[side] & ~pbit & ~trapped);
+    ulong bad_traps = TRAPS & ~neighbors_of(pos.placement[side] & ~pbit);
+    ulong safe_empties = empties & ~bad_traps;
+    ulong trapped = neighbors_of(pbit) & pos.placement[side] & bad_traps;
+    ulong fr_neighbors = neighbors_of(freezers);
+    ulong freeze_sq = fr_neighbors & ~neighbors_of(pos.placement[side] & ~pbit & ~trapped);
 
     reachable[1] = neighbors_of(pbit) & safe_empties;
     frozen |= reachable[1] & freeze_sq;
@@ -61,9 +55,7 @@ body
     frozen |= reachable[4] & freeze_sq;
     ulong fmove = neighbors_of(pbit) & pos.placement[side];
     if (popcount(fmove) > 1
-            || (pbit & ~neighbors_of(pos.placement[side^1] & ~weaker
-                    & ~pos.bitBoards[piece - enemyoffset])
-                & ~TRAPS))
+            || (pbit & ~fr_neighbors & ~TRAPS))
     {
         fmove &= ~(pos.bitBoards[Piece.WRABBIT + pieceoffset]
                 & ~rabbit_steps(cast(Side)(side^1), safe_empties))
@@ -75,8 +67,9 @@ body
     {
         ulong fbit = fmove & -fmove;
         fmove ^= fbit;
+        ulong f_neighbors = neighbors_of(fbit);
         ulong filled = 0;
-        ulong se_neighbors = neighbors_of(fbit) & pos.bitBoards[Piece.EMPTY]
+        ulong se_neighbors = f_neighbors & empties
             & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~pbit & ~fbit));
         ulong f_steps = se_neighbors;
         bool is_r = false;
@@ -88,16 +81,15 @@ body
         if (popcount(f_steps) > 1)
         {
             reachable[3] |= se_neighbors;
-            frozen |= reachable[3] & neighbors_of(pos.placement[side^1] & ~weaker
-                    & ~pos.bitBoards[piece - enemyoffset])
+            frozen |= reachable[3] & fr_neighbors
                 & ~neighbors_of(pos.placement[side] & ~(pbit | fbit));
             reachable[4] |= neighbors_of(se_neighbors & ~frozen)
-                & pos.bitBoards[Piece.EMPTY]
+                & empties
                 & ~(TRAPS & ~neighbors_of(pos.placement[side]
                             & ~pbit & ~fbit));
         } else {
             bitix fix = bitindex(fbit);
-            if ((neighbors_of(fbit) & pos.placement[side] & ~pbit)
+            if ((f_neighbors & pos.placement[side] & ~pbit)
                     || ((fbit & ~TRAPS)
                         && piece >= pos.strongest[side^1][fix] + enemyoffset))
             {
@@ -107,18 +99,17 @@ body
         if (f_steps)
         {
             reachable[2] |= fbit;
-            reachable[4] |= neighbors_of(fbit) & (pos.placement[side] | filled)
+            reachable[4] |= f_neighbors & (pos.placement[side] | filled)
                 & ~((pos.bitBoards[Piece.WRABBIT + pieceoffset]
                             | (is_r ? filled : 0))
                         & ~rabbit_steps(cast(Side)(side^1), safe_empties & ~filled))
                 & neighbors_of(safe_empties & ~filled);
-            frozen |= reachable[4] & neighbors_of(pos.placement[side^1] & ~weaker
-                    & ~pos.bitBoards[piece - enemyoffset])
+            frozen |= reachable[4] & fr_neighbors
                 & ~neighbors_of(pos.placement[side] & ~(pbit | fbit));
         }
     }
-    ulong pmove = neighbors_of(pbit) & weaker & neighbors_of(empties)
-        & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~pbit));
+    ulong weaker = pos.placement[side^1] & ~freezers & ~pos.bitBoards[piece - enemyoffset];
+    ulong pmove = neighbors_of(pbit) & weaker & neighbors_of(empties) & ~bad_traps;
     reachable[2] |= pmove;
     frozen |= pmove & freeze_sq;
     while (pmove)
@@ -143,7 +134,7 @@ body
         if (obit & ~frozen)
         {
             reachable[4] |= neighbors_of(obit) & (weaker | filled) & neighbors_of(empties)
-                & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~pbit));
+                & ~bad_traps;
                 frozen |= reachable[4] & freeze_sq;
         }
     }
@@ -204,11 +195,17 @@ debug (test_movement)
             }
         }
 
+        ulong enemyoffset = 6;
+        ulong freezers;
         ulong[Piece.max+1] reported_movement;
-        for (int p = Piece.WCAT; p <= Piece.max; p++)
+        for (int p = Piece.BELEPHANT; p > Piece.WRABBIT; p--)
         {
             if (p == Piece.BRABBIT)
+            {
+                enemyoffset = -6;
+                freezers = 0UL;
                 continue;
+            }
             ulong pbits = pos.bitBoards[p];
             while (pbits)
             {
@@ -216,9 +213,10 @@ debug (test_movement)
                 pbits ^= pbit;
                 ulong[5] move_sq;
                 ulong frozen;
-                piece_mobility(pos, pbit, move_sq, frozen);
+                piece_mobility(pos, pbit, freezers, move_sq, frozen);
                 reported_movement[p] |= move_sq[4];
             }
+            freezers |= pos.bitBoards[p - enemyoffset];
         }
 
         int total_true;

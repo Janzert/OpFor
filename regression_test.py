@@ -1,12 +1,14 @@
 
 import re
+import os.path
 import sys
 import time
 
 from subprocess import Popen
 
 if len(sys.argv) < 2:
-    print "usage: %s <board file>" & sys.args[0]
+    print "usage: %s <board file>" % os.path.basename(sys.argv[0])
+    sys.exit(0)
 
 test_boards = open(sys.argv[1], "rU")
 

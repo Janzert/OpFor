@@ -875,11 +875,14 @@ class StaticEval
         {
             int pieces_checked;
             int pieceoffset = 0;
+            int enemyoffset = -6;
             if (side == Side.BLACK)
             {
                 pieceoffset = 6;
+                enemyoffset = 6;
             }
 
+            ulong freezers;
             for (int p = Piece.WELEPHANT + pieceoffset; p > Piece.WCAT + pieceoffset; p--)
             {
                 ulong pieces = pos.bitBoards[p];
@@ -887,6 +890,7 @@ class StaticEval
                 {
                     pieces_checked++;
                 }
+                pieces &= ~pos.frozen;
                 while (pieces)
                 {
                     ulong pbit = pieces & -pieces;
@@ -894,7 +898,7 @@ class StaticEval
 
                     ulong[5] ptosquares;
                     ulong pfrozen;
-                    piece_mobility(pos, pbit, ptosquares, pfrozen);
+                    piece_mobility(pos, pbit, freezers, ptosquares, pfrozen);
                     int mobility = popcount(ptosquares[4] & ~pfrozen);
                     if (pieces_checked < 4)
                     {
@@ -910,13 +914,18 @@ class StaticEval
                             blockaders[side^1][1] |= neighbors_of(blockaders[side^1][0]);
                         }
                     }
-                    tosquares[side][num_pieces[side]][0] = pbit;
-                    for (int i=1; i < 5; i++)
-                        tosquares[side][num_pieces[side]][i] = ptosquares[i];
-                    frozen[side][num_pieces[side]] = pfrozen;
-                    type[side][num_pieces[side]] = cast(Piece)p;
+
+                    int np = num_pieces[side];
+                    tosquares[side][np][0] = ptosquares[0];
+                    tosquares[side][np][1] = ptosquares[1];
+                    tosquares[side][np][2] = ptosquares[2];
+                    tosquares[side][np][3] = ptosquares[3];
+                    tosquares[side][np][4] = ptosquares[4];
+                    frozen[side][np] = pfrozen;
+                    type[side][np] = cast(Piece)p;
                     num_pieces[side]++;
                 }
+                freezers |= pos.bitBoards[p - enemyoffset];
             }
         }
         debug (mobility)
