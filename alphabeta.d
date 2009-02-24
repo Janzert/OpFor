@@ -612,6 +612,7 @@ class ABSearch
 
     bool use_lmr = true;
     bool use_nmh = true;
+    bool use_early_beta = true;
 
     this(Logger l)
     {
@@ -651,6 +652,9 @@ class ABSearch
                 break;
             case "use_nmh":
                 use_nmh = cast(bool)toInt(value);
+                break;
+            case "use_early_beta":
+                use_early_beta = cast(bool)toInt(value);
                 break;
             case "use_killers":
                 StepSorter.use_killers = cast(bool)(toInt(value));
@@ -774,9 +778,16 @@ class ABSearch
                     return null_score;
             }
 
+            if (use_early_beta && depth < pos.stepsLeft)
+            {
+                int short_score = eval(pos, alpha, beta);
+                if (short_score >= beta)
+                    return short_score;
+            }
+
             StepSorter sorted_steps = StepSorter.allocate(height, pos, prev_best, last_step);
-            Step* curstep;
-            if ((curstep = sorted_steps.next_step()) is null)
+            Step* curstep = sorted_steps.next_step();
+            if (curstep is null)
             {
                 // immobilized
                 StepSorter.free(sorted_steps);
