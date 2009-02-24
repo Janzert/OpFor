@@ -2371,7 +2371,7 @@ class TrapGenerator
                 return;
         }
         p2rattackers = p2attackers & ~pos.frozen;
-        if (!p2rattackers && (p2attackers & p1neighbors)
+        if ((p2attackers & p1neighbors)
                 && p1piece > p2piece)
         {
             // check to see if any p2attackers unfreeze

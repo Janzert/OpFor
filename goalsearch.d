@@ -2817,7 +2817,9 @@ class GoalSearchDT
                     { // fn is frozen
                         ulong unfreezers = neighbors_of(neighbors_of(fn_bit)
                                 & start.bitBoards[Piece.EMPTY])
-                            & start.placement[side] & ~start.frozen;
+                            & start.placement[side] & ~start.frozen
+                            & ~(start.bitBoards[myrabbit]
+                                    & neighbors_of(forward(fn_bit, side)));
                         if (unfreezers && (en_safe
                                     || (unfreezers & ~en_neighbors)
                                     || (fn_pop > 2)))
