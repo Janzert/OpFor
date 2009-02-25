@@ -21,7 +21,6 @@ class TrapGenerator
 
     private Position pos;
     private Side side;
-    private bool findall = true;
 
     void clear()
     {
@@ -132,15 +131,11 @@ class TrapGenerator
                                          // There should only be one bit in tobits set
                                         assert (tobits == (tobits & -tobits));
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, nbit, tobits);
-                                        if (!findall)
-                                            return;
                                         tobits_handled = true;
                                     }
                                     if (!(t_neighbors & ~nbit & pos.placement[side]))
                                     {
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, nbit, tbit);
-                                        if (!findall)
-                                            return;
                                     }
                                 }
                             }
@@ -156,8 +151,6 @@ class TrapGenerator
                                             || (neighbors_of(tobit) & pos.placement[side] & ~nbit))
                                     {
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, nbit, tobit);
-                                        if (!findall)
-                                            return;
                                         break;
                                     }
                                 }
@@ -167,8 +160,6 @@ class TrapGenerator
                                     && (t_neighbors & ~nbit & pos.placement[side]))
                             {
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, nbit, tbit);
-                                if (!findall)
-                                    return;
                             }
                         }
                     }
@@ -197,8 +188,6 @@ class TrapGenerator
                                 {
                                     // can finish trap
                                     add_capture(pos.pieces[pix], pbit, 3, tbit, pbit, nbit);
-                                    if (!findall)
-                                        return;
                                     break;
                                 }
                             }
@@ -238,8 +227,6 @@ class TrapGenerator
                                 {
                                     // This piece won't be frozen and can finish trap
                                     add_capture(pos.pieces[pix], pbit, 4, tbit, pbit, nbit, true);
-                                    if (!findall)
-                                        return;
                                     break;
                                 } else if (pos.strongest[side][nix] > pos.pieces[pix] + enemyoffset)
                                 {
@@ -260,8 +247,6 @@ class TrapGenerator
                                         {
                                             // can finish trap
                                             add_capture(pos.pieces[pix], pbit, 4, tbit, pbit, nbit, true);
-                                            if (!findall)
-                                                return;
                                             break;
                                         }
                                     }
@@ -305,8 +290,6 @@ class TrapGenerator
                                                 && pos.pieces[pushix] >= pos.strongest[side^1][nix] + enemyoffset)
                                         {
                                             add_capture(pos.pieces[onix], onbit, 6, tbit, onbit, ennbit, true);
-                                            if (!findall)
-                                                return;
                                             break;
                                         }
                                     }
@@ -339,8 +322,6 @@ class TrapGenerator
                                 & ~lastbit))
                     {
                         add_capture(pos.pieces[pix], pbit, 3, tbit, pbit, lastbit);
-                        if (!findall)
-                            return;
                     }
                 }
             }
@@ -379,8 +360,6 @@ class TrapGenerator
                                     ulong tobit = tobits & -tobits;
                                     tobits ^= tobit;
                                     add_capture(pos.pieces[pix], pbit, 4, tbit, pbit, tobit, true);
-                                    if (!findall)
-                                        return;
                                 }
                                 break;
                             }
@@ -431,8 +410,6 @@ class TrapGenerator
                             if (ptobit)
                             {
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, pbit, ptobit, true);
-                                if (!findall)
-                                    return;
                             }
                         }
                         ulong tobits = at_neighbors & pos.bitBoards[Piece.EMPTY];
@@ -462,8 +439,6 @@ class TrapGenerator
                                     continue;
                             }
                             add_capture(pos.pieces[pix], pbit, 4, tbit, atbit, tobit);
-                            if (!findall)
-                                return;
                         }
 
                     }
@@ -499,15 +474,11 @@ class TrapGenerator
                                 ulong tobit = empties & -empties;
                                 empties ^= tobit;
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, atbit, tobit);
-                                if (!findall)
-                                    return;
                             }
                             ulong ptobit = neighbors_of(pbit) & t_neighbors & pos.bitBoards[Piece.EMPTY];
                             if (ptobit)
                             {
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, pbit, ptobit, true);
-                                if (!findall)
-                                    return;
                             }
                         }
                     }
@@ -539,8 +510,6 @@ class TrapGenerator
                     && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
             {
                 add_capture(pos.pieces[tix], tbit, 1, tbit, pbit, lastbit);
-                if (!findall)
-                    return;
             }
 
             while (pneighbors)
@@ -562,8 +531,6 @@ class TrapGenerator
                                 pushtos ^= tobit;
 
                                 add_capture(pos.pieces[tix], tbit, 2, tbit, pbit, tobit, true);
-                                if (!findall)
-                                    return;
                             }
                             ulong pulltos = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
                             while (pulltos)
@@ -572,8 +539,6 @@ class TrapGenerator
                                 pulltos ^= tobit;
 
                                 add_capture(pos.pieces[tix], tbit, 2, tbit, pnbit, tobit);
-                                if (!findall)
-                                    return;
                             }
 
                             ulong clear = neighbors_of(pbit) & pos.placement[side] & ~pnbit;
@@ -602,8 +567,6 @@ class TrapGenerator
                                         if (pobit & pos.bitBoards[Piece.EMPTY])
                                         {
                                             add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, pobit);
-                                            if (!findall)
-                                                return;
                                         }
                                         else if (pobit & pos.placement[side] && !canfreeze)
                                         {
@@ -618,8 +581,6 @@ class TrapGenerator
                                                 ulong abit = aways & -aways;
                                                 aways ^= abit;
                                                 add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, abit);
-                                                if (!findall)
-                                                    return;
                                             }
                                         }
                                         else if (pobit & pos.placement[side^1])
@@ -634,8 +595,6 @@ class TrapGenerator
                                                     ulong tobit = tobits & -tobits;
                                                     tobits ^= tobit;
                                                     add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit, true);
-                                                    if (!findall)
-                                                        return;
                                                 }
                                             }
                                         }
@@ -661,8 +620,6 @@ class TrapGenerator
                                             ulong unbit = unfreezers & -unfreezers;
                                             unfreezers ^= unbit;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, empty);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -694,8 +651,6 @@ class TrapGenerator
                                         if (pobit & pos.bitBoards[Piece.EMPTY])
                                         {
                                             add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, pobit);
-                                            if (!findall)
-                                                return;
                                         }
                                         else if (pobit & pos.placement[side])
                                         {
@@ -710,8 +665,6 @@ class TrapGenerator
                                                 ulong tobit = empties & -empties;
                                                 empties ^= tobit;
                                                 add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit);
-                                                if (!findall)
-                                                    return;
                                             }
                                         } else {
                                             // pobit must be opponent peice
@@ -729,8 +682,6 @@ class TrapGenerator
                                                     ulong tobit = tobits & -tobits;
                                                     tobits ^= tobit;
                                                     add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit, true);
-                                                    if (!findall)
-                                                        return;
                                                 }
                                             }
                                         }
@@ -754,8 +705,6 @@ class TrapGenerator
                                                 || (neighbors_of(pnbit) & pos.placement[side])))
                                 {
                                     add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
-                                    if (!findall)
-                                        return;
                                 }
                                 ulong pullers = c_neighbors & ~t_neighbors & ~pos.frozen
                                     & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
@@ -779,8 +728,6 @@ class TrapGenerator
                                             ulong tobit = tobits & -tobits;
                                             tobits ^= tobit;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -799,8 +746,6 @@ class TrapGenerator
                                         && pos.lastpiece > pos.pieces[cix] + enemyoffset)
                                 {
                                     add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
-                                    if (!findall)
-                                        return;
                                 }
                                 if ((cbit & TRAPS)
                                         && (neighbors_of(neighbors_of(cbit) & pos.placement[side^1])
@@ -814,8 +759,6 @@ class TrapGenerator
                                         if (pos.lastpiece > hpiece + enemyoffset)
                                         {
                                             add_capture(pos.pieces[tix], tbit, 3, tbit, holder, lastbit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -835,8 +778,6 @@ class TrapGenerator
                                             ulong tobit = tobits & -tobits;
                                             tobits ^= tobit;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -886,8 +827,6 @@ class TrapGenerator
                                             // pn square will be safe for finisher after pn piece moves away
                                             real_finish = true;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, pnbit, tobit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                     if (real_finish)
@@ -956,8 +895,6 @@ class TrapGenerator
                                                     }
                                                 }
                                                 add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, pnnnbit);
-                                                if (!findall)
-                                                    return;
                                             }
                                         }
                                     }
@@ -1009,8 +946,6 @@ class TrapGenerator
                                                     ulong tobit = tobits & -tobits;
                                                     tobits ^= tobit;
                                                     add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, tobit);
-                                                    if (!findall)
-                                                        return;
                                                 }
                                             }
                                         }
@@ -1018,8 +953,6 @@ class TrapGenerator
                                                 || (neighbors_of(pbit) & (pos.bitBoards[Piece.EMPTY] | pnnnbit)))
                                         {
                                             add_capture(pos.pieces[tix], tbit, 3, tbit, pnnnbit, pnnbit);
-                                            if (!findall)
-                                                return;
                                         } else {
                                             // can unfreeze pn (attacker) in one step but have no where to push or
                                             // pull pbit to. Can we move another piece away from pbit to create space?
@@ -1028,8 +961,6 @@ class TrapGenerator
                                             if (clear & ~pos.bitBoards[Piece.WRABBIT + pieceoffset])
                                             {
                                                 add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
-                                                if (!findall)
-                                                    return;
                                             } else {
                                                 // any clear pieces must be rabbits
                                                 while (clear)
@@ -1040,8 +971,6 @@ class TrapGenerator
                                                     if (neighbors_of(cbit) & pos.bitBoards[Piece.EMPTY] & ~backward)
                                                     {
                                                         add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
-                                                        if (!findall)
-                                                            return;
                                                         break;
                                                     }
                                                 }
@@ -1054,8 +983,6 @@ class TrapGenerator
                                                 if (pupiece > cpiece + enemyoffset)
                                                 {
                                                     add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
-                                                    if (!findall)
-                                                        return;
                                                 }
                                             }
                                         }
@@ -1079,8 +1006,6 @@ class TrapGenerator
                                 {
                                     add_capture(pos.pieces[tix], tbit, 3, tbit,
                                             pnnbit, (1UL << pos.lastfrom));
-                                    if (!findall)
-                                        return;
                                 }
                                 if (!ofreezers || (neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY]))
                                 {
@@ -1104,8 +1029,6 @@ class TrapGenerator
                                                     pulltos ^= tobit;
 
                                                     add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, tobit);
-                                                    if (!findall)
-                                                        return;
                                                 }
                                             }
                                         }
@@ -1122,8 +1045,6 @@ class TrapGenerator
                                             pushtos ^= tobit;
 
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, tobit, true);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -1138,8 +1059,6 @@ class TrapGenerator
                                     {
                                         add_capture(pos.pieces[tix], tbit, 3, tbit,
                                                 holder, (1UL << pos.lastfrom));
-                                        if (!findall)
-                                            return;
                                     }
 
                                     bool can_push = false;
@@ -1161,8 +1080,6 @@ class TrapGenerator
                                                 tobits ^= tobit;
 
                                                 add_capture(pos.pieces[tix], tbit, 4, tbit, pubit, tobit);
-                                                if (!findall)
-                                                    return;
                                             }
                                         }
                                     }
@@ -1176,8 +1093,6 @@ class TrapGenerator
                                             ulong tobit = tobits & -tobits;
                                             tobits ^= tobit;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, holder, tobit, true);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -1213,8 +1128,6 @@ class TrapGenerator
                                                 || (pos.pieces[perix] < pos.strongest[side^1][pnnix] + enemyoffset))))
                                 {
                                     add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, pnnbit);
-                                    if (!findall)
-                                        return;
                                 }
                             }
                         } else if (pos.pieces[pnnix] > pos.pieces[pix] + enemyoffset)
@@ -1254,8 +1167,6 @@ class TrapGenerator
                                             ulong tobit = tobits & -tobits;
                                             tobits ^= tobit;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, tobit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -1264,8 +1175,6 @@ class TrapGenerator
                                     || (neighbors_of(pnbit) & pos.placement[side] & ~pnnbit))
                             {
                                 add_capture(pos.pieces[tix], tbit, 3, tbit, pnnbit, pnbit);
-                                if (!findall)
-                                    return;
                             } else {
                                 // pnn is unfrozen but will freeze when moving to pn
                                 bool pnn_first = false;
@@ -1307,8 +1216,6 @@ class TrapGenerator
                                             ulong tobit = tobits & -tobits;
                                             tobits ^= tobit;
                                             add_capture(pos.pieces[tix], tbit, 4, tbit, unfbit, tobit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                     else if ((tobits || (unf_neighbors & (pnnbit
@@ -1323,8 +1230,6 @@ class TrapGenerator
                                 if (pnn_first)
                                 {
                                     add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, pnbit);
-                                    if (!findall)
-                                        return;
                                 }
                             }
                         }
@@ -1372,8 +1277,6 @@ class TrapGenerator
                                     ulong tobit = pushtos & -pushtos;
                                     pushtos ^= tobit;
                                     add_capture(pos.pieces[tix], tbit, 4, tbit, pnbit, tobit, true);
-                                    if (!findall)
-                                        return;
                                     pushers = 0UL;
                                 }
                             }
@@ -1505,8 +1408,6 @@ class TrapGenerator
                     for (int i=0; i < num_clears; i++)
                     {
                         add_capture(pos.pieces[pix], pbit, 1 + clear_length[i], tbit, &clear_first_step[i]);
-                        if (!findall)
-                            return;
                     }
                     return;
                 }
@@ -1517,8 +1418,6 @@ class TrapGenerator
             {
                 // Can finish a pull onto the trap
                 add_capture(pos.pieces[pix], pbit, 1, tbit, pbit, lastbit);
-                if (!findall)
-                    return;
             }
 
             ulong pneighbors = neighbors_of(pbit);
@@ -1551,8 +1450,6 @@ class TrapGenerator
                                         if (clear_length[i] == 1)
                                         {
                                             add_capture(pos.pieces[pix], pbit, 4, tbit, &clear_first_step[i]);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -1620,8 +1517,6 @@ class TrapGenerator
                                                 ulong tobit = tobits & -tobits;
                                                 tobits ^= tobit;
                                                 add_capture(pos.pieces[pix], pbit, 4, tbit, ufufbit, tobit);
-                                                if (!findall)
-                                                    return;
                                             }
                                         }
                                     } else if (ufbit & ~pos.frozen
@@ -1632,13 +1527,9 @@ class TrapGenerator
                                             for (int i=0; i < num_clears; i++)
                                             {
                                                 add_capture(pos.pieces[pix], pbit, 3 + clear_length[i], tbit, &clear_first_step[i]);
-                                                if (!findall)
-                                                    return;
                                             }
                                         } else {
                                             add_capture(pos.pieces[pix], pbit, 3, tbit, ufbit, anbit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -1690,8 +1581,6 @@ class TrapGenerator
                                             } else {
                                                 add_capture(pos.pieces[pix], pbit, 4, tbit, unfbit, tobit);
                                             }
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 }
@@ -1731,8 +1620,6 @@ class TrapGenerator
                                                         pushtos ^= tobit;
 
                                                         add_capture(pos.pieces[pix], pbit, 4, tbit, anbit, tobit, true);
-                                                        if (!findall)
-                                                            return;
                                                     }
                                                     did_push = true;
                                                 }
@@ -1745,8 +1632,6 @@ class TrapGenerator
                                                         pulltos ^= tobit;
 
                                                         add_capture(pos.pieces[pix], pbit, 4, tbit, perbit, tobit);
-                                                        if (!findall)
-                                                            return;
                                                     }
                                                 }
                                             }
@@ -1759,8 +1644,6 @@ class TrapGenerator
                                 {
                                     add_capture(pos.pieces[pix], pbit, 3 + min_clear_steps,
                                             tbit, anbit, (1UL << pos.lastfrom));
-                                    if (!findall)
-                                        return;
                                 }
                                 if (!ofreezers
                                         && (anbit & TRAPS)
@@ -1774,8 +1657,6 @@ class TrapGenerator
                                         {
                                             add_capture(pos.pieces[pix], pbit, 3 + min_clear_steps,
                                                     tbit, holder, (1UL << pos.lastfrom));
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                     bool can_push = false;
@@ -1824,13 +1705,9 @@ class TrapGenerator
                            for (int i=0; i < num_clears; i++)
                            {
                                add_capture(pos.pieces[pix], pbit, 2 + clear_length[i], tbit, &clear_first_step[i]);
-                               if (!findall)
-                                   return;
                            }
                         } else {
                             add_capture(pos.pieces[pix], pbit, 2, tbit, pbit, tbit, true);
-                            if (!findall)
-                                return;
                         }
                     } else if ((min_clear_steps == 0)
                             && (neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY])
@@ -1879,8 +1756,6 @@ class TrapGenerator
                                         // finisher won't be frozen once moving into the neighbor square
                                         real_finish = true;
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, pnbit, tobit);
-                                        if (!findall)
-                                            return;
                                     }
                                 }
                                 if (real_finish)
@@ -1921,8 +1796,6 @@ class TrapGenerator
                                                     continue;
                                             }
                                             add_capture(pos.pieces[pix], pbit, 4, tbit, abit, pnbit);
-                                            if (!findall)
-                                                return;
                                         }
                                         continue;
                                     }
@@ -1966,15 +1839,11 @@ class TrapGenerator
                                             tobits ^= tobit;
 
                                             add_capture(pos.pieces[pix], pbit, 4, tbit, sbit, tobit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                     if (ab_first && (pnbit & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~abit))))
                                     {
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, abit, pnbit);
-                                        if (!findall)
-                                            return;
                                     }
                                     // how about a piece neighboring the attacker
                                     if (pnbit & ~TRAPS)
@@ -2020,8 +1889,6 @@ class TrapGenerator
                                         if (!ofreezers && pos.pieces[aix] > hpiece + enemyoffset)
                                         {
                                             add_capture(pos.pieces[pix], pbit, 4, tbit, abit, pnbit);
-                                            if (!findall)
-                                                return;
                                         }
                                     }
                                 } else {
@@ -2029,8 +1896,6 @@ class TrapGenerator
                                     {
                                         case 0:
                                             add_capture(pos.pieces[pix], pbit, 3, tbit, abit, pnbit);
-                                            if (!findall)
-                                                return;
                                             break;
                                         case 1:
                                             if (!(abit & t_neighbors)
@@ -2040,15 +1905,11 @@ class TrapGenerator
                                                 for (int i=0; i < num_clears; i++)
                                                 {
                                                     add_capture(pos.pieces[pix], pbit, 3 + clear_length[i], tbit, &clear_first_step[i]);
-                                                    if (!findall)
-                                                        return;
                                                 }
                                             }
                                             else if (t_neighbors & pos.placement[side] & ~abit)
                                             {
                                                 add_capture(pos.pieces[pix], pbit, 4, tbit, abit, pnbit);
-                                                if (!findall)
-                                                    return;
                                             }
                                             break;
                                         case 2:
@@ -2060,8 +1921,6 @@ class TrapGenerator
                                                             && clear_first_step[i].tobit == pnbit)
                                                     {
                                                         add_capture(pos.pieces[pix], pbit, 4, tbit, &clear_first_step[i]);
-                                                        if (!findall)
-                                                            return;
                                                         break;
                                                     }
                                                 }
@@ -2072,8 +1931,6 @@ class TrapGenerator
                                     if (!(t_neighbors & pos.placement[side] & ~abit))
                                     {
                                         add_capture(pos.pieces[pix], pbit, 3, tbit, abit, pnbit);
-                                        if (!findall)
-                                            return;
                                     }
                                 }
                             }
@@ -2122,8 +1979,6 @@ class TrapGenerator
                                         if ((tobit & tbit) && !(t_neighbors & pos.bitBoards[Piece.EMPTY]))
                                             cap_length = 5;
                                         add_capture(pos.pieces[pix], pbit, cap_length, tbit, sbit, tobit);
-                                        if (!findall)
-                                            return;
                                     }
                                 }
                             }
@@ -2162,8 +2017,6 @@ class TrapGenerator
                                         || (neighbors_of(tobit) & pos.placement[side] & ~abit))
                                     {
                                         add_capture(pos.pieces[pix], pbit, 4, tbit, abit, tobit);
-                                        if (!findall)
-                                            return;
                                     }
                                 }
                             }
@@ -2212,8 +2065,6 @@ class TrapGenerator
                                 ulong tobit = tobits & -tobits;
                                 tobits ^= tobit;
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, pnbit, tobit, true);
-                                if (!findall)
-                                    return;
                                 attackers = 0UL;
                             }
                         }
@@ -2335,8 +2186,6 @@ class TrapGenerator
                 ulong tobit = pushtos & -pushtos;
                 pushtos ^= tobit;
                 add_capture(p2piece, p2bit, 4, tbit, p1bit, tobit, true);
-                if (!findall)
-                    return;
             }
         }
         else if ((tbit & pos.placement[side^1])
@@ -2353,8 +2202,6 @@ class TrapGenerator
                 ulong tobit = pushtos & -pushtos;
                 pushtos ^= tobit;
                 add_capture(tpiece, tbit, 4, tbit, p1bit, tobit, true);
-                if (!findall)
-                    return;
             }
         }
         p2pullto = neighbors_of(p2attackers & ~pos.frozen) & pos.bitBoards[Piece.EMPTY];
@@ -2378,8 +2225,6 @@ class TrapGenerator
                         && !p2pushto && !p2pullto)))
         {
             add_capture(p1piece, p1bit, 4, tbit, p1bit, tbit, true);
-            if (!findall)
-                return;
         }
         p2rattackers = p2attackers & ~pos.frozen;
         if ((p2attackers & p1neighbors)
@@ -2544,12 +2389,11 @@ class TrapGenerator
         }
     }
 
-    int find_captures(Position p, Side s, bool findall=true)
+    int find_captures(Position p, Side s)
     {
         pos = p;
         side = s;
         num_captures = 0;
-        this.findall = findall;
 
         ulong trapbits = TRAPS;
         while (trapbits)
