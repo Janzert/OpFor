@@ -185,6 +185,7 @@ class FullSearch : ABSearch
                     }
                 }
             }
+            trap_search.clear();
         } else {
             pos.get_steps(steps);
         }

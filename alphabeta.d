@@ -397,6 +397,7 @@ class StepSorter
                                 *nstep = trap_search.captures[i].first_step;
                             }
                         }
+                        trap_search.clear();
                         capture_num = 0;
                         captures_generated = true;
                     }

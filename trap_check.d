@@ -213,6 +213,7 @@ class TrapCheck
             }
             StepList.free(legal_steps);
         }
+        trap_gen.clear();
         return Status.OK;
     }
 }

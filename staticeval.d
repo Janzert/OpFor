@@ -1251,6 +1251,7 @@ class StaticEval
                 writefln("score %d", score);
             }
         }
+        trap_search.clear();
 
         return score;
     }

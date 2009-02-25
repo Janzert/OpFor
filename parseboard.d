@@ -174,6 +174,7 @@ int main(char[][] args)
                         tgen.captures[i].length, tgen.captures[i].first_step);
             }*/
         }
+        tgen.clear();
     }
     TrapCheck tcheck = new TrapCheck();
     StepList sl = StepList.allocate();

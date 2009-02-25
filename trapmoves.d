@@ -19,7 +19,18 @@ class TrapGenerator
     int num_captures;
     CaptureInfo[MAX_CAPTURES] captures;
 
+    private Position pos;
+    private Side side;
     private bool findall = true;
+
+    void clear()
+    {
+        if (pos !is null)
+        {
+            pos = null;
+        }
+        num_captures = 0;
+    }
 
     void add_capture(Piece piece, ulong vbit, int steps, ulong tbit, ulong frombit, ulong tobit, bool ispush=false)
     in
@@ -65,7 +76,7 @@ class TrapGenerator
         num_captures++;
     }
 
-    private void gen_0n(Position pos, ulong tbit, Side side)
+    private void gen_0n(ulong tbit)
     {
         // There are no enemy pieces neighboring the trap
         int enemyoffset = -6;
@@ -505,7 +516,7 @@ class TrapGenerator
         }
     }
 
-    private void gen_1n(Position pos, ulong tbit, Side side)
+    private void gen_1n(ulong tbit)
     {
         // One enemy piece neighboring the trap
         int enemyoffset = -6;
@@ -1300,8 +1311,8 @@ class TrapGenerator
                                                 return;
                                         }
                                     }
-                                    else if ((unf_neighbors & (pnnbit
-                                                    | (TRAPS & pnb_neighbors & pos.bitBoards[Piece.EMPTY])) & ~backward)
+                                    else if ((tobits || (unf_neighbors & (pnnbit
+                                                        | (TRAPS & pnb_neighbors & pos.bitBoards[Piece.EMPTY])) & ~backward))
                                             && ((unf_neighbors & pos.placement[side] & ~pnnbit)
                                                 || ((unfbit & ~TRAPS)
                                                     && (pos.pieces[unfix] >= pos.strongest[side^1][unfix] + enemyoffset))))
@@ -2212,7 +2223,7 @@ class TrapGenerator
         }
     }
 
-    private void gen_2n(Position pos, ulong tbit, Side side)
+    private void gen_2n(ulong tbit)
     {
         int enemyoffset = -6;
         int pieceoffset = 0;
@@ -2240,11 +2251,11 @@ class TrapGenerator
             if ((neighbors[0] & (1UL << pos.lastfrom))
                     && (pos.lastpiece > pos.pieces[pix[0]] + enemyoffset)
                     && (pos.strongest[side][pix[1]] > pos.pieces[pix[1]] + enemyoffset))
-                gen_2n_pull(pos, tbit, pbit[0], pbit[1]);
+                gen_2n_pull(tbit, pbit[0], pbit[1]);
             if ((neighbors[1] & (1UL << pos.lastfrom))
                     && (pos.lastpiece > pos.pieces[pix[1]] + enemyoffset)
                     && (pos.strongest[side][pix[0]] > pos.pieces[pix[0]] + enemyoffset))
-                gen_2n_pull(pos, tbit, pbit[1], pbit[0]);
+                gen_2n_pull(tbit, pbit[1], pbit[0]);
         }
 
         if ((pos.strongest[side][pix[0]] > pos.pieces[pix[0]] + enemyoffset)
@@ -2275,12 +2286,12 @@ class TrapGenerator
             if (tbit & pos.placement[side] & ~(attackers[0] | attackers[1]))
                 return;
 
-            gen_2n_1p(pos, tbit, side, pbit[0], pbit[1], attackers[0], attackers[1]);
-            gen_2n_1p(pos, tbit, side, pbit[1], pbit[0], attackers[1], attackers[0]);
+            gen_2n_1p(tbit, pbit[0], pbit[1], attackers[0], attackers[1]);
+            gen_2n_1p(tbit, pbit[1], pbit[0], attackers[1], attackers[0]);
         }
     }
 
-    private void gen_2n_1p(Position pos, ulong tbit, Side side, ulong p1bit, ulong p2bit,
+    private void gen_2n_1p(ulong tbit, ulong p1bit, ulong p2bit,
             ulong p1attackers, ulong p2attackers)
     {
         int enemyoffset = -6;
@@ -2463,7 +2474,7 @@ class TrapGenerator
         }
     }
 
-    private void gen_2n_pull(Position pos, ulong tbit, ulong p1bit, ulong p2bit)
+    private void gen_2n_pull(ulong tbit, ulong p1bit, ulong p2bit)
     {
         ulong p1tobit = 1UL << pos.lastfrom;
         Side side = pos.side;
@@ -2533,8 +2544,10 @@ class TrapGenerator
         }
     }
 
-    int find_captures(Position pos, Side side, bool findall=true)
+    int find_captures(Position p, Side s, bool findall=true)
     {
+        pos = p;
+        side = s;
         num_captures = 0;
         this.findall = findall;
 
@@ -2547,13 +2560,13 @@ class TrapGenerator
             switch (popcount(neighbors_of(tbit) & pos.placement[side^1]))
             {
                 case 0:
-                    gen_0n(pos, tbit, side);
+                    gen_0n(tbit);
                     break;
                 case 1:
-                    gen_1n(pos, tbit, side);
+                    gen_1n(tbit);
                     break;
                 case 2:
-                    gen_2n(pos, tbit, side);
+                    gen_2n(tbit);
                     break;
                 default:
                     break;
@@ -2577,3 +2590,4 @@ class TrapGenerator
         return num_captures;
     }
 }
+
