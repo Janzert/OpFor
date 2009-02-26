@@ -185,7 +185,58 @@ class FullSearch : ABSearch
                     }
                 }
             }
+            if (trap_search.find_captures(pos, cast(Side)(pos.side^1)))
+            {
+                StepList esteps = StepList.allocate();
+                trap_search.evasion_steps(esteps);
+                for (int eix=0; eix < esteps.numsteps; eix++)
+                {
+                    bool duplicate = false;
+                    for (int i=0; i < steps.numsteps; i++)
+                    {
+                        if (esteps.steps[eix] == steps.steps[i])
+                        {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                    if (!duplicate)
+                    {
+                        Step* step = steps.newstep();
+                        *step = esteps.steps[eix];
+                    }
+                }
+                StepList.free(esteps);
+            }
             trap_search.clear();
+            debug (check_qsteps)
+            {
+                StepList rsteps = StepList.allocate();
+                pos.get_steps(rsteps);
+                for (int six=0; six < steps.numsteps; six++)
+                {
+                    bool invalid = true;
+                    for (int rix=0; rix < rsteps.numsteps; rix++)
+                    {
+                        if (steps.steps[six].frombit == rsteps.steps[rix].frombit
+                                && steps.steps[six].tobit == rsteps.steps[rix].tobit)
+                        {
+                            invalid = false;
+                            break;
+                        }
+                    }
+                    if (invalid)
+                    {
+                        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                        for (int rix=0; rix < rsteps.numsteps; rix++)
+                            writef("%s ", rsteps.steps[rix].toString(true));
+                        writefln();
+                        throw new Exception(format("Bad step found in qsearch %s",
+                                    steps.steps[six].toString(true)));
+                    }
+                }
+                StepList.free(rsteps);
+            }
         } else {
             pos.get_steps(steps);
         }

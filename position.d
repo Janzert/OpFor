@@ -217,23 +217,30 @@ struct Step
     char[] toString(bool showpush=false)
     {
         char[] str;
+        if (frombit == INV_STEP)
+            return "pass";
         str ~= ix_to_alg(fromix);
-        switch (toix - fromix)
+        if (tobit == INV_STEP)
         {
-            case 8:
-                str ~= "n";
-                break;
-            case -8:
-                str ~= "s";
-                break;
-            case -1:
-                str ~= "e";
-                break;
-            case 1:
-                str ~= "w";
-                break;
-            default:
-                str ~= ix_to_alg(toix);
+            str ~= "x";
+        } else {
+            switch (toix - fromix)
+            {
+                case 8:
+                    str ~= "n";
+                    break;
+                case -8:
+                    str ~= "s";
+                    break;
+                case -1:
+                    str ~= "e";
+                    break;
+                case 1:
+                    str ~= "w";
+                    break;
+                default:
+                    str ~= ix_to_alg(toix);
+            }
         }
         if (showpush && push)
         {

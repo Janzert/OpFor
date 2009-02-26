@@ -3125,7 +3125,12 @@ class GoalSearchDT
                                             forward(p_bit, side))));
                         if (unfreezers)
                         {
-                            if (can_push)
+                            if (can_push
+                                    || (neighbors_of(unfreezers)
+                                        & start.placement[side]
+                                        & ~start.frozen
+                                        & ~(start.bitBoards[myrabbit]
+                                            & neighbors_of(forward(p_bit, side)))))
                             {
                                 shortest_goal = 4;
                                 continue;

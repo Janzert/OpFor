@@ -1227,6 +1227,29 @@ class TrapGenerator
                                         pnn_first = true;
                                     }
                                 }
+                                if (!pnn_first && (pnb_neighbors & pos.placement[side^1]
+                                            & (TRAPS & neighbors_of(pnn_neighbors & pos.placement[side^1]))
+                                            & ~(TRAPS & neighbors_of(pos.placement[side^1] & ~pnn_neighbors))))
+                                {
+                                    ulong pulled = pnn_neighbors & pos.placement[side^1]
+                                        & neighbors_of(TRAPS & pnb_neighbors);
+                                    assert (popcount(pulled) == 1);
+                                    Piece ppiece = pos.pieces[bitindex(pulled)];
+                                    if (pos.pieces[pnnix] > ppiece + enemyoffset)
+                                    {
+                                        ulong ofreezers = pnb_neighbors & pos.placement[side^1] & ~TRAPS
+                                            & ~pos.bitBoards[Piece.WRABBIT + pieceoffset - enemyoffset];
+                                        while (ofreezers)
+                                        {
+                                            ulong obit = ofreezers & -ofreezers;
+                                            if (pos.pieces[pnnix] < pos.pieces[bitindex(obit)])
+                                                break;
+                                            ofreezers ^= obit;
+                                        }
+                                        if (!ofreezers)
+                                            pnn_first = true;
+                                    }
+                                }
                                 if (pnn_first)
                                 {
                                     add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, pnbit);
@@ -2432,6 +2455,179 @@ class TrapGenerator
         }
 
         return num_captures;
+    }
+
+    void evasion_steps(StepList steps)
+    {
+        Side pside = cast(Side)(side^1);
+        int pieceoffset = 0;
+        int enemyoffset = -6;
+        if (pside == Side.BLACK)
+        {
+            pieceoffset = 6;
+            enemyoffset = 6;
+        }
+
+        ulong active_traps;
+        ulong victims;
+        for (int c = 0; c < num_captures; c++)
+        {
+            if (captures[c].length <= 4)
+            {
+                active_traps |= captures[c].trap_bit;
+                victims |= captures[c].victim_bit;
+            }
+        }
+        ulong tbits = active_traps;
+        while (tbits)
+        {
+            ulong tbit = tbits & -tbits;
+            tbits ^= tbit;
+
+            ulong t_neighbors = neighbors_of(tbit);
+            ulong empty_neighbors = t_neighbors & pos.bitBoards[Piece.EMPTY];
+            // pieces one step away from trap
+            ulong rescuers = neighbors_of(empty_neighbors)
+                & pos.placement[pside] & ~(victims & ~TRAPS) & ~pos.frozen;
+            while (rescuers)
+            {
+                ulong rbit = rescuers & -rescuers;
+                rescuers ^= rbit;
+
+                ulong tobits = empty_neighbors & neighbors_of(rbit);
+                if (rbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                {
+                    tobits &= rabbit_steps(pside, rbit);
+                }
+                while (tobits)
+                {
+                    ulong tobit = tobits & -tobits;
+                    tobits ^= tobit;
+
+                    Step* step = steps.newstep();
+                    step.set(rbit, tobit, false);
+                }
+            }
+            if (pos.stepsLeft == 1)
+                continue;
+            // pieces two steps away from the trap
+            rescuers = neighbors_of(neighbors_of(empty_neighbors)
+                    & pos.bitBoards[Piece.EMPTY]) & pos.placement[pside]
+                & ~pos.frozen & ~victims;
+            while (rescuers)
+            {
+                ulong rbit = rescuers & -rescuers;
+                rescuers ^= rbit;
+                bitix rix = bitindex(rbit);
+                Piece rpiece = pos.pieces[rix];
+
+                ulong tobits = neighbors_of(empty_neighbors)
+                    & neighbors_of(rbit)
+                    & pos.bitBoards[Piece.EMPTY]
+                    & ~(TRAPS & ~neighbors_of(pos.placement[pside] & ~rbit));
+                if (rbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                {
+                    tobits &= rabbit_steps(pside, rbit);
+                }
+                while (tobits)
+                {
+                    ulong tobit = tobits & -tobits;
+                    tobits ^= tobit;
+
+                    // will it freeze before it can get to the trap
+                    if (rpiece < pos.strongest[side][bitindex(tobit)] + enemyoffset
+                            && !(neighbors_of(tobit) & pos.placement[pside] & ~rbit))
+                        continue;
+                    // can it get to a possibly safe spot
+                    ulong entos = neighbors_of(tobit) & empty_neighbors;
+                    while (entos)
+                    {
+                        ulong enbit = entos & -entos;
+                        Piece estrong = pos.strongest[side][bitindex(enbit)];
+                        if (rpiece >= estrong + enemyoffset)
+                            break;
+                        entos ^= enbit;
+                    }
+                    if (!entos)
+                        continue;
+
+                    Step* step = steps.newstep();
+                    step.set(rbit, tobit, false);
+                }
+            }
+        }
+
+        ulong vbits = victims;
+        while (vbits)
+        {
+            ulong vbit = vbits & -vbits;
+            vbits ^= vbit;
+            ulong v_neighbors = neighbors_of(vbit);
+
+            ulong pushed = v_neighbors & pos.placement[side]
+                & neighbors_of(pos.bitBoards[Piece.EMPTY])
+                & ~(TRAPS & ~neighbors_of(pos.placement[pside] & ~vbit));
+
+            if (vbit & ~pos.frozen)
+            {
+                ulong tobits = v_neighbors & pos.bitBoards[Piece.EMPTY]
+                    & ~(TRAPS & ~neighbors_of(pos.placement[pside] & ~vbit));
+                if (vbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                    tobits &= rabbit_steps(pside, vbit);
+                while (tobits)
+                {
+                    ulong tobit = tobits & -tobits;
+                    tobits ^= tobit;
+                    Step* step = steps.newstep();
+                    step.set(vbit, tobit, false);
+                }
+                if (pos.stepsLeft > 1
+                        && (vbit & ~pos.bitBoards[Piece.WRABBIT + pieceoffset]))
+                {
+                    Piece vpiece = pos.pieces[bitindex(vbit)];
+                    while (pushed)
+                    {
+                        ulong pbit = pushed & -pushed;
+                        pushed ^= pbit;
+                        bitix pix = bitindex(pbit);
+                        if (vpiece > pos.pieces[pix] + enemyoffset)
+                        {
+                            ulong pushtos = neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY];
+                            while (pushtos)
+                            {
+                                ulong tobit = pushtos & -pushtos;
+                                pushtos ^= tobit;
+                                Step* step = steps.newstep();
+                                step.set(pbit, tobit, true);
+                            }
+                        }
+                    }
+                }
+            }
+            else if (pushed || popcount(v_neighbors & pos.bitBoards[Piece.EMPTY]) > 1)
+            {
+                ulong unfreezers = neighbors_of(v_neighbors & pos.bitBoards[Piece.EMPTY])
+                    & pos.placement[pside] & ~pos.frozen;
+                while (unfreezers)
+                {
+                    ulong unbit = unfreezers & -unfreezers;
+                    unfreezers ^= unbit;
+                    ulong tobits = neighbors_of(unbit) & v_neighbors & pos.bitBoards[Piece.EMPTY];
+                    if (unbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                    {
+                        tobits &= rabbit_steps(pside, unbit);
+                    }
+                    while (tobits)
+                    {
+                        ulong tobit = tobits & -tobits;
+                        tobits ^= tobit;
+
+                        Step* step = steps.newstep();
+                        step.set(unbit, tobit);
+                    }
+                }
+            }
+        }
     }
 }
 
