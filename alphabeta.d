@@ -320,7 +320,7 @@ class StepSorter
         // Allow a step if:
         // Piece steps into last from
         // Same piece as last step
-        // Last step suported this step onto a trap
+        // Last step supported this step onto a trap
         // Last step was to a neighbor of this from
         // Last step allowed this piece to step away from a trap
         if ((((to | from) & (last.tobit | last_tneighbors))
@@ -779,6 +779,8 @@ class ABSearch
             }
 
             StepSorter sorted_steps = StepSorter.allocate(height, pos, prev_best, last_step);
+            if (depth > max_depth - 4 && depth > max_depth / 2)
+                sorted_steps.remove_unrelated = false;
             Step* curstep = sorted_steps.next_step();
             if (curstep is null)
             {

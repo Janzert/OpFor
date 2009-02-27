@@ -940,6 +940,13 @@ class StaticEval
                             blk_num = blk_num > 2 ? 2 : blk_num;
                             sc *= BLOCK_WEAK_FAR[blk_num];
                             score += sc;
+                            debug (mobility)
+                            {
+                                bitix pix = bitindex(pbit);
+                                Piece ppiece = pos.pieces[pix];
+                                logger.log("Found blockade of %s%s to be worth %f",
+                                        ".RCDHMErcdhme"[ppiece], ix_to_alg(pix), sc);
+                            }
                         }
                     }
 
