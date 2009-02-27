@@ -23,7 +23,7 @@ class SetupGenerator
     bool random_minor = true;
     bool random_all = false;
 
-    int[] setup_weights = [3, 6, 1];
+    int[] setup_weights = [19, 80, 1];
 
     private ulong gold_to_silver(ulong bitboard)
     {
@@ -104,7 +104,7 @@ class SetupGenerator
             pos.place_piece(piece, sbit);
         }
     }
-    
+
     void setup_board(Side s, inout Position pos)
     {
         int offset = (s == Side.WHITE) ? 0 : 6;

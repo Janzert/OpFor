@@ -213,8 +213,8 @@ class StaticEval
     int on_trap()
     {
         const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
-        const int FRAMED[13] = [0, -50, -75, -100, -150, -225, -400,
-              50, 75, 100, 150, 225, 400];
+        const int FRAMED[13] = [0, -50, -75, -100, -175, -225, -400,
+              50, 75, 100, 175, 225, 400];
         const int PINNED[13] = [0, 0, -2, -3, -5, -8, -22, 0, 2, 3, 5, 8, 22];
         const int FRAMER[13] = [0, 0, -1, -2, -3, -4, -11, 0, 1, 2, 3, 4, 11];
 
@@ -688,8 +688,8 @@ class StaticEval
     int block_and_hostage()
     {
         // Depends on piece strength done first
-        static const int[] BLOCKADE_VAL = [0, -5, -12, -16, -30, -55, -132,
-                                    5, 12, 16, 30, 55, 132];
+        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -20, -35, -90,
+                                    1, 5, 10, 20, 35, 90];
         static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
                                     10, 25, 39, 61, 150, 264];
         static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
@@ -859,7 +859,7 @@ class StaticEval
         static const real[] BLOCK_WEAK_CL = [1.0, 0.8, 0.6];
         static const real[] BLOCK_WEAK_FAR = [1.0, 0.9, 0.8];
 
-        static const int[] MOBILE_VAL = [0, 10, 3, 1];
+        static const int[] MOBILE_VAL = [0, 8, 5, 1];
         static const real[] SIDE_MUL = [0.2, -0.2];
 
         static const int[] NK_TOUCH_THREAT = [0, -10, -30, -40, -60, -122, -200,
@@ -1024,20 +1024,28 @@ class StaticEval
             for (int p = Piece.WCAT; p < Piece.WELEPHANT; p++)
             {
                 int threat_ix = p - Piece.WCAT;
+                ulong cover = threat_map[side^1][threat_ix][0]
+                    | threat_map[side^1][threat_ix][1]
+                    | threat_map[side^1][threat_ix][3];
                 ulong pieces = pos.bitBoards[p + pcorr];
                 ulong handled;
                 ulong threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
                 score += NK_TOUCH_THREAT[p + pcorr] * popcount(threatened);
+                score -= (NK_TOUCH_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
                 handled = threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][3]) & pieces & ~handled;
+                score += KP_THREAT[p + pcorr] * popcount(threatened);
+                score -= (KP_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
+                handled |= threatened;
                 threatened = neighbors_of(threat_map[side][threat_ix][1]) & pieces & ~handled;
                 score += NK_CLOSE_THREAT[p + pcorr] * popcount(threatened);
+                score -= (NK_CLOSE_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
                 handled |= threatened;
+                cover |= threat_map[side^1][threat_ix][2];
                 threatened = neighbors_of(threat_map[side][threat_ix][2]) & pieces & ~handled;
                 score += KP_THREAT[p + pcorr] * popcount(threatened & neighbors_of(pos.placement[side]));
                 score += NK_FAR_THREAT[p + pcorr] * popcount(threatened & ~neighbors_of(pos.placement[side]));
-                handled |= threatened;
-                threatened = neighbors_of(threat_map[side][threat_ix][3]) & pieces & ~handled;
-                score += KP_THREAT[p + pcorr] * popcount(threatened);
+                score -= (NK_FAR_THREAT[p + pcorr]  * popcount(threatened & cover)) / 4;
 
                 debug (mobility)
                 {

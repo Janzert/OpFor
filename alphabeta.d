@@ -320,24 +320,16 @@ class StepSorter
         // Allow a step if:
         // Piece steps into last from
         // Same piece as last step
-        // A push neighboring the last to
         // Last step suported this step onto a trap
-        // Last step might have unfrozen this piece
+        // Last step was to a neighbor of this from
         // Last step allowed this piece to step away from a trap
         if ((((to | from) & (last.tobit | last_tneighbors))
                     && ((to == last.frombit) || (last.tobit == from)
-                        || ((last_tneighbors & from)
-                            && s.push)
                         || ((to & TRAPS & last_tneighbors)
                             && !(pos.placement[pos.side]
                                 & neighbors_of(to)
                                 & ~from & ~last.tobit))
-                        || ((from & last_tneighbors)
-                            && !(neighbors_of(from)
-                                & pos.placement[pos.side]
-                                & ~last.tobit)
-                            && (neighbors_of(from)
-                                & pos.placement[pos.side^1]))))
+                        || (from & last_tneighbors)))
                 || (last_tneighbors & neighbors_of(from) & TRAPS
                     & pos.placement[pos.side])
                 || ((last.frombit & TRAPS)
