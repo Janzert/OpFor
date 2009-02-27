@@ -690,8 +690,8 @@ class StaticEval
         // Depends on piece strength done first
         static const int[] BLOCKADE_VAL = [0, -5, -12, -16, -30, -55, -132,
                                     5, 12, 16, 30, 55, 132];
-        static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -110, -264,
-                                    10, 25, 39, 61, 110, 264];
+        static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
+                                    10, 25, 39, 61, 150, 264];
         static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
                                     0, 4, 5, 10, 18, 44];
         static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
@@ -864,8 +864,8 @@ class StaticEval
 
         static const int[] NK_TOUCH_THREAT = [0, -10, -30, -40, -60, -122, -200,
                      10, 30, 40, 60, 122, 400];
-        static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -56, -100,
-                     5, 15, 20, 30, 56, 100];
+        static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
+                     5, 15, 20, 30, 64, 100];
         static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -28, -50,
                      2, 7, 10, 15, 28, 50];
         static const int[] KP_THREAT = [0, -1, -4, -5, -7, -14, -25,
@@ -1185,13 +1185,13 @@ class StaticEval
             // multiple traps for one victim
             // multiple victims one trap
             // nearness stronger or even piece
-            const static real[] victim_per = [0.45, 0.55, 0.65];
+            const static real[] victim_per = [0.65, 0.75, 0.85];
             const static real[] length_per = [1.0,
                 1.0, 1.0, 0.9, 0.9,
                 0.3, 0.3, 0.2, 0.1,
                 0.05, 0.05, 0.01, 0.01];
-            const static real[] defense_per = [1.0, 0.84, 0.68, 0.52, 0.36];
-            const static real frozen_per = 0.1;
+            const static real[] defense_per = [1.0, 0.9, 0.8, 0.6, 0.4];
+            const static real frozen_per = 0.2;
             const static real multivic_per = 0.9;
             const static real multitrap_per = 1.5;
             const static real max_victim_per = 0.9;
