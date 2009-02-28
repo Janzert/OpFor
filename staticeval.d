@@ -843,8 +843,8 @@ class StaticEval
 
     int mobility()
     {
-        static const int[] BLOCKADE_VAL = [0, -1, -10, -15, -120, -200, -450,
-                     1, 10, 15, 120, 200, 450];
+        static const int[] BLOCKADE_VAL = [0, -1, -10, -15, -120, -200, -375,
+                     1, 10, 15, 120, 200, 375];
         static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
         static const real[] BLOCK_STRONGER_CL = [1.0, 0.4, 0.2, 0.1, 0.1];
         static const real[] BLOCK_STRONGER_FAR = [1.0, 0.6, 0.4, 0.3, 0.1];
