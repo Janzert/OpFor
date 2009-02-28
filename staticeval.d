@@ -464,20 +464,10 @@ class StaticEval
         // Depends on goal search and trap safety being done first
         const static int[] pieceval = [0, 0, 45, 60, 150, 200, 300,
               0, -45, -60, -150, -200, -300];
-        const static int[] distval = [100, 100, 95, 75, 70,
-              40, 30, 25, 20, 5, 1, 1, 1, 1, 0, 0];
+        const static int[] distval = [100, 100, 90, 75, 60,
+              30, 25, 15, 10, 2, 2, 1, 1, 1, 0, 0];
         const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.2, 0],
               [0, -1.2, -1.0, -0.5, -0.2, 0, 0, 0]];
-        const static real[] goalval = [1.0,
-              1.0, 1.0, 1.0, 1.0,
-              1.0, 1.0, 0.9, 0.9,
-              0.8, 0.8, 0.8, 0.8,
-              0.7, 0.7, 0.7, 0.7];
-        const static real[] weakgoal = [0,
-              0.1, 0.2, 0.2, 0.4,
-              0.5, 0.6, 0.7, 0.8,
-              1, 1, 1, 1,
-              1, 1, 1, 1];
         const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0],
              [0, 30, 40, 35, 30, 15, 0, 0]];
         const static int power_balance = 1000;
@@ -541,7 +531,7 @@ class StaticEval
                 } else {
                     power = (power < full_strong) ? power : full_strong;
                     real rv = rankval[s][rix/8];
-                    real rval = power * rv * goalval[16];
+                    real rval = power * rv;
                     if (rbit & TRAPS)
                         rval /= 2;
                     uint rfile = rix % 8;
@@ -555,7 +545,7 @@ class StaticEval
                         sector <<= 40;
                     }
                     if (!((safe_traps[s] & ~safe_traps[s^1]) & sector))
-                        rval /= 2;
+                        rval *= 0.4;
                     debug (rabbit_strength)
                     {
                         writefln("strong r at %s, val %.2f final %d sector %X st %X", ix_to_alg(rix), rval, cast(int)(rval*rstrong_w),
@@ -862,8 +852,8 @@ class StaticEval
         static const int[] MOBILE_VAL = [0, 8, 5, 1];
         static const real[] SIDE_MUL = [0.2, -0.2];
 
-        static const int[] NK_TOUCH_THREAT = [0, -10, -30, -40, -60, -122, -200,
-                     10, 30, 40, 60, 122, 400];
+        static const int[] NK_TOUCH_THREAT = [0, -10, -30, -40, -50, -80, -200,
+                     10, 30, 40, 50, 80, 200];
         static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
                      5, 15, 20, 30, 64, 100];
         static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -28, -50,
@@ -1279,7 +1269,7 @@ class StaticEval
               40, 40, 30, 30,
               10, 10, 5, 5, 0];
         const real[] DEFENSE_STEPS = [1.0, 0.8, 0.66, 0.5, 0.33];
-        const real[] DEFENSE_NUM = [1.0, 0.8, 0.5, 0.2, 0.1, 0.1, 0.05, 0.01, 0.01];
+        const real[] DEFENSE_NUM = [1.0, 0.8, 0.7, 0.4, 0.2, 0.1, 0.05, 0.01, 0.01];
         const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
         const ulong MIDDLE_SECTOR = 0x181818;
         const ulong[] GOAL_RANK = [RANK_8, RANK_1];
