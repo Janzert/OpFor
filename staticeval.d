@@ -854,7 +854,10 @@ class StaticEval
         static const real[] BLOCK_WEAK_FAR = [1.0, 0.9, 0.8];
 
         static const int[] MOBILE_VAL = [0, 10, 4, 1];
-        static const real[] SIDE_MUL = [0.25, -0.25];
+        static const real[] SIDE_MUL = [0.1, -0.1];
+
+        static const int[] AREA_VAL = [0, 0, 2, 1];
+        static const real[] AREA_MUL = [-0.2, 0.2];
 
         static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -80, -200,
                      7, 22, 30, 45, 80, 200];
@@ -867,6 +870,7 @@ class StaticEval
         static const real threat_mul = 0.6;
 
         real score = 0;
+        int[4][2] strongest_left;
         ulong[4][4][2] threat_map;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
@@ -892,6 +896,8 @@ class StaticEval
                 if (pieces)
                 {
                     pieces_checked++;
+                    if (pieces_checked < 4)
+                        strongest_left[side][pieces_checked] = epiece;
                 }
                 pieces &= ~pos.frozen;
                 while (pieces)
@@ -1015,6 +1021,24 @@ class StaticEval
         debug (mobility)
         {
             logger.log("Mobility and blockade only: %f", score);
+        }
+
+        for (Side side = Side.WHITE; side <= Side.BLACK; side++)
+        {
+            for (int rank=2; rank < 4; rank++)
+            {
+                int threat_ix = strongest_left[side][rank] - Piece.WCAT;
+                ulong threat_area = neighbors_of(threat_map[side][threat_ix][0]
+                        | threat_map[side][threat_ix][1]
+                        | threat_map[side][threat_ix][2]
+                        | threat_map[side][threat_ix][3]);
+                score += popcount(threat_area) * AREA_VAL[rank] * AREA_MUL[side];
+            }
+        }
+
+        debug (mobility)
+        {
+            logger.log("Mobility, blockade and threat area: %f", score);
         }
 
         real threat_score = 0;
