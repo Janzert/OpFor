@@ -79,9 +79,11 @@ class TrapGenerator
     {
         // There are no enemy pieces neighboring the trap
         int enemyoffset = -6;
+        int pieceoffset = 0;
         if (side == Side.BLACK)
         {
             enemyoffset = 6;
+            pieceoffset = 6;
         }
 
         ulong t_neighbors = neighbors_of(tbit);
@@ -160,6 +162,40 @@ class TrapGenerator
                                     && (t_neighbors & ~nbit & pos.placement[side]))
                             {
                                 add_capture(pos.pieces[pix], pbit, 4, tbit, nbit, tbit);
+                            }
+                        }
+                    }
+
+                    ulong lastbit = 1UL << pos.lastfrom;
+                    if ((side == pos.side) && (neighbors_of(nbit) & lastbit))
+                    {
+                        possibles = neighbors_of(lastbit) & pos.placement[side^1];
+                        while (possibles)
+                        {
+                            ulong pbit = possibles & -possibles;
+                            possibles ^= pbit;
+                            bitix pix = bitindex(pbit);
+
+                            if (pos.lastpiece <= pos.pieces[pix] + enemyoffset
+                                    || pos.pieces[nix] <= pos.pieces[pix] + enemyoffset)
+                                continue;
+
+                            ulong tobits = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY]
+                                & ~tbit & ~lastbit;
+                            while (tobits)
+                            {
+                                ulong tobit = tobits & -tobits;
+                                bitix toix = bitindex(tobit);
+                                if ((tobit == tbit) && (t_neighbors & pos.placement[side] & ~nbit)
+                                        && (t_neighbors & pos.bitBoards[Piece.EMPTY]))
+                                    break;
+                                if (pos.pieces[nix] >= pos.strongest[side^1][toix] + enemyoffset)
+                                    break;
+                                tobits ^= tobit;
+                            }
+                            if (tobits)
+                            {
+                                add_capture(pos.pieces[pix], pbit, 5, tbit, pbit, lastbit);
                             }
                         }
                     }
@@ -257,19 +293,106 @@ class TrapGenerator
                         }
                     }
 
-                    ulong enn = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY] & ~t_neighbors & neighbors_of(pos.placement[side^1]);
+                    // maybe there's a friendly that can pull a piece to the trap
+                    possibles = neighbors_of(nbit) & pos.placement[side] & ~pos.frozen
+                        & ~pos.bitBoards[Piece.WRABBIT + pieceoffset]
+                        & neighbors_of(pos.placement[side^1]);
+                    while (possibles)
+                    {
+                        ulong pbit = possibles & -possibles;
+                        possibles ^= pbit;
+                        bitix pix = bitindex(pbit);
+                        Piece ppiece = pos.pieces[pix];
+
+                        if ((nbit & ~neighbors_of(pos.placement[side] & ~pbit))
+                                && (ppiece < pos.strongest[side^1][nix] + enemyoffset))
+                            continue;
+
+                        ulong pvictims = neighbors_of(pbit) & pos.placement[side^1];
+                        ulong victims;
+                        while (pvictims)
+                        {
+                            ulong vbit = pvictims & -pvictims;
+                            pvictims ^= vbit;
+                            if (ppiece > pos.pieces[bitindex(vbit)] + enemyoffset)
+                                victims |= vbit;
+                        }
+                        if (!victims)
+                            continue;
+
+                        ulong ptos = neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY];
+                        ulong tobits;
+                        while (ptos)
+                        {
+                            ulong tobit = ptos & -ptos;
+                            ptos ^= tobit;
+                            if ((tobit & ~neighbors_of(pos.placement[side] & ~pbit))
+                                    && (TRAPS
+                                        || ppiece < pos.strongest[side^1][bitindex(tobit)] + enemyoffset))
+                                continue;
+                            if ((tobit & nbit)
+                                    && !((t_neighbors & pos.bitBoards[Piece.EMPTY] & ~nbit)
+                                        && (t_neighbors & pos.placement[side])))
+                            {
+                                // can't pull through the trap can we flip on nbit
+                                ulong pflips = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY];
+                                while (pflips)
+                                {
+                                    ulong pfbit = pflips & - pflips;
+                                    if (ppiece >= pos.strongest[side^1][bitindex(pfbit)] + enemyoffset)
+                                        break;
+                                    pflips ^= pfbit;
+                                }
+                                if (!pflips)
+                                    continue;
+                            }
+                            ulong vbits = victims;
+                            while (vbits)
+                            {
+                                ulong vbit = vbits & -vbits;
+                                vbits ^= vbit;
+                                bitix vix = bitindex(vbit);
+                                add_capture(pos.pieces[vix], vbit, 6, tbit, pbit, tobit);
+                            }
+                        }
+                    }
+
+                    ulong enn = neighbors_of(nbit) & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
                     while (enn)
                     {
                         ulong ennbit = enn & -enn;
                         enn ^= ennbit;
                         bitix ennix = bitindex(ennbit);
+                        ulong enn_neighbors = neighbors_of(ennbit);
 
-                        ulong oneighbors = neighbors_of(ennbit) & pos.placement[side^1];
+                        ulong oneighbors = enn_neighbors & pos.placement[side^1];
                         while (oneighbors)
                         {
                             ulong onbit = oneighbors & - oneighbors;
                             oneighbors ^= onbit;
                             bitix onix = bitindex(onbit);
+
+                            if ((side == pos.side) && (ennbit == (1UL << pos.lastfrom))
+                                    && (pos.lastpiece > pos.pieces[onix] + enemyoffset))
+                            {
+                                // can pull piece closer to trap
+                                ulong finishers = neighbors_of(ennbit) & pos.placement[side] & ~pos.frozen;
+                                while (finishers)
+                                {
+                                    ulong fbit = finishers & -finishers;
+                                    finishers ^= fbit;
+                                    bitix fix = bitindex(fbit);
+
+                                    if (pos.pieces[fix] > pos.pieces[onix] + enemyoffset
+                                            && (pos.pieces[fix] > pos.strongest[side^1][ennix] + enemyoffset
+                                                || (neighbors_of(ennbit) & pos.placement[side] & ~fbit)))
+                                    {
+                                        // can finish trap
+                                        add_capture(pos.pieces[onix], onbit, 5, tbit, onbit, ennbit);
+                                        break;
+                                    }
+                                }
+                            }
 
                             if (pos.strongest[side][onix] > pos.pieces[onix] + enemyoffset)
                             {
