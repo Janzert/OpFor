@@ -54,7 +54,7 @@ class StaticEval
     ScoreCache sc_cache;
 
     real map_e_w = 2;
-    real tsafety_w = 1;
+    real tsafety_w = 4;
     real ontrap_w = 2;
     real frozen_w = 3;
     real rwall_w = 1;
@@ -775,7 +775,7 @@ class StaticEval
                     // the piece is blockaded
                     debug (mobility)
                     {
-                        writefln("b piece %d", pos.pieces[pix]);
+                        logger.log("blockaded piece %d", pos.pieces[pix]);
                     }
                     bscore += BLOCKADE_VAL[pos.pieces[pix]];
                 } else {
@@ -788,9 +788,11 @@ class StaticEval
                     // power_mul should now be .8 to 1
                     debug (mobility)
                     {
-                        writefln("fb piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
+                        logger.log("pseudo-blockade piece %s%s, pp %.2f", ".RCDHMErcdhme"[pos.pieces[pix]],
+                                ix_to_alg(pix), power_mul);
                     }
                     hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
+                    // it's not actually frozen but should carry the same penalty as if it were
                     hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3; // magic number is frozen_w
                     hostages |= pbit;
                 }
@@ -820,11 +822,13 @@ class StaticEval
                         else
                             power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
                         // power_mul should now be .8 to 1
+                        hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
                         debug (mobility)
                         {
-                            writefln("h piece %d at %s, pp %.2f", pos.pieces[pix], ix_to_alg(pix), power_mul);
+                            logger.log("hostage piece %s%s, pp %.2f, sc %.2f", ".RCDHMErcdhme"[pos.pieces[pix]],
+                                    ix_to_alg(pix), power_mul,
+                                    HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul);
                         }
-                        hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
 
                         Piece strong_holder = pos.strongest[side^1][pix];
                         hscore += HOLDER_PENALTY[strong_holder];
@@ -849,17 +853,18 @@ class StaticEval
         static const real[] BLOCK_WEAK_CL = [1.0, 0.8, 0.6];
         static const real[] BLOCK_WEAK_FAR = [1.0, 0.9, 0.8];
 
-        static const int[] MOBILE_VAL = [0, 8, 5, 1];
-        static const real[] SIDE_MUL = [0.2, -0.2];
+        static const int[] MOBILE_VAL = [0, 10, 4, 1];
+        static const real[] SIDE_MUL = [0.25, -0.25];
 
-        static const int[] NK_TOUCH_THREAT = [0, -10, -30, -40, -50, -80, -200,
-                     10, 30, 40, 50, 80, 200];
+        static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -80, -200,
+                     7, 22, 30, 45, 80, 200];
         static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
                      5, 15, 20, 30, 64, 100];
         static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -28, -50,
                      2, 7, 10, 15, 28, 50];
         static const int[] KP_THREAT = [0, -1, -4, -5, -7, -14, -25,
                      1, 4, 5, 7, 14, 25];
+        static const real threat_mul = 0.6;
 
         real score = 0;
         ulong[4][4][2] threat_map;
@@ -1012,6 +1017,7 @@ class StaticEval
             logger.log("Mobility and blockade only: %f", score);
         }
 
+        real threat_score = 0;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
             int eside = side^1;
@@ -1027,22 +1033,22 @@ class StaticEval
                 ulong pieces = pos.bitBoards[p + pcorr];
                 ulong handled;
                 ulong threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
-                score += NK_TOUCH_THREAT[p + pcorr] * popcount(threatened);
-                score -= (NK_TOUCH_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
+                threat_score += NK_TOUCH_THREAT[p + pcorr] * popcount(threatened);
+                threat_score -= (NK_TOUCH_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
                 handled = threatened;
                 threatened = neighbors_of(threat_map[side][threat_ix][3]) & pieces & ~handled;
-                score += KP_THREAT[p + pcorr] * popcount(threatened);
-                score -= (KP_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
+                threat_score += KP_THREAT[p + pcorr] * popcount(threatened);
+                threat_score -= (KP_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
                 handled |= threatened;
                 threatened = neighbors_of(threat_map[side][threat_ix][1]) & pieces & ~handled;
-                score += NK_CLOSE_THREAT[p + pcorr] * popcount(threatened);
-                score -= (NK_CLOSE_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
+                threat_score += NK_CLOSE_THREAT[p + pcorr] * popcount(threatened);
+                threat_score -= (NK_CLOSE_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
                 handled |= threatened;
                 cover |= threat_map[side^1][threat_ix][2];
                 threatened = neighbors_of(threat_map[side][threat_ix][2]) & pieces & ~handled;
-                score += KP_THREAT[p + pcorr] * popcount(threatened & neighbors_of(pos.placement[side]));
-                score += NK_FAR_THREAT[p + pcorr] * popcount(threatened & ~neighbors_of(pos.placement[side]));
-                score -= (NK_FAR_THREAT[p + pcorr]  * popcount(threatened & cover)) / 4;
+                threat_score += KP_THREAT[p + pcorr] * popcount(threatened & neighbors_of(pos.placement[side]));
+                threat_score += NK_FAR_THREAT[p + pcorr] * popcount(threatened & ~neighbors_of(pos.placement[side]));
+                threat_score -= (NK_FAR_THREAT[p + pcorr]  * popcount(threatened & cover)) / 4;
 
                 debug (mobility)
                 {
@@ -1079,6 +1085,7 @@ class StaticEval
                 }
             }
         }
+        score += threat_score * threat_mul;
 
         debug (mobility)
         {
