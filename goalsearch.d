@@ -3114,7 +3114,7 @@ class GoalSearchDT
                             }
                             continue;
                         }
-                        ulong unfreezers = p_neighbors
+                        ulong unfreeze_sqs = p_neighbors
                             & start.bitBoards[Piece.EMPTY]
                             & (neighbors_of(start.placement[side]
                                         & ~start.bitBoards[myrabbit]
@@ -3123,14 +3123,15 @@ class GoalSearchDT
                                         & ~start.frozen
                                         & ~neighbors_of(
                                             forward(p_bit, side))));
-                        if (unfreezers)
+                        if (unfreeze_sqs)
                         {
                             if (can_push
-                                    || (neighbors_of(unfreezers)
+                                    || (neighbors_of(unfreeze_sqs)
                                         & start.placement[side]
                                         & ~start.frozen
                                         & ~(start.bitBoards[myrabbit]
-                                            & neighbors_of(forward(p_bit, side)))))
+                                            & neighbors_of(forward(p_bit, side)))
+                                        & neighbors_of(o_bit)))
                             {
                                 shortest_goal = 4;
                                 continue;
@@ -3140,8 +3141,8 @@ class GoalSearchDT
                                         & ~start.bitBoards[erabbit])
                                     && ((p_neighbors
                                         & start.bitBoards[Piece.EMPTY]
-                                        & ~unfreezers)
-                                        || popcount(unfreezers) > 1))
+                                        & ~unfreeze_sqs)
+                                        || popcount(unfreeze_sqs) > 1))
                             {
                                 shortest_goal = 4;
                             }

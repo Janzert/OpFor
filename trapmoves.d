@@ -2404,7 +2404,7 @@ class TrapGenerator
             return;
         if ((tbit & p1attackers)
                 && (neighbors_of(tbit) & pos.bitBoards[Piece.EMPTY])
-                && (!(p2to || (neighbors_of(p2rattackers & ~tbit) & pos.bitBoards[Piece.EMPTY]))
+                && (!(p2to || (neighbors_of(p2rattackers & ~tbit & ~pos.frozen) & pos.bitBoards[Piece.EMPTY]))
                     || !(p2rattackers & ~pos.frozen))
                 && ((neighbors_of(p2rattackers & ~tbit) & p1bit)
                     || (neighbors_of(p2attackers & ~tbit) & neighbors_of(tbit)
