@@ -1790,10 +1790,11 @@ Position parse_long_str(char[] boardstr)
     }
 
     Side color;
-    if (rowstrs[0][length-1] == 'w')
+    char sidechar = rowstrs[0][length-1];
+    if (sidechar == 'w' || sidechar == 'g')
     {
         color = Side.WHITE;
-    } else if (rowstrs[0][length-1] == 'b')
+    } else if (sidechar == 'b' || sidechar == 's')
     {
         color = Side.BLACK;
     } else
