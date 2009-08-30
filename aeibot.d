@@ -175,7 +175,7 @@ class StdioServer : ServerConnection
         comt = new _StdioCom();
         comt.start();
     }
-    
+
     ~this()
     {
         shutdown();
@@ -318,7 +318,7 @@ class ServerCmd
 
 class GoCmd : ServerCmd
 {
-    enum Option { NONE, PONDER } 
+    enum Option { NONE, PONDER }
     Option option;
     int time;
     int depth;
@@ -388,6 +388,7 @@ class ServerInterface : LogConsumer
         char[] greet = con.receive();
         if (cmp(strip(greet), "aei") != 0)
             throw new Exception("Invalid greeting from server.");
+        con.send("protocol-version 1\n");
         con.send(format("id name %s\n", bot_name));
         con.send(format("id author %s\n", bot_author));
         con.send("aeiok\n");
@@ -464,10 +465,10 @@ class ServerInterface : LogConsumer
                         int six = find(line, "setposition") + 11;
                         switch(stripl(line[six..length])[0])
                         {
-                            case 'w':
+                            case 'g':
                                 p_cmd.side = Side.WHITE;
                                 break;
-                            case 'b':
+                            case 's':
                                 p_cmd.side = Side.BLACK;
                                 break;
                             default:
@@ -584,6 +585,22 @@ class ServerInterface : LogConsumer
             }
             cmd_queue = cmd_queue[1..length];
             return cast(bool)cmd_queue.length;
+        }
+        return false;
+    }
+
+    static bool is_standard_option(char[] name)
+    {
+        static char[][] stdopts = ["tcmove", "tcreserve", "tcpercent", "tcmax",
+            "tctotal", "tcturns", "tcturntime", "greserve", "sreserve",
+            "gused", "sused", "lastmoveused", "moveused", "opponent",
+            "opponent_rating", "rated", "event", "hash", "depth"];
+        for (int i=0; i < stdopts.length; i++)
+        {
+            if (cmp(name, stdopts[i]) == 0)
+            {
+                return true;
+            }
         }
         return false;
     }

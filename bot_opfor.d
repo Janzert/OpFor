@@ -792,6 +792,7 @@ class Engine : AEIEngine
 
 }
 
+
 int main(char[][] args)
 {
     char[] ip = "127.0.0.1";
@@ -1024,8 +1025,8 @@ int main(char[][] args)
                 case ServerCmd.CmdType.SETPOSITION:
                     PositionCmd pcmd = cast(PositionCmd)server.current_cmd;
                     engine.set_position(pcmd.side, pcmd.pos_str);
-                    logger.console("set position\n%s\n%s", 
-                            "wb"[engine.position.side], 
+                    logger.console("set position\n%s\n%s",
+                            "gs"[engine.position.side],
                             engine.position.to_long_str());
                     server.clear_cmd();
                     break;
@@ -1071,16 +1072,16 @@ int main(char[][] args)
                         case "tcturntime":
                             tc_maxmove = toInt(scmd.value);
                             break;
-                        case "wreserve":
+                        case "greserve":
                             tc_wreserve = toInt(scmd.value);
                             break;
-                        case "breserve":
+                        case "sreserve":
                             tc_breserve = toInt(scmd.value);
                             break;
-                        case "tclastmoveused":
+                        case "lastmoveused":
                             tc_lastmove = toInt(scmd.value);
                             break;
-                        case "tcmoveused":
+                        case "moveused":
                             move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
                             break;
                         case "target_min_time":
@@ -1099,7 +1100,11 @@ int main(char[][] args)
                             logger.log("Garbage collection took %d seconds", clength / TicksPerSecond);
                             break;
                         default:
-                            engine.set_option(scmd.name, scmd.value);
+                            if (!engine.set_option(scmd.name, scmd.value)
+                                    && !server.is_standard_option(scmd.name))
+                            {
+                                logger.warn("Unrecognized option received: %s\n", scmd.name);
+                            }
                             break;
                     }
                     server.clear_cmd();

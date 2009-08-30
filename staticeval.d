@@ -928,16 +928,16 @@ class StaticEval
                             blk_num = popcount(blockaders[1] & freezers);
                             blk_num = blk_num > 4 ? 4 : blk_num;
                             sc *= BLOCK_STRONGER_FAR[blk_num];
-                            blk_num = popcount(blockaders[0] & pos.pieces[epiece]);
+                            blk_num = popcount(blockaders[0] & pos.bitBoards[epiece]);
                             assert (blk_num < 3);
                             sc *= BLOCK_EVEN_CL[blk_num];
-                            blk_num = popcount(blockaders[1] & pos.pieces[epiece]);
+                            blk_num = popcount(blockaders[1] & pos.bitBoards[epiece]);
                             assert (blk_num < 3);
                             sc *= BLOCK_EVEN_FAR[blk_num];
-                            blk_num = popcount(blockaders[0] & pos.pieces[epiece-1]);
+                            blk_num = popcount(blockaders[0] & pos.bitBoards[epiece-1]);
                             blk_num = blk_num > 2 ? 2 : blk_num;
                             sc *= BLOCK_WEAK_CL[blk_num];
-                            blk_num = popcount(blockaders[1] & pos.pieces[epiece-1]);
+                            blk_num = popcount(blockaders[1] & pos.bitBoards[epiece-1]);
                             blk_num = blk_num > 2 ? 2 : blk_num;
                             sc *= BLOCK_WEAK_FAR[blk_num];
                             score += sc;
@@ -1027,7 +1027,10 @@ class StaticEval
         {
             for (int rank=2; rank < 4; rank++)
             {
-                int threat_ix = strongest_left[side][rank] - Piece.WCAT;
+                int strength = strongest_left[side][rank];
+                if (!strength)
+                    continue;
+                int threat_ix = strength - Piece.WCAT;
                 ulong threat_area = neighbors_of(threat_map[side][threat_ix][0]
                         | threat_map[side][threat_ix][1]
                         | threat_map[side][threat_ix][2]
