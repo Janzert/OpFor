@@ -296,7 +296,6 @@ class ServerCmd
     enum CmdType {
         NONE,
         SETOPTION,
-        CHECKEVAL,
         GO,
         ISREADY,
         CRITICAL,   // Any commands past this are critical to handle ASAP
@@ -359,18 +358,6 @@ class OptionCmd : ServerCmd
     this()
     {
         super(CmdType.SETOPTION);
-    }
-}
-
-class CheckCmd : ServerCmd
-{
-    bool current = false;
-    char[] pos_str;
-    Side side;
-
-    this()
-    {
-        super(CmdType.CHECKEVAL);
     }
 }
 
@@ -476,30 +463,6 @@ class ServerInterface : LogConsumer
                         }
                         int pix = find(line, "[");
                         p_cmd.pos_str = strip(line[pix..length]);
-                        break;
-                    case "checkeval":
-                        CheckCmd c_cmd = new CheckCmd();
-                        cmd_queue ~= c_cmd;
-                        int six = find(line, "checkeval") + 9;
-                        switch(stripl(line[six..length])[0])
-                        {
-                            case 'w':
-                                c_cmd.side = Side.WHITE;
-                                break;
-                            case 'b':
-                                c_cmd.side = Side.BLACK;
-                                break;
-                            case 'c':
-                                c_cmd.current = true;
-                                break;
-                            default:
-                                throw new Exception("Bad side sent in setposition from server.");
-                        }
-                        if (!c_cmd.current)
-                        {
-                            int pix = find(line, "[");
-                            c_cmd.pos_str = strip(line[pix..length]);
-                        }
                         break;
                     case "setoption":
                         OptionCmd option_cmd = new OptionCmd();

@@ -1030,18 +1030,6 @@ int main(char[][] args)
                             engine.position.to_long_str());
                     server.clear_cmd();
                     break;
-                case ServerCmd.CmdType.CHECKEVAL:
-                    CheckCmd chkcmd = cast(CheckCmd)server.current_cmd;
-                    if (chkcmd.current)
-                    {
-                        engine.searcher.logged_eval(engine.position);
-                    } else {
-                        Position pos = parse_short_str(chkcmd.side, 4, chkcmd.pos_str);
-                        engine.searcher.logged_eval(pos);
-                        Position.free(pos);
-                    }
-                    server.clear_cmd();
-                    break;
                 case ServerCmd.CmdType.SETOPTION:
                     OptionCmd scmd = cast(OptionCmd)server.current_cmd;
                     switch (scmd.name)
@@ -1098,6 +1086,9 @@ int main(char[][] args)
                             GC.collect();
                             d_time clength = getUTCtime() - start_collect;
                             logger.log("Garbage collection took %d seconds", clength / TicksPerSecond);
+                            break;
+                        case "check_eval":
+                            engine.searcher.logged_eval(engine.position);
                             break;
                         default:
                             if (!engine.set_option(scmd.name, scmd.value)
