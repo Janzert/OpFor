@@ -48,16 +48,20 @@ class TransTable
     Logger log;
     TTNode[] store;
 
+    long hits, miss, collisions;
+
     this (Logger l, int size)
     {
         log = l;
         set_size(size);
+        hits = miss = collisions = 0;
     }
 
     void set_size(int size)
     {
         store.length = 0;
         store.length = (size*1024*1024) / TTNode.sizeof;
+        store.length = store.length < 1 ? 1 : store.length;
         GC.setAttr(cast(void*)store, GC.BlkAttr.NO_SCAN);
         age();
         log.log("Set transposition table size to %dMB (%d entries)", size, store.length);
@@ -95,6 +99,16 @@ class TransTable
                     }
                 }
             }
+        }
+        if (node.zobrist == pos.zobrist)
+        {
+            hits += 1;
+        }
+        else if (node.aged)
+        {
+            miss += 1;
+        } else {
+            collisions += 1;
         }
         return node;
     }
@@ -679,6 +693,7 @@ class ABSearch
 
     int alphabeta(Position pos, int depth, int alpha, int beta, int height, Step* last_step = null)
     {
+        nodes_searched++;
         int score = MIN_SCORE;
         if (pos.is_endstate() && (pos.stepsLeft == 4
                     || !pos.is_goal(cast(Side)(pos.side^1))))
@@ -692,7 +707,7 @@ class ABSearch
         }
 
         SType sflag = SType.ALPHA;
-        TTNode node = *ttable.get(pos);
+        TTNode* node = ttable.get(pos);
         Step* prev_best;
         if (node.zobrist == pos.zobrist)
         {
@@ -704,7 +719,6 @@ class ABSearch
                     || (node.type == SType.BETA && node.score >= beta))
                 {
                     tthits++;
-                    (*ttable.get(pos)) = node;
                     return node.score;
                 }
             }
@@ -790,7 +804,6 @@ class ABSearch
             }
             while (curstep !is null)
             {
-                nodes_searched++;
                 int cal;
 
                 Position npos = pos.dup;
@@ -920,7 +933,6 @@ class ABSearch
         }
 
         node.set(pos, depth, score, sflag, new_best);
-        (*ttable.get(pos)) = node;
 
         if (nodes_searched > check_nodes)
         {
@@ -973,6 +985,7 @@ class ABSearch
     void report()
     {
         logger.info("nodes %d", nodes_searched);
+        logger.info("TT hits %d misses %d collisions %d", ttable.hits, ttable.miss, ttable.collisions);
     }
 }
 

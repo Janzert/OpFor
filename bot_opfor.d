@@ -99,6 +99,9 @@ class FullSearch : ABSearch
 
     int quiesce(Position pos, int depth, int alpha, int beta)
     {
+        nodes_searched++;
+        nodes_quiesced++;
+
         int score = MIN_SCORE;
         if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1)) || pos.stepsLeft < 2))
         {
@@ -241,8 +244,6 @@ class FullSearch : ABSearch
         int best_ix = -1;
         for (int six = 0; six < steps.numsteps; six++)
         {
-            nodes_searched++;
-            nodes_quiesced++;
             int cal;
             Position npos = pos.dup;
             npos.do_step(steps.steps[six]);
