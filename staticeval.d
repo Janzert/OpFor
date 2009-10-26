@@ -1,6 +1,5 @@
 
-import std.conv;
-import std.stdio;
+import tango.util.Convert;
 
 import alphabeta;
 import goalsearch;
@@ -85,55 +84,55 @@ class StaticEval
         switch (option)
         {
             case "eval_map_e":
-                map_e_w = toReal(value);
+                map_e_w = to!(real)(value);
                 break;
             case "eval_tsafety":
-                tsafety_w = toReal(value);
+                tsafety_w = to!(real)(value);
                 break;
             case "eval_frozen":
-                frozen_w = toReal(value);
+                frozen_w = to!(real)(value);
                 break;
             case "eval_ontrap":
-                ontrap_w = toReal(value);
+                ontrap_w = to!(real)(value);
                 break;
             case "eval_rwall":
-                rwall_w = toReal(value);
+                rwall_w = to!(real)(value);
                 break;
             case "eval_ropen":
-                ropen_w = toReal(value);
+                ropen_w = to!(real)(value);
                 break;
             case "eval_rhome":
-                rhome_w = toReal(value);
+                rhome_w = to!(real)(value);
                 break;
             case "eval_rweak":
-                rweak_w = toReal(value);
+                rweak_w = to!(real)(value);
                 break;
             case "eval_rstrong":
-                rstrong_w = toReal(value);
+                rstrong_w = to!(real)(value);
                 break;
             case "eval_pstrength":
-                pstrength_w = toReal(value) * 0.00001;
+                pstrength_w = to!(real)(value) * 0.00001;
                 break;
             case "eval_goal":
-                goal_w = toReal(value);
+                goal_w = to!(real)(value);
                 break;
             case "eval_static_otrap":
-                static_otrap_w = toReal(value);
+                static_otrap_w = to!(real)(value);
                 break;
             case "eval_static_strap":
-                static_strap_w = toReal(value);
+                static_strap_w = to!(real)(value);
                 break;
             case "eval_blockade":
-                blockade_w = toReal(value);
+                blockade_w = to!(real)(value);
                 break;
             case "eval_hostage":
-                hostage_w = toReal(value);
+                hostage_w = to!(real)(value);
                 break;
             case "eval_mobility":
-                mobility_w = toReal(value);
+                mobility_w = to!(real)(value);
                 break;
             case "eval_cache_size":
-                sc_cache.set_size(toInt(value));
+                sc_cache.set_size(to!(int)(value));
                 break;
             default:
                 handled = false;
@@ -467,7 +466,7 @@ class StaticEval
         const static int[] distval = [100, 100, 90, 75, 60,
               30, 25, 15, 10, 2, 2, 1, 1, 1, 0, 0];
         const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.2, 0],
-              [0, -1.2, -1.0, -0.5, -0.2, 0, 0, 0]];
+              [0.0, -1.2, -1.0, -0.4, -0.2, 0, 0, 0]];
         const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0],
              [0, 30, 40, 35, 30, 15, 0, 0]];
         const static int power_balance = 1000;
@@ -525,7 +524,8 @@ class StaticEval
                     sfactor = (sfactor < 1) ? sfactor : 1;
                     debug (rabbit_strength)
                     {
-                        writefln("weak r at %s, pf %.2f", ix_to_alg(rix), sfactor);
+                        logger.log("weak r at {}, pf {}",
+                                ix_to_alg(rix), sfactor);
                     }
                     wscore += weakval[s][rix/8] * sfactor;
                 } else {
@@ -548,7 +548,8 @@ class StaticEval
                         rval *= 0.4;
                     debug (rabbit_strength)
                     {
-                        writefln("strong r at %s, val %.2f final %d sector %X st %X", ix_to_alg(rix), rval, cast(int)(rval*rstrong_w),
+                        logger.log("strong r at {}, val {} final {} sector {:X} st {:X}",
+                                ix_to_alg(rix), rval, cast(int)(rval*rstrong_w),
                                 sector, safe_traps[s^1]);
                     }
                     sscore += rval;
@@ -605,7 +606,7 @@ class StaticEval
 
         debug (piece_strength)
         {
-            writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+            logger.log("{}\n{}", "wb"[pos.side], pos.to_long_str());
         }
         for (int p = num_pieces; p--;)
         {
@@ -624,12 +625,13 @@ class StaticEval
             score += ppower;
             debug (piece_strength)
             {
-                writefln("piece %d at %s has %d power", pos.pieces[pix], ix_to_alg(pix), ppower);
+                logger.log("piece {} at {} has {} power",
+                        pos.pieces[pix], ix_to_alg(pix), ppower);
             }
         }
         debug (piece_strength)
         {
-            writefln("overall board piece strength %d", score);
+            logger.log("overall board piece strength {}", score);
         }
         return score;
     }
@@ -775,7 +777,7 @@ class StaticEval
                     // the piece is blockaded
                     debug (mobility)
                     {
-                        logger.log("blockaded piece %d", pos.pieces[pix]);
+                        logger.log("blockaded piece {}", pos.pieces[pix]);
                     }
                     bscore += BLOCKADE_VAL[pos.pieces[pix]];
                 } else {
@@ -788,7 +790,8 @@ class StaticEval
                     // power_mul should now be .8 to 1
                     debug (mobility)
                     {
-                        logger.log("pseudo-blockade piece %s%s, pp %.2f", ".RCDHMErcdhme"[pos.pieces[pix]],
+                        logger.log("pseudo-blockade piece {}{}, pp {}",
+                                ".RCDHMErcdhme"[pos.pieces[pix]],
                                 ix_to_alg(pix), power_mul);
                     }
                     hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
@@ -825,7 +828,8 @@ class StaticEval
                         hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
                         debug (mobility)
                         {
-                            logger.log("hostage piece %s%s, pp %.2f, sc %.2f", ".RCDHMErcdhme"[pos.pieces[pix]],
+                            logger.log("hostage piece {}{}, pp {}, sc {}",
+                                    ".RCDHMErcdhme"[pos.pieces[pix]],
                                     ix_to_alg(pix), power_mul,
                                     HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul);
                         }
@@ -945,8 +949,9 @@ class StaticEval
                             {
                                 bitix pix = bitindex(pbit);
                                 Piece ppiece = pos.pieces[pix];
-                                logger.log("Found blockade of %s%s to be worth %f",
-                                        ".RCDHMErcdhme"[ppiece], ix_to_alg(pix), sc);
+                                logger.log("Found blockade of {}{} to be worth {}",
+                                        ".RCDHMErcdhme"[ppiece],
+                                        ix_to_alg(pix), sc);
                             }
                         }
                     }
@@ -1020,7 +1025,7 @@ class StaticEval
         }
         debug (mobility)
         {
-            logger.log("Mobility and blockade only: %f", score);
+            logger.log("Mobility and blockade only: {}", score);
         }
 
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
@@ -1041,7 +1046,7 @@ class StaticEval
 
         debug (mobility)
         {
-            logger.log("Mobility, blockade and threat area: %f", score);
+            logger.log("Mobility, blockade and threat area: {}", score);
         }
 
         real threat_score = 0;
@@ -1083,7 +1088,8 @@ class StaticEval
                     threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
                     int threatened_pop = popcount(threatened);
                     if (threatened_pop)
-                        logger.log("NK_TOUCH_THREAT to %d %s for %d", threatened_pop,
+                        logger.log("NK_TOUCH_THREAT to {} {} for {}",
+                                threatened_pop,
                                 ".RCDHMErcdhme"[p + pcorr],
                                 NK_TOUCH_THREAT[p + pcorr] * threatened_pop);
                     handled = threatened;
@@ -1091,7 +1097,8 @@ class StaticEval
                         & pieces & ~handled;
                     threatened_pop = popcount(threatened);
                     if (threatened_pop)
-                        logger.log("NK_CLOSE_THREAT to %d %s for %d", threatened_pop,
+                        logger.log("NK_CLOSE_THREAT to {} {} for {}",
+                                threatened_pop,
                                 ".RCDHMErcdhme"[p + pcorr],
                                 NK_CLOSE_THREAT[p + pcorr] * threatened_pop);
                     handled |= threatened;
@@ -1099,14 +1106,14 @@ class StaticEval
                         & pieces & ~handled;
                     threatened_pop = popcount(threatened);
                     if (threatened_pop)
-                        logger.log("NK_FAR_THREAT to %d %s", threatened_pop,
+                        logger.log("NK_FAR_THREAT to {} {}", threatened_pop,
                                 ".RCDHMErcdhme"[p + pcorr]);
                     handled |= threatened;
                     threatened = neighbors_of(threat_map[side][threat_ix][3])
                         & pieces & ~handled;
                     threatened_pop = popcount(threatened);
                     if (threatened_pop)
-                        logger.log("KP_THREAT to %d %s for %d", threatened_pop,
+                        logger.log("KP_THREAT to {} {} for {}", threatened_pop,
                                 ".RCDHMErcdhme"[p + pcorr],
                                 KP_THREAT[p + pcorr] * threatened_pop);
                 }
@@ -1116,7 +1123,7 @@ class StaticEval
 
         debug (mobility)
         {
-            logger.log("Final mobility and threat: %f", score);
+            logger.log("Final mobility and threat: {}", score);
         }
 
         return cast(int)score;
@@ -1271,23 +1278,23 @@ class StaticEval
 
             debug (eval_trap)
             {
-                writefln("trap:\n%s\n%s", "wb"[pos.side^1], pos.to_long_str());
-                writefln("lf %d, lp %d, ip %d", pos.lastfrom, pos.lastpiece, pos.inpush);
-                writefln("score %d, num %d", score, trap_search.num_captures);
-                writefln("mvv %d, svv %d, tvv %d", valuable_victim[0], valuable_victim[1], valuable_victim[2]);
-                writefln("mvl %d, svl %d, tvl %d", valuable_length[0], valuable_length[1], valuable_length[2]);
+                logger.log("trap:\n{}\n{}", "wb"[pos.side^1], pos.to_long_str());
+                logger.log("lf {}, lp {}, ip {}", pos.lastfrom, pos.lastpiece, pos.inpush);
+                logger.log("score {}, num {}", score, trap_search.num_captures);
+                logger.log("mvv {}, svv {}, tvv {}", valuable_victim[0], valuable_victim[1], valuable_victim[2]);
+                logger.log("mvl {}, svl {}, tvl {}", valuable_length[0], valuable_length[1], valuable_length[2]);
                 for (int i=0; i < trap_search.num_captures; i++)
                 {
-                    writefln("v %d, l %d, t %X", trap_search.captures[i].victim, trap_search.captures[i].length,
+                    logger.log("v {}, l {}, t {:X}", trap_search.captures[i].victim, trap_search.captures[i].length,
                             trap_search.captures[i].trap_bit);
                 }
             }
         } else {
             debug (eval_trap)
             {
-                writefln("no trap:\n%s\n%s", "wb"[pos.side^1], pos.to_long_str());
-                writefln("lf %d, lp %d, ip %d", pos.lastfrom, pos.lastpiece, pos.inpush);
-                writefln("score %d", score);
+                logger.log("no trap:\n{}\n{}", "wb"[pos.side^1], pos.to_long_str());
+                logger.log("lf {}, lp {}, ip {}", pos.lastfrom, pos.lastpiece, pos.inpush);
+                logger.log("score {}", score);
             }
         }
         trap_search.clear();
@@ -1458,54 +1465,54 @@ class StaticEval
         if ((goals.shortest[pos.side] != goals.NOT_FOUND)
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
-            logger.log("Found goal in %d steps", goals.shortest[pos.side]);
+            logger.log("Found goal in {} steps", goals.shortest[pos.side]);
             return WIN_SCORE - goals.shortest[pos.side];
         }
 
         int pop = population(pos);
         int fscore = fame.score(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
-        logger.log("Fame %d", fscore);
+        logger.log("Fame {}", fscore);
         int score = fscore;
         int pscore = fscore;
         score += static_trap_eval(cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
-        logger.log("static otrap %d", score-pscore);
+        logger.log("static otrap {}", score-pscore);
         pscore = score;
         score += static_trap_eval(pos.side, pop, fscore) * static_strap_w;
-        logger.log("static strap %d", score-pscore);
+        logger.log("static strap {}", score-pscore);
         pscore = score;
 
         score += trap_safety() * tsafety_w;
-        logger.log("trap safety %d", score-pscore);
+        logger.log("trap safety {}", score-pscore);
         pscore = score;
         score += piece_strength() * pstrength_w;
-        logger.log("piece strength %d", score-pscore);
+        logger.log("piece strength {}", score-pscore);
         pscore = score;
         score += on_trap() * ontrap_w;
-        logger.log("on trap %d", score-pscore);
+        logger.log("on trap {}", score-pscore);
         score += block_and_hostage();
-        logger.log("blockade and hostage %d", score-pscore);
+        logger.log("blockade and hostage {}", score-pscore);
         pscore = score;
         score += mobility() * mobility_w;
-        logger.log("mobility %d", score-pscore);
+        logger.log("mobility {}", score-pscore);
         pscore = score;
         score += rabbit_strength();
-        logger.log("rabbit strength %d", score-pscore);
+        logger.log("rabbit strength {}", score-pscore);
         pscore = score;
         score += rabbit_wall() * rwall_w;
-        logger.log("rabbit wall %d", score-pscore);
+        logger.log("rabbit wall {}", score-pscore);
         pscore = score;
         score += rabbit_open() * ropen_w;
-        logger.log("rabbit open %d", score-pscore);
+        logger.log("rabbit open {}", score-pscore);
         pscore = score;
         score += rabbit_home() * rhome_w;
-        logger.log("rabbit home %d", score-pscore);
+        logger.log("rabbit home {}", score-pscore);
         pscore = score;
         score += frozen_pieces() * frozen_w;
-        logger.log("frozen pieces %d", score-pscore);
+        logger.log("frozen pieces {}", score-pscore);
         pscore = score;
         score += map_elephant() * map_e_w;
-        logger.log("map elephant %d", score-pscore);
+        logger.log("map elephant {}", score-pscore);
         pscore = score;
 
         if (pos.side == Side.BLACK)
@@ -1513,13 +1520,13 @@ class StaticEval
 
         pscore = score;
         score += goal_threat();
-        logger.log("goal threat (side to move) %d", score-pscore);
+        logger.log("goal threat (side to move) {}", score-pscore);
         pscore = score;
 
         // clamp the evaluation to be less than a win
         score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;
-        logger.log("Final (clamped) score %d", score);
-        logger.info("score cr %d", cast(int)(score/1.96));
+        logger.log("Final (clamped) score {}", score);
+        logger.info("score cr {}", cast(int)(score/1.96));
         return score;
     }
 }

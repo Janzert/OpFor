@@ -1,12 +1,21 @@
 
+/*
 import std.conv;
 import std.date;
 import std.math;
 import std.random;
 import std.stdio;
 import std.string;
+*/
 
 import tango.core.Memory;
+import tango.io.Stdout;
+import tango.text.Ascii;
+import tango.text.convert.Float;
+import tango.text.convert.Integer;
+import tango.time.Clock;
+import tango.time.StopWatch;
+import tango.time.Time;
 // Lifted from tango trunk, should be included in some release after 0.99.7
 import Arguments;
 
@@ -144,7 +153,7 @@ class FullSearch : ABSearch
                 {
                     fwritefln(stderr, "%s\n%s", "wb"[pos.side], pos.to_long_str());
                     fwritefln(stderr, "reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
-                    throw new Exception(format("Biased eval, %d != %d", score, rscore));
+                    throw new Exception(Format("Biased eval, {} != {}", score, rscore));
                 }
                 Position.free(reversed);
             }
@@ -327,7 +336,7 @@ class FullSearch : ABSearch
     {
         super.report();
         if (do_qsearch)
-            logger.info("qnodes %d", nodes_quiesced);
+            logger.info("qnodes {}", nodes_quiesced);
     }
 }
 
@@ -415,6 +424,8 @@ class Engine : AEIEngine
     bool root_lmr = true;
     const static int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
 
+    StopWatch search_timer;
+
     this(Logger l)
     {
         super(l);
@@ -442,7 +453,7 @@ class Engine : AEIEngine
                 root_lmr = cast(bool)toInt(value);
                 break;
             case "setup_rabbits":
-                switch (toupper(value))
+                switch (toUpper(value))
                 {
                     case "ANY":
                         board_setup.rabbit_style = SetupGenerator.RabbitSetup.ANY;
@@ -559,7 +570,7 @@ class Engine : AEIEngine
     void search(uint check_nodes, bool delegate() should_abort)
     {
         in_step = true;
-        d_time start_time = getUTCtime();
+        search_timer.start();
         searcher.check_interval = check_nodes;
         ulong stop_nodes = searcher.nodes_searched + check_nodes;
         searcher.check_nodes = stop_nodes;
@@ -618,10 +629,11 @@ class Engine : AEIEngine
 
             if (score == -ABORT_SCORE)
             {
-                d_time now = getUTCtime();
                 if (aborts_reported < MAX_ABORT_REPORTS)
                 {
-                    logger.log("Aborted long search after %d seconds.", (now - start_time) / TicksPerSecond);
+                    auto elapsed_time = search_timer.microsec() / 1000000;
+                    logger.log("Aborted long search after {} seconds.",
+                            elapsed_time);
                     aborts_reported += 1;
                 }
                 break;
@@ -638,7 +650,7 @@ class Engine : AEIEngine
                     if (pos.side == Side.BLACK)
                         val = -val;
                     score += val;
-                    logger.console("Saw position in book added %d to %d score.", val, score);
+                    logger.console("Saw position in book added {} to {} score.", val, score);
                 }
             }
 
@@ -719,6 +731,7 @@ class Engine : AEIEngine
 
             next_pos = next_pos.next;
         }
+        search_timer.stop();
     }
 
     void set_bestmove()
@@ -752,16 +765,16 @@ class Engine : AEIEngine
     {
         searcher.report();
         if (num_losing)
-            logger.info("losing_moves %d", num_losing);
+            logger.info("losing_moves {}", num_losing);
         if (in_step)
         {
-            logger.info("depth_searched %d", checked_moves);
-            logger.info("score %d", cast(int)(best_score / 1.96));
+            logger.info("depth_searched {}", checked_moves);
+            logger.info("score {}", cast(int)(best_score / 1.96));
         } else {
-            logger.info("score %d", cast(int)(last_score / 1.96));
+            logger.info("score {}", cast(int)(last_score / 1.96));
         }
         StepList bestline = get_bestline();
-        logger.info("pv %s", bestline.to_move_str(position));
+        logger.info("pv {}", bestline.to_move_str(position));
         StepList.free(bestline);
     }
 
@@ -816,7 +829,7 @@ int main(char[][] args)
         if (arguments.contains("port"))
         {
             use_stdio = false;
-            port = toUshort(arguments["port"]);
+            port = toInt(arguments["port"]);
         }
         if (arguments.contains("socket"))
         {
@@ -828,8 +841,8 @@ int main(char[][] args)
         }
     }
 
-    d_time report_interval = 60 * std.date.TicksPerSecond;
-    d_time nextreport = 0;
+    TimeSpan report_interval = TimeSpan.fromMinutes(1);
+    Time nextreport = Time.min;
     int report_depth = 0;
 
     Logger logger = new Logger();
@@ -845,8 +858,8 @@ int main(char[][] args)
                 BOT_NAME, BOT_AUTHOR);
         } catch (ConnectException e)
         {
-            fwritefln(stderr, "Error connecting to server: %s", e.msg);
-            fwritefln(stderr, "Tried to connect to %s:%d", ip, port);
+            Stderr.formatln("Error connecting to server: {}", e.msg);
+            Stderr.formatln("Tried to connect to {}:{}", ip, port);
             return 1;
         }
     }
@@ -855,45 +868,47 @@ int main(char[][] args)
 
     class AbortChecker
     {
-        d_time abort_time;
+        Time abort_time;
         ServerInterface server;
         this(ServerInterface s)
         {
             server = s;
+            abort_time = Time.max;
         }
 
         bool should_abort()
         {
-            if (abort_time && getUTCtime() > abort_time)
+            if (Clock.now() > abort_time)
                 return true;
             return server.should_abort();
         }
     }
     AbortChecker abort_checker = new AbortChecker(server);
 
-    int tc_permove = 0;         // time given per move
-    int tc_maxreserve = 0;      // maximum reserve size
-    int tc_maxmove = 0;         // maximum time for a single move
-    int tc_wreserve = 0;        // white's reserve time
-    int tc_breserve = 0;        // black's reserve time
-    int tc_lastmove = 0;        // time used by opponent for last move
-    int tc_safety_margin = 11;  // safety margin in seconds to end the search
+    TimeSpan tc_permove = TimeSpan.zero; // time given per move
+    TimeSpan tc_maxreserve = TimeSpan.zero; // maximum reserve size
+    TimeSpan tc_maxmove = TimeSpan.zero; // maximum time for a move
+    TimeSpan tc_wreserve = TimeSpan.zero; // white's reserve time
+    TimeSpan tc_breserve = TimeSpan.zero; // black's reserve time
+    TimeSpan tc_lastmove = TimeSpan.zero; // time used for opponents last move
+    TimeSpan tc_safety_margin = TimeSpan.fromSeconds(11); // safety margin in seconds to end the search
     real tc_min_search_per = 0.6;  // minimum percentage of permove time to search
     real tc_confidence_denom = 3;
     real tc_time_left_denom = 3;
 
-    int tc_target_length = 0; // used to set different thinking times than the game timecontrol
-    int tc_max_length = 0;
+    // used to set different thinking times than the game timecontrol
+    TimeSpan tc_target_length = TimeSpan.fromSeconds(0);
+    TimeSpan tc_max_length =  TimeSpan.fromSeconds(0);
 
-    d_time search_time = 0;
-    d_time search_max = 0;
+    TimeSpan search_time = 0;
+    TimeSpan search_max = 0;
     int search_num = 0;
-    d_time search_start;
-    d_time move_start;
+    Time search_start;
+    Time move_start;
 
-    int tc_min_search;
-    int tc_max_search;
-    d_time last_decision_change;
+    TimeSpan tc_min_search;
+    TimeSpan tc_max_search;
+    Time last_decision_change;
 
     bool pondering = false;
 
@@ -911,7 +926,7 @@ int main(char[][] args)
             }
         } catch (UnknownCommand e)
         {
-            logger.warn("Received unknown command: %s", e.command);
+            logger.warn("Received unknown command: '{}'", e.command);
         }
 
         while (server.current_cmd !is null)
@@ -944,21 +959,21 @@ int main(char[][] args)
                         engine.state = EngineState.IDLE;
                     }
                     logger.log("Starting search");
-                    logger.console("%s\n%s", "wb"[engine.position.side], engine.position.to_long_str);
-                    search_start = getUTCtime();
+                    logger.console("{}\n{}", "wb"[engine.position.side], engine.position.to_long_str);
+                    search_start = Clock.now();
                     debug (gc_time)
                     {
                         if (gcmd.option == GoCmd.Option.PONDER)
                         {
-                            d_time start_collect = getUTCtime();
+                            auto start_collect = Clock.now();
                             GC.collect();
-                            d_time clength = getUTCtime() - start_collect;
-                            logger.log("Garbage collection took %d seconds", clength / TicksPerSecond);
+                            auto clength = Clock.now() - start_collect;
+                            logger.log("Garbage collection took {} seconds", clength.interval);
                         }
                     }
                     engine.start_search();
                     last_decision_change = search_start;
-                    nextreport = getUTCtime() + report_interval;
+                    nextreport = Clock.now() + report_interval;
                     report_depth = 0;
                     if (gcmd.option == GoCmd.Option.PONDER)
                     {
@@ -966,17 +981,22 @@ int main(char[][] args)
                     } else {
                         pondering = false;
                     }
-                    if (tc_permove && engine.max_depth == -1)
+                    if (tc_permove.interval && engine.max_depth == -1)
                     {
                         Side myside = engine.position.side;
-                        int myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;
-                        int maxuse = (tc_maxreserve > tc_maxmove - tc_permove) ? tc_maxreserve : tc_maxmove - tc_permove;
-                        real reserve_fill = cast(real)myreserve / maxuse;
-                        tc_min_search = cast(int)(tc_permove * tc_min_search_per);
-                        tc_min_search += cast(int)((tc_permove * (1-tc_min_search_per)) * reserve_fill);
+                        TimeSpan myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;
+                        TimeSpan max_reserve = tc_maxmove - tc_permove;
+                        if (tc_maxreserve > max_reserve)
+                            max_reserve = tc_maxreserve;
+                        real reserve_fill = myreserve.interval / max_reserve.interval;
+                        tc_min_search = TimeSpan(cast(long)(tc_permove.ticks
+                                * tc_min_search_per));
+                        tc_min_search += TimeSpan(cast(long)((tc_permove.ticks
+                                    * (1-tc_min_search_per)) * reserve_fill));
 
                         tc_max_search = tc_permove + myreserve;
-                        if (tc_maxmove && (tc_max_search > tc_maxmove))
+                        if (tc_maxmove != TimeSpan.zero
+                                && (tc_max_search > tc_maxmove))
                         {
                             tc_max_search = tc_maxmove;
                         }
@@ -984,9 +1004,10 @@ int main(char[][] args)
 
                         if (pondering)
                         {
-                            int otherreserve = (myside == Side.WHITE) ? tc_breserve : tc_wreserve;
-                            int myrealtime = otherreserve + tc_permove;
-                            if (myrealtime < 35)
+                            TimeSpan otherreserve = (myside == Side.WHITE)
+                                ? tc_breserve : tc_wreserve;
+                            TimeSpan myrealtime = otherreserve + tc_permove;
+                            if (myrealtime.seconds < 35)
                             {
                                 pondering = false;
                                 engine.cleanup_search();
@@ -994,10 +1015,11 @@ int main(char[][] args)
                                 logger.log("Stopping ponder because of low time for next move.");
                             }
                         }
-                        logger.log("Min search: %d Max: %d", tc_min_search, tc_max_search);
+                        logger.log("Min search: {} Max: {}", tc_min_search,
+                                tc_max_search);
                     } else {
-                        tc_min_search = 0;
-                        tc_max_search = 0;
+                        tc_min_search = TimeSpan.zero;
+                        tc_max_search = TimeSpan.zero;
                     }
                     server.clear_cmd();
                     break;
@@ -1019,12 +1041,12 @@ int main(char[][] args)
                     }
                     engine.make_move(mcmd.move);
                     server.clear_cmd();
-                    logger.log("made move %s", mcmd.move);
+                    logger.log("made move {}", mcmd.move);
                     break;
                 case ServerCmd.CmdType.SETPOSITION:
                     PositionCmd pcmd = cast(PositionCmd)server.current_cmd;
                     engine.set_position(pcmd.side, pcmd.pos_str);
-                    logger.console("set position\n%s\n%s",
+                    logger.console("set position\n{}\n{}",
                             "gs"[engine.position.side],
                             engine.position.to_long_str());
                     server.clear_cmd();
@@ -1041,12 +1063,13 @@ int main(char[][] args)
                             } else {
                                 int depth = toInt(scmd.value);
                                 engine.max_depth = (depth > 3) ? depth - 4 : 0;
-                                logger.log("Search depth set to %d", engine.max_depth+4);
+                                logger.log("Search depth set to {}", engine.max_depth+4);
                             }
                             break;
                         case "tcmove":
-                            tc_permove = toInt(scmd.value);
-                            if (tc_permove < 600)
+                            tc_permove = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
+                            if (tc_permove.minutes < 10)
                             {
                                 GC.disable();
                             } else {
@@ -1054,37 +1077,48 @@ int main(char[][] args)
                             }
                             break;
                         case "tcmax":
-                            tc_maxreserve = toInt(scmd.value);
+                            tc_maxreserve = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
                             break;
                         case "tcturntime":
-                            tc_maxmove = toInt(scmd.value);
+                            tc_maxmove = TimeSpan.fromInterval(
+                                toFloat(scmd.value));
                             break;
                         case "greserve":
-                            tc_wreserve = toInt(scmd.value);
+                            tc_wreserve = TimeSpan.fromInterval(
+                                toFloat(scmd.value));
                             break;
                         case "sreserve":
-                            tc_breserve = toInt(scmd.value);
+                            tc_breserve = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
                             break;
                         case "lastmoveused":
-                            tc_lastmove = toInt(scmd.value);
+                            tc_lastmove = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
                             break;
                         case "moveused":
-                            move_start = getUTCtime() - (cast(d_time)(toInt(scmd.value)) * TicksPerSecond);
+                            auto used = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
+                            move_start = Clock.now() - used;
                             break;
                         case "target_min_time":
-                            tc_target_length = toInt(scmd.value);
+                            tc_target_length = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
                             break;
                         case "target_max_time":
-                            tc_max_length = toInt(scmd.value);
+                            tc_max_length = TimeSpan.fromInterval(
+                                    toFloat(scmd.value));
                             break;
                         case "log_console":
                             logger.to_console = cast(bool)toInt(scmd.value);
                             break;
                         case "run_gc":
-                            d_time start_collect = getUTCtime();
+                            auto collect_timer = new StopWatch();
+                            collect_timer.start();
                             GC.collect();
-                            d_time clength = getUTCtime() - start_collect;
-                            logger.log("Garbage collection took %d seconds", clength / TicksPerSecond);
+                            auto collect_time = collect_timer.stop();
+                            logger.log("Garbage collection took {} seconds",
+                                    collect_time);
                             break;
                         case "check_eval":
                             engine.searcher.logged_eval(engine.position);
@@ -1093,7 +1127,7 @@ int main(char[][] args)
                             if (!engine.set_option(scmd.name, scmd.value)
                                     && !server.is_standard_option(scmd.name))
                             {
-                                logger.warn("Unrecognized option received: %s\n", scmd.name);
+                                logger.warn("Unrecognized option received: {}\n", scmd.name);
                             }
                             break;
                     }
@@ -1104,22 +1138,23 @@ int main(char[][] args)
             }
         }
 
-        d_time length = getUTCtime() - search_start;
+        TimeSpan search_length = Clock.now() - search_start;
         switch (engine.state)
         {
             case EngineState.MOVESET:
-                if (length > search_max)
+                if (search_length > search_max)
                 {
-                    search_max = length;
+                    search_max = search_length;
                 }
-                real seconds = cast(real)length/TicksPerSecond;
+                auto seconds = search_length.interval();
                 if (engine.ply > 2)
                 {
-                    search_time += length;
+                    search_time += search_length;
                     search_num += 1;
                     if (engine.best_score >= WIN_SCORE)
                     {
-                        logger.log("Sending forced win move in %.2f seconds.", seconds);
+                        logger.log("Sending forced win move in {} seconds.",
+                                seconds);
                     } else if (engine.pos_list.next is null)
                     {
                         auto score = engine.best_score;
@@ -1127,68 +1162,69 @@ int main(char[][] args)
                             score = engine.last_score;
                         if (score <= -MIN_WIN_SCORE)
                         {
-                            logger.log("Sending move with forced loss, after %.2f seconds.", seconds);
+                            logger.log("Sending move with forced loss, after {} seconds.", seconds);
                         } else {
-                            logger.log("Sending forced move, after %.2f seconds.", seconds);
+                            logger.log("Sending forced move, after {} seconds.", seconds);
                         }
                     }
                 }
-                real average = 0;
+                double average = 0;
                 if (search_num)
                 {
-                    average = (cast(real)search_time / TicksPerSecond) / search_num;
+                    average = search_time.interval() / search_num;
                 }
-                real max_seconds = cast(real)search_max / TicksPerSecond;
-                logger.log("Searched %d nodes, %.0f nps, %d tthits.",
-                        engine.searcher.nodes_searched, engine.searcher.nodes_searched/seconds, engine.searcher.tthits);
-                logger.log("Finished search in %.2f seconds, average %.2f, max %.2f.", seconds, average, max_seconds);
-                logger.console("Sending move %s", engine.bestmove);
+                double max_seconds = search_max.interval();
+                logger.log("Searched {} nodes, {:d} nps, {} tthits.",
+                        engine.searcher.nodes_searched,
+                        engine.searcher.nodes_searched/seconds,
+                        engine.searcher.tthits);
+                logger.log("Finished search in {} seconds, average {}, max {}.",
+                        seconds, average, max_seconds);
+                logger.console("Sending move {}", engine.bestmove);
                 if (!pondering)
                 {
                     server.bestmove(engine.bestmove);
                 }
                 engine.cleanup_search();
-                logger.log("Positions allocated %d, in reserve %d (%.0fMB).",
+                logger.log("Positions allocated {}, in reserve {}({}MB).",
                         Position.allocated, Position.reserved, Position.reserve_size);
                 if (PositionNode.allocated != PositionNode.reserved)
                 {
-                    logger.warn("PNodes allocated %d != in reserve %d.", PositionNode.allocated, PositionNode.reserved);
+                    logger.warn("PNodes allocated {} != in reserve {}.", PositionNode.allocated, PositionNode.reserved);
                 }
                 if (StepList.allocated != StepList.reserved)
                 {
-                    logger.warn("StepList allocated %d != in reserve %d", StepList.allocated, StepList.reserved);
+                    logger.warn("StepList allocated {} != in reserve {}", StepList.allocated, StepList.reserved);
                 }
                 engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
-                d_time start_run = getUTCtime();
                 PositionNode cur_best = engine.pos_list;
                 int check_nodes;
-                if (engine.searcher.nodes_searched && (length > (TicksPerSecond * 2)))
+                if (engine.searcher.nodes_searched
+                        && (search_length.seconds > 2))
                 {
-                    check_nodes = engine.searcher.nodes_searched / (length / TicksPerSecond);
+                    check_nodes = cast(int)(engine.searcher.nodes_searched
+                            / search_length.interval);
                 } else {
                     check_nodes = START_SEARCH_NODES;
                 }
-                if (tc_max_search && !pondering)
+                if (tc_max_search != TimeSpan.zero && !pondering)
                 {
-                    d_time abort_time = ((tc_min_search + 20) * TicksPerSecond) + move_start;
-                    d_time max_time_limit = (tc_max_search * TicksPerSecond) + move_start;
-                    if (abort_time > max_time_limit)
-                        abort_time = max_time_limit;
-                    if (tc_max_length)
+                    Time abort_time = move_start + tc_max_search;
+                    if (tc_max_length != TimeSpan.zero)
                     {
-                        d_time length_abort = (tc_max_length * TicksPerSecond) + search_start;
+                        Time length_abort = search_start + tc_max_length;
                         if (abort_time > length_abort)
                             abort_time = length_abort;
                     }
                     abort_checker.abort_time = abort_time;
                 } else {
-                    abort_checker.abort_time = 0;
+                    abort_checker.abort_time = Time.max;
                 }
                 engine.search(check_nodes, &abort_checker.should_abort);
                 check_num += 1;
-                d_time now = getUTCtime();
+                Time now = Clock.now();
                 if (cur_best != engine.pos_list)
                 {
                     last_decision_change = now;
@@ -1198,84 +1234,102 @@ int main(char[][] args)
                     if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
                         || (engine.best_score >= WIN_SCORE)
                         || (engine.pos_list.next is null)
-                        || (tc_permove && (now >= ((tc_max_search * TicksPerSecond) + move_start)))
-                        || (tc_max_length && (now >= ((tc_max_length * TicksPerSecond) + search_start))))
+                        || (tc_permove != TimeSpan.zero
+                            && (now >= (move_start + tc_max_search)))
+                        || (tc_max_length != TimeSpan.zero
+                            && (now >= (search_start + tc_max_length))))
                     {
                         engine.set_bestmove();
                         engine.state = EngineState.MOVESET;
-                    } else if (tc_target_length && (now > ((tc_target_length * TicksPerSecond) + search_start)))
+                    } else if (tc_target_length != TimeSpan.zero
+                            && (now > (search_start + tc_target_length)))
                     {
                         logger.log("Target search time reached");
-                        d_time decision_length = now - last_decision_change;
-                        d_time think_time = now - search_start;
-                        d_time time_left = (move_start + (tc_max_search * TicksPerSecond)) - now;
-                        d_time search_left = (search_start + (tc_max_length * TicksPerSecond)) - now;
+                        auto decision_length = (now - last_decision_change).interval;
+                        auto think_time = (now - search_start).interval;
+                        auto time_left = ((move_start + tc_max_search)
+                                - now).interval;
+                        auto search_left = ((search_start + tc_max_length)
+                            - now).interval;
                         if (time_left < search_left)
                             search_left = time_left;
-                        logger.log("search_length %d, decision_length %d, search_left %d", 
-                                   (think_time / TicksPerSecond),
-                                   (decision_length / TicksPerSecond),
-                                   (search_left / TicksPerSecond));
-                        if (decision_length < think_time * (1.0/tc_confidence_denom)
-                                && decision_length < search_left * (1.0/tc_time_left_denom))
+                        logger.log("search_length {}, decision_length {}, search_left {}",
+                                   think_time, decision_length, search_left);
+                        if (decision_length < (think_time
+                                    * (1.0/tc_confidence_denom))
+                                && decision_length < (search_left
+                                    * (1.0/tc_time_left_denom)))
                         {
-                            real tc_cd = 1.0 / (tc_confidence_denom-1);
-                            real tc_tld = 1.0 / (tc_time_left_denom-1);
-                            d_time length_cutoff = cast(d_time)((last_decision_change - search_start) * tc_cd) + last_decision_change;
-                            d_time reserve_cutoff = cast(d_time)(((search_start + (tc_max_length * TicksPerSecond))
-                                        - last_decision_change) * tc_tld) + last_decision_change;
-                            d_time end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
-                            end_search += cast(d_time)(0.1 * TicksPerSecond);
-                            tc_target_length = (end_search - search_start) / TicksPerSecond;
-                            logger.log("next target time set to %d", tc_target_length);
+                            auto tc_cd = 1.0 / (tc_confidence_denom-1);
+                            auto tc_tld = 1.0 / (tc_time_left_denom-1);
+                            auto length_cutoff = last_decision_change
+                                + TimeSpan.fromInterval((last_decision_change
+                                            - search_start).interval * tc_cd);
+                            auto reserve_cutoff = last_decision_change
+                                + TimeSpan.fromInterval(((search_start
+                                                + tc_max_length)
+                                            - last_decision_change).interval
+                                        * tc_tld);
+                            auto end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
+                            end_search += TimeSpan.fromInterval(0.1);
+                            tc_target_length = (end_search - search_start);
+                            logger.log("next target time set to {}",
+                                    tc_target_length);
                         } else {
                             engine.set_bestmove();
                             engine.state = EngineState.MOVESET;
                         }
-                    } else if (tc_permove && (now > ((tc_min_search * TicksPerSecond) + move_start)))
+                    } else if (tc_permove != TimeSpan.zero
+                            && (now > (move_start + tc_min_search)))
                     {
                         logger.log("Min search time reached");
-                        d_time decision_length = now - last_decision_change;
-                        d_time move_length = now - move_start;
-                        d_time time_left = (move_start + (tc_max_search * TicksPerSecond)) - now;
-                        logger.log("move_length %d, decision_length %d, time_left %d", 
-                                    (move_length / TicksPerSecond),
-                                    (decision_length / TicksPerSecond),
-                                    (time_left / TicksPerSecond));
-                        if (decision_length < move_length * (1.0/tc_confidence_denom)
-                                && decision_length < time_left * (1.0/tc_time_left_denom))
+                        auto decision_length = (now - last_decision_change).interval;
+                        auto move_length = (now - move_start).interval;
+                        auto time_left = ((move_start + tc_max_search)
+                                - now).interval;
+                        logger.log("move_length {}, decision_length {}, time_left {}",
+                                    move_length, decision_length, time_left);
+                        if (decision_length < move_length
+                                * (1.0/tc_confidence_denom)
+                                && decision_length < time_left
+                                * (1.0/tc_time_left_denom))
                         {
                             real tc_cd = 1.0 / (tc_confidence_denom-1);
                             real tc_tld = 1.0 / (tc_time_left_denom-1);
-                            d_time length_cutoff = cast(d_time)((last_decision_change - move_start) * tc_cd) + last_decision_change;
-                            d_time reserve_cutoff = cast(d_time)(((move_start + (tc_max_search * TicksPerSecond))
-                                        - last_decision_change) * tc_tld) + last_decision_change;
-                            d_time end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
-                            end_search += cast(d_time)(0.1 * TicksPerSecond);
-                            tc_min_search = (end_search - move_start) / TicksPerSecond;
-                            logger.log("next min_search set to %d", tc_min_search);
+                            auto length_cutoff = last_decision_change
+                                + TimeSpan.fromInterval((last_decision_change
+                                            - move_start).interval * tc_cd);
+                            auto reserve_cutoff = last_decision_change
+                                + TimeSpan.fromInterval(((move_start
+                                                + tc_max_search)
+                                        - last_decision_change).interval
+                                        * tc_tld);
+                            auto end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
+                            end_search += TimeSpan.fromInterval(0.1);
+                            tc_min_search = end_search - move_start;
+                            logger.log("next min_search set to {}", tc_min_search);
                         } else {
                             engine.set_bestmove();
                             engine.state = EngineState.MOVESET;
                         }
                     }
-                    if (now > nextreport 
-                            || engine.depth > report_depth 
+                    if (now > nextreport
+                            || engine.depth > report_depth
                             || cur_best !is engine.pos_list)
                     {
                         if (engine.in_step)
                         {
-                            logger.info("depth %d+", engine.depth+3);
+                            logger.info("depth {}+", engine.depth+3);
                         } else {
-                            logger.info("depth %d", engine.depth+3);
+                            logger.info("depth {}", engine.depth+3);
                         }
-                        logger.info("time %d", (now-search_start)/TicksPerSecond);
+                        logger.info("time {:f0}", (now-search_start).interval);
                         engine.report();
                         check_num = 0;
                         nextreport = now + report_interval;
                         report_depth = engine.depth;
                     }
-                } 
+                }
                 break;
             default:
                 break;

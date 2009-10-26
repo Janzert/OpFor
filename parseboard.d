@@ -1,10 +1,10 @@
 
-import std.file;
-import std.path;
-import std.stdio;
-import std.string;
-import std.perf;
-import std.gc;
+import tango.core.Exception;
+import tango.core.Memory;
+import tango.io.device.File;
+import tango.io.FilePath;
+import tango.io.Stdout;
+import tango.time.StopWatch;
 
 import goalsearch;
 import trap_check;
@@ -16,16 +16,17 @@ int main(char[][] args)
 {
     if (args.length < 2)
     {
-        writefln("usage: %s boardfile [run_playouts]", getBaseName(args[0]));
+        Stdout.format("usage: %s boardfile [run_playouts]",
+                FilePath(args[0]).name);
         return 1;
     }
     char[] boardstr;
     try
     {
-        boardstr = cast(char[])read(args[1]);
-    } catch (FileException fx)
+        boardstr = cast(char[])File.get(args[1]);
+    } catch (IOException fx)
     {
-        writefln("A file exception occured: " ~ fx.toString());
+        Stdout.format("A file exception occured: " ~ fx.toString());
         return 2;
     }
     bool run_playouts = false;
@@ -33,20 +34,21 @@ int main(char[][] args)
         run_playouts = true;
 
     Position pos = position.parse_long_str(boardstr);
-    writefln("wb"[pos.side]);
-    writefln(pos.to_long_str(true));
-    writefln(pos.to_placing_move());
-    writefln();
+    Stdout("wb"[pos.side]).newline;
+    Stdout(pos.to_long_str(true)).newline;
+    Stdout(pos.to_placing_move()).newline;
+    Stdout.newline;
     StepList steps = new StepList();
     pos.get_steps(steps);
-    writefln("There are %d initial steps.",
-                steps.numsteps);
-    ProcessTimesCounter Timer = new ProcessTimesCounter();
-    Timer.start();
+    Stdout.format("There are {} initial steps.",
+                steps.numsteps).newline;
+    auto timer = new StopWatch();
+    timer.start();
     PosStore moves = pos.get_moves();
-    Timer.stop();
-    writefln("%d unique moves.", moves.length);
-    writefln("Time to generate moves %.3f seconds", cast(double)Timer.milliseconds / 1000);
+    timer.stop();
+    Stdout.format("{} unique moves.", moves.length).newline;
+    Stdout.format("Time to generate moves {:f3} seconds",
+            cast(double)timer.microsec / 1000000).newline;
     GoalSearchDT gsdt = new GoalSearchDT();
     int shortest_goal = gsdt.NOT_FOUND;
     StepList shortest_move;
@@ -73,52 +75,56 @@ int main(char[][] args)
         shortest_move = shortest_move.dup;
     moves.free_items();
     delete moves;
-    std.gc.fullCollect();
+    GC.collect();
 
     real slow_score = FAME(pos);
-    writefln("FAME score: %.2f", slow_score);
+    Stdout.format("FAME score: {}", slow_score).newline;
     FastFAME ffame = new FastFAME();
     int fast_score = ffame.score(pos);
     if (fast_score != cast(int)(slow_score))
-        writefln("Fast FAME score %d != slow fame score %d", fast_score, cast(int)(slow_score));
+        Stdout.format("Fast FAME score {} != slow fame score {}",
+                fast_score, cast(int)(slow_score)).newline;
 
     if (shortest_goal != gsdt.NOT_FOUND)
-        writefln("Side to move goals in %d steps", shortest_goal);
+        Stdout.format("Side to move goals in {} steps", shortest_goal).newline;
     GoalSearch gsearch = new GoalSearch();
     gsearch.set_start(pos);
     gsearch.find_goals(30);
     if (gsearch.goals_found[Side.WHITE] > 0)
     {
-        writefln("White has a goal in %d steps from %s.", gsearch.goal_depth[Side.WHITE][0],
-                ix_to_alg(gsearch.rabbit_location[Side.WHITE][0]));
+        Stdout.format("White has a goal in {} steps from {}.",
+                gsearch.goal_depth[Side.WHITE][0],
+                ix_to_alg(gsearch.rabbit_location[Side.WHITE][0])).newline;
     }
     if (gsearch.goals_found[Side.BLACK] > 0)
     {
-        writefln("Black has a goal in %d steps from %s.", gsearch.goal_depth[Side.BLACK][0],
-                ix_to_alg(gsearch.rabbit_location[Side.BLACK][0]));
+        Stdout.format("Black has a goal in {} steps from {}.",
+                gsearch.goal_depth[Side.BLACK][0],
+                ix_to_alg(gsearch.rabbit_location[Side.BLACK][0])).newline;
     }
     gsdt.set_start(pos);
     gsdt.find_goals();
     if (gsdt.shortest[Side.WHITE] != gsdt.NOT_FOUND)
-        writefln("DT: White has a goal in %d steps.",
-                gsdt.shortest[Side.WHITE]);
+        Stdout.format("DT: White has a goal in {} steps.",
+                gsdt.shortest[Side.WHITE]).newline;
     if (gsdt.shortest[Side.BLACK] != gsdt.NOT_FOUND)
-        writefln("DT: Black has a goal in %d steps.",
-                gsdt.shortest[Side.BLACK]);
+        Stdout.format("DT: Black has a goal in {} steps.",
+                gsdt.shortest[Side.BLACK]).newline;
 
     if (shortest_goal != gsdt.shortest[pos.side])
     {
-        writefln("Goal detection error.");
+        Stdout.format("Goal detection error.").newline;
         if (shortest_goal != gsdt.NOT_FOUND)
-            writefln("shortest move %s", shortest_move.to_move_str(pos));
+            Stdout.format("shortest move {}",
+                    shortest_move.to_move_str(pos)).newline;
         return 1;
     }
 
     if ((shortest_goal != gsdt.NOT_FOUND)
             && (gsdt.shortest[pos.side] != gsdt.NOT_FOUND))
     {
-        writefln("checking shortest goal with %s",
-                shortest_move.to_move_str(pos));
+        Stdout.format("checking shortest goal with {}",
+                shortest_move.to_move_str(pos)).newline;
         Position mpos = pos.dup;
         for (int i=0; i < (shortest_goal-1); i++)
         {
@@ -129,10 +135,11 @@ int main(char[][] args)
             gsdt.find_goals();
             if (gsdt.shortest[pos.side] != (shortest_goal - (i+1)))
             {
-                writefln("step %d", i+1);
-                writefln(mpos.to_long_str());
-                writefln("Is goal in %d", (shortest_goal - (i+1)));
-                writefln("Search found goal in %d", gsdt.shortest[mpos.side]);
+                Stdout.format("step {}", i+1).newline;
+                Stdout.format(mpos.to_long_str()).newline;
+                Stdout.format("Is goal in {}", (shortest_goal - (i+1))).newline;
+                Stdout.format("Search found goal in {}",
+                        gsdt.shortest[mpos.side]).newline;
                 return 1;
             }
         }
@@ -147,9 +154,10 @@ int main(char[][] args)
         {
             const char[] piece_names = ".RCDHMErcdhme";
             if (s == pos.side)
-                writefln("%s can capture:", ["Gold", "Silver"][s]);
+                Stdout.format("{} can capture:", ["Gold", "Silver"][s]).newline;
             else
-                writefln("%s could capture:", ["Gold", "Silver"][s]);
+                Stdout.format("{} could capture:",
+                        ["Gold", "Silver"][s]).newline;
             int[64] victims;
             for (int i=0; i < tgen.num_captures; i++)
             {
@@ -162,16 +170,19 @@ int main(char[][] args)
             {
                 if (victims[i])
                 {
-                    writefln("  %s at %s in %d steps", piece_names[pos.pieces[i]],
-                            ix_to_alg(cast(bitix)i), victims[i]);
+                    Stdout.format("  {} at {} in {} steps",
+                            piece_names[pos.pieces[i]],
+                            ix_to_alg(cast(bitix)i), victims[i]).newline;
                 }
             }
 
             /*
             for (int i=0; i < tgen.num_captures; i++)
             {
-                writefln("  %s in %d steps %s first", piece_names[tgen.captures[i].victim],
-                        tgen.captures[i].length, tgen.captures[i].first_step);
+                Stdout.format("  {} in {} steps {} first",
+                        piece_names[tgen.captures[i].victim],
+                        tgen.captures[i].length,
+                        tgen.captures[i].first_step).newline;
             }*/
         }
         tgen.clear();
@@ -183,8 +194,7 @@ int main(char[][] args)
 
     if (run_playouts)
     {
-        Timer = new ProcessTimesCounter();
-        Timer.start();
+        timer.start();
         Position gamepos = Position.allocate();
         PlayoutResult result;
         const int tests = 10000;
@@ -206,9 +216,9 @@ int main(char[][] args)
             totalsteps += result.length;
         }
         Position.free(gamepos);
-        Timer.stop();
-        writefln("Win percentage for side to move %.2f%% with random play.", (cast(double)wins / tests) *100.0);
-        writefln("%d playouts took %.2f seconds and averaged %d moves with %d total wins.",  tests, cast(double)Timer.milliseconds / 1000, totalsteps/tests, wins);
+        timer.stop();
+        Stdout.format("Win percentage for side to move {}% with random play.", (cast(double)wins / tests) *100.0).newline;
+        Stdout.format("{} playouts took {} seconds and averaged {} moves with {} total wins.",  tests, cast(double)timer.microsec / 1000000, totalsteps/tests, wins).newline;
     }
 
     return 0;

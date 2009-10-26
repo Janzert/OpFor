@@ -1,5 +1,5 @@
 
-import std.stdio;
+import tango.io.Stdout;
 
 import position;
 import trapmoves;
@@ -78,21 +78,24 @@ class TrapCheck
                 {
                     if (steps.numsteps)
                     {
-                        writefln("Capture of %s missed after %s", "xRCDHMErcdhme"[pt],
-                                steps.to_move_str(start));
+                        Stdout.format("Capture of {} missed after {}",
+                                "xRCDHMErcdhme"[pt],
+                                steps.to_move_str(start)).newline;
                     } else {
-                        writefln("Capture of %s missed by static capture", "xRCDHMErcdhme"[pt]);
+                        Stdout.format("Capture of {} missed by static capture",
+                                "xRCDHMErcdhme"[pt]).newline;
                     }
                 }
                 else if (!(victims & (1 << pt)) && (svictims & (1 << pt)))
                 {
                     if (steps.numsteps)
                     {
-                        writefln("Incorrect capture of %s reported after %s",
-                                "xRCDHMErcdhme"[pt], steps.to_move_str(start));
+                        Stdout.format("Incorrect capture of {} reported after {}",
+                                "xRCDHMErcdhme"[pt],
+                                steps.to_move_str(start)).newline;
                     } else {
-                        writefln("Incorrect capture of %s reported by static capture",
-                                "xRCDHMErcdhme"[pt]);
+                        Stdout.format("Incorrect capture of {} reported by static capture",
+                                "xRCDHMErcdhme"[pt]).newline;
                     }
                 }
             }
@@ -129,12 +132,16 @@ class TrapCheck
                     {
                         if (steps.numsteps)
                         {
-                            writefln("Tried to capture %s after %s with illegal step %s",
-                                    "xRCDHMErcdhme"[cap.victim], steps.to_move_str(start), cap.first_step.toString(true));
-                            writefln("Current pos:\n%s", pos.to_long_str());
+                            Stdout.format("Tried to capture {} after {} with illegal step {}",
+                                    "xRCDHMErcdhme"[cap.victim],
+                                    steps.to_move_str(start),
+                                    cap.first_step.toString(true)).newline;
+                            Stdout.format("Current pos:\n{}",
+                                    pos.to_long_str()).newline;
                         } else {
-                            writefln("Tried to capture %s with illegal step %s",
-                                    "xRCDHMErcdhme"[cap.victim], cap.first_step.toString(true));
+                            Stdout.format("Tried to capture {} with illegal step {}",
+                                    "xRCDHMErcdhme"[cap.victim],
+                                    cap.first_step.toString(true)).newline;
                         }
                         throw new BadCaptureException();
                     }
@@ -153,9 +160,11 @@ class TrapCheck
                         int npop = pop2count(population(npos), cap.victim);
                         if (npop != pop-1)
                         {
-                            writefln("Final step didn't capture %s with %s",
-                                    "xRCDHMErcdhme"[cap.victim], steps.to_move_str(start));
-                            writefln("Current pos:\n%s", npos.to_long_str());
+                            Stdout.format("Final step didn't capture {} with {}",
+                                    "xRCDHMErcdhme"[cap.victim],
+                                    steps.to_move_str(start)).newline;
+                            Stdout.format("Current pos:\n{}",
+                                    npos.to_long_str()).newline;
                             throw new BadCaptureException();
                         }
                         if (npos.inpush)
@@ -164,9 +173,11 @@ class TrapCheck
                             npos.get_steps(psteps);
                             if (psteps.numsteps == 0)
                             {
-                                writefln("Could not find piece to finish capture push of %s after %s",
-                                        "xRCDHMErcdhme"[cap.victim], npos.to_long_str());
-                                writefln("Current pos:\n%s", npos.to_long_str());
+                                Stdout.format("Could not find piece to finish capture push of {} after {}",
+                                        "xRCDHMErcdhme"[cap.victim],
+                                        npos.to_long_str()).newline;
+                                Stdout.format("Current pos:\n{}",
+                                        npos.to_long_str()).newline;
                                 throw new BadCaptureException();
                             }
                             StepList.free(psteps);
@@ -176,9 +187,11 @@ class TrapCheck
                     {
                         if (check_captures(start, npos, steps, victim) == Status.LOST)
                         {
-                            writefln("Capture of %s lost after %s",
-                                    "xRCDHMErcdhme"[cap.victim], steps.to_move_str(start));
-                            writefln("Current pos:\n%s", npos.to_long_str());
+                            Stdout.format("Capture of {} lost after {}",
+                                    "xRCDHMErcdhme"[cap.victim],
+                                    steps.to_move_str(start)).newline;
+                            Stdout.format("Current pos:\n{}",
+                                    npos.to_long_str()).newline;
                             throw new BadCaptureException();
                         }
                     }
@@ -201,9 +214,11 @@ class TrapCheck
                         StepList.free(psteps);
                         if (!found_capture)
                         {
-                            writefln("Capture of %s lost in push after %s",
-                                    "xRCDHMErcdhme"[cap.victim], steps.to_move_str(start));
-                            writefln("Current pos:\n%s", npos.to_long_str());
+                            Stdout.format("Capture of {} lost in push after {}",
+                                    "xRCDHMErcdhme"[cap.victim],
+                                    steps.to_move_str(start)).newline;
+                            Stdout.format("Current pos:\n{}",
+                                    npos.to_long_str()).newline;
                             throw new BadCaptureException();
                         }
                     }

@@ -1,12 +1,23 @@
 
 import std.intrinsic;
-import std.stdio;
-import std.string;
-import std.random;
 
 import tango.core.Memory;
+import tango.math.random.Random;
+import tango.text.convert.Format;
+import tango.text.Text;
+import tango.text.Unicode;
+import tango.text.Util;
+import tango.util.Convert;
 
 import zobristkeys;
+
+private int find(char[] src, char pattern)
+{
+    int index = locate!(char)(src, pattern);
+    if (index == src.length)
+        index = -1;
+    return index;
+}
 
 typedef byte bitix;
 
@@ -106,7 +117,7 @@ char[] ix_to_alg(bitix index)
 {
     char[] alg;
     alg ~= "hgfedcba"[index % 8];
-    alg ~= toString((index / 8) + 1);
+    alg ~= to!(char[])((index / 8) + 1);
 
     return alg;
 }
@@ -116,7 +127,7 @@ char[] bits_to_str(ulong bits)
     char[] boardstr = " +-----------------+\n".dup;
     for (int rownum = 8; rownum > 0; rownum--)
     {
-        char[] rowstr = std.string.toString(rownum) ~ "| ";
+        char[] rowstr = to!(char[])(rownum) ~ "| ";
         int rowix = 8 * (rownum - 1);
         for (int colnum = 0; colnum < 8; colnum++)
         {
@@ -190,8 +201,10 @@ struct Step
 
     void set(bitix f, bitix t, bool p=false)
     {
-        assert((f == 64 && t == 64) || f != t, format("from %d == to %d", f, t));
-        assert((f == 64 && t == 64) || (f >= 0 && f < 64), format("from %d out of bounds", f));
+        assert((f == 64 && t == 64) || f != t,
+                Format("from {} == to {}", f, t));
+        assert((f == 64 && t == 64) || (f >= 0 && f < 64),
+                Format("from {} out of bounds", f));
 
         frombit = 1UL << f;
         tobit = 1UL << t;
@@ -200,9 +213,12 @@ struct Step
 
     void set(ulong f, ulong t, bool p=false)
     {
-        assert((f == INV_STEP && t == INV_STEP) || f != t, format("from %X == to %X", f, t));
-        assert((f == INV_STEP && t == INV_STEP) || popcount(f) == 1, format("invalid f %X", f));
-        assert(t == INV_STEP || popcount(t) == 1, format("invalid t %X", t));
+        assert((f == INV_STEP && t == INV_STEP) || f != t,
+                Format("from {:X} == to {:X}", f, t));
+        assert((f == INV_STEP && t == INV_STEP) || popcount(f) == 1,
+                Format("invalid f {:X}", f));
+        assert(t == INV_STEP || popcount(t) == 1,
+                Format("invalid t {:X}", t));
 
         frombit = f;
         tobit = t;
@@ -397,8 +413,8 @@ class StepList
                         move ~= ".RCDHMErcdhme"[previous.pieces[step.fromix]];
                         move ~= ix_to_alg(step.toix);
                     } else {
-                        throw new ValueException(format(
-                                "Piece disappeared without being trapped. %s",
+                        throw new ValueException(Format(
+                                "Piece disappeared without being trapped. {}",
                                 move));
                     }
                     move ~= "x ";
@@ -490,7 +506,7 @@ class Position
             }
             if (usedsquares != ALL_BITS_SET)
             {
-                assert(0, format("not all squares were accounted for, %X", usedsquares));
+                assert(0, Format("not all squares were accounted for, {:X}", usedsquares));
             }
 
             ulong zcheck = ZOBRIST_STEP[stepsLeft];
@@ -528,7 +544,7 @@ class Position
                 checkfrozen |= bitBoards[pix] & neighbors_of(bstronger) & (~wneighbors);
                 checkfrozen |= bitBoards[pix+6] & neighbors_of(wstronger) & (~bneighbors);
             }
-            assert (checkfrozen == frozen, format("Incorrect frozen board encountered. %X, %X", frozen, checkfrozen));
+            assert (checkfrozen == frozen, Format("Incorrect frozen board encountered. {:X}, {:X}", frozen, checkfrozen));
 
             for (int sqix = 0; sqix < 64; sqix++)
             {
@@ -545,7 +561,7 @@ class Position
                             strong = pieces[nix];
                     }
                     assert (strongest[sideix][sqix] == strong,
-                            format("Incorrect strongest neighbor encountered. %d %d %d %d",
+                            Format("Incorrect strongest neighbor encountered. {} {} {} {}",
                                    sideix, sqix, strong, strongest[sideix][sqix]));
                 }
             }
@@ -915,7 +931,7 @@ class Position
         char[] boardstr = " +-----------------+\n".dup;
         for (int rownum = 8; rownum > 0; rownum--)
         {
-            char[] rowstr = std.string.toString(rownum) ~ "| ";
+            char[] rowstr = to!(char[])(rownum) ~ "| ";
             int rowix = 8 * (rownum - 1);
             for (int colnum = 0; colnum < 8; colnum++)
             {
@@ -1118,8 +1134,8 @@ class Position
             bitix fromix = step.fromix;
             bitix toix = step.toix;
             Piece piece = pieces[fromix];
-            assert (piece != Piece.EMPTY, format("move empty piece f%d t%d", fromix, toix));
-            assert (pieces[toix] == Piece.EMPTY, format("occupied to f%d t%d", fromix, toix));
+            assert (piece != Piece.EMPTY, Format("move empty piece f{} t{}", fromix, toix));
+            assert (pieces[toix] == Piece.EMPTY, Format("occupied to f{} t{}", fromix, toix));
 
             Side piece_side;
             if (placement[Side.WHITE] & step.frombit)
@@ -1181,7 +1197,7 @@ class Position
         if (stepsLeft < 1 ||
             (step.frombit == INV_STEP && step.tobit == INV_STEP)) // pass step
         {
-            assert (!inpush, format("stepsleft %d, step.from %d, step.to %d", stepsLeft, step.fromix, step.toix));
+            assert (!inpush, Format("stepsleft {}, step.from {}, step.to {}", stepsLeft, step.fromix, step.toix));
             side ^= 1;
             zobrist ^= ZOBRIST_SIDE ^ ZOBRIST_LAST_PIECE[lastpiece][lastfrom];
             stepsLeft = 4;
@@ -1196,26 +1212,26 @@ class Position
     {
         Side start_side = side;
 
-        foreach (char[] step; split(move))
+        foreach (char[] step; split!(char)(move, " "))
         {
             Piece piece = cast(Piece)(find("RCDHMErcdhme", step[0]) +1);
             if (piece <= 0)
             {
-                throw new ValueException(format("Step starts with invalid piece. %s", step));
+                throw new ValueException(Format("Step starts with invalid piece. {}", step));
             }
             int column = find("abcdefgh", step[1])+1;
             if (column < 1)
             {
-                throw new ValueException(format("Step has invalid column. %s", step));
+                throw new ValueException(Format("Step has invalid column. {}", step));
             }
-            if (!isNumeric(step[2]))
+            if (!isDigit(step[2]))
             {
-                throw new ValueException(format("Step column is not a number. %s", step));
+                throw new ValueException(Format("Step column is not a number. {}", step));
             }
-            int rank = atoi(step[2..3])-1;
+            int rank = to!(int)(step[2..3])-1;
             if (rank < 0 || rank > 7)
             {
-                throw new ValueException(format("Step column is invalid. %s", step));
+                throw new ValueException(Format("Step column is invalid. {}", step));
             }
 
             bitix fromix = cast(bitix)((rank*8) + (8-column));
@@ -1227,11 +1243,11 @@ class Position
                     case "n":
                         if (pieces[fromix] != piece)
                         {
-                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                            throw new ValueException(Format("Step moves non-existant piece. {}", step));
                         }
                         if (pieces[fromix+8] != Piece.EMPTY)
                         {
-                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                            throw new ValueException(Format("Step tries to move to an occupied square. {}", step));
                         }
                         Step bstep;
                         bstep.set(from, from << 8);
@@ -1240,11 +1256,11 @@ class Position
                     case "s":
                         if (pieces[fromix] != piece)
                         {
-                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                            throw new ValueException(Format("Step moves non-existant piece. {}", step));
                         }
                         if (pieces[fromix-8] != Piece.EMPTY)
                         {
-                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                            throw new ValueException(Format("Step tries to move to an occupied square. {}", step));
                         }
                         Step bstep;
                         bstep.set(from, from >> 8);
@@ -1253,11 +1269,11 @@ class Position
                     case "e":
                         if (pieces[fromix] != piece)
                         {
-                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                            throw new ValueException(Format("Step moves non-existant piece. {}", step));
                         }
                         if (pieces[fromix-1] != Piece.EMPTY)
                         {
-                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                            throw new ValueException(Format("Step tries to move to an occupied square. {}", step));
                         }
                         Step bstep;
                         bstep.set(from, from >> 1);
@@ -1266,11 +1282,11 @@ class Position
                     case "w":
                         if (pieces[fromix] != piece)
                         {
-                            throw new ValueException(format("Step moves non-existant piece. %s", step));
+                            throw new ValueException(Format("Step moves non-existant piece. {}", step));
                         }
                         if (pieces[fromix+1] != Piece.EMPTY)
                         {
-                            throw new ValueException(format("Step tries to move to an occupied square. %s", step));
+                            throw new ValueException(Format("Step tries to move to an occupied square. {}", step));
                         }
                         Step bstep;
                         bstep.set(from, from << 1);
@@ -1279,12 +1295,12 @@ class Position
                     case "x":
                         break;
                     default:
-                        throw new ValueException(format("Step direction is invalid. %s", step));
+                        throw new ValueException(Format("Step direction is invalid. {}", step));
                 }
             } else {
                 if (pieces[fromix] != Piece.EMPTY)
                 {
-                    throw new ValueException(format("Tried to place a piece in a non-empty square. %s", step));
+                    throw new ValueException(Format("Tried to place a piece in a non-empty square. {}", step));
                 }
                 pieces[fromix] = piece;
                 bitBoards[piece] |= from;
@@ -1310,7 +1326,7 @@ class Position
         }
 
         if ((~bitBoards[Piece.EMPTY]) & squares)
-            throw new ValueException(format("Tried to place a piece in a non-empty square. squares %X empty %X", squares, bitBoards[Piece.EMPTY]));
+            throw new ValueException(Format("Tried to place a piece in a non-empty square. squares {:X} empty {:X}", squares, bitBoards[Piece.EMPTY]));
 
         bitBoards[p] |= squares;
         update_derived();
@@ -1319,7 +1335,7 @@ class Position
     void set_steps_left(int num)
     {
         if (num < 0 || num > 4)
-            throw new ValueException(format("Tried to set steps left to an illegal value, %d.", num));
+            throw new ValueException(Format("Tried to set steps left to an illegal value, {}.", num));
         stepsLeft = num;
         update_derived();
     }
@@ -1675,8 +1691,8 @@ class PosStore
 
         if (numstored != found)
         {
-            throw new ValueException(format(
-                "found different number of positions %d != %d", numstored, found));
+            throw new ValueException(Format(
+                "found different number of positions {} != {}", numstored, found));
         }
         return true;
     }
@@ -1777,16 +1793,16 @@ class PosStore
 
 Position parse_long_str(char[] boardstr)
 {
-    char[][] rowstrs = std.string.splitlines(boardstr);
+    char[][] rowstrs = splitLines!(char)(boardstr);
     if (rowstrs.length < 10)
         throw new InvalidBoardException("Not enough lines for a full board.");
-    rowstrs[0] = std.string.strip(rowstrs[0]);
+    rowstrs[0] = trim!(char)(rowstrs[0]);
     foreach (int rownum, char[] row; rowstrs[1..10])
     {
-        row = std.string.strip(row);
+        row = trim!(char)(row);
         if (row.length < 17)
             throw new InvalidBoardException("Short row encountered in board, rownum " ~
-                   std.string.toString(rownum+2));
+                   to!(char[])(rownum+2));
     }
 
     Side color;
@@ -1802,26 +1818,27 @@ Position parse_long_str(char[] boardstr)
         throw new InvalidBoardException("Invalid side to move.");
     }
 
-    if (!std.string.cmp(rowstrs[1], "+-----------------+"))
+    auto first_row = new Text!(char)(rowstrs[1]);
+    if (!first_row.trim().equals("+-----------------+"))
         throw new InvalidBoardException("Invalid board header.");
 
     ulong[Piece.max+1] bitboards;
     foreach (int lineix, char[] line; rowstrs[2..10])
     {
-        if (std.string.atoi(line[0..1]) != 8-lineix)
-            throw new InvalidBoardException(format("Invalid row marker, expected %d got %s",
+        if (to!(int)(line[0..1]) != 8-lineix)
+            throw new InvalidBoardException(Format("Invalid row marker, expected {} got {}",
                        7-lineix, line[0]));
         for (int squareix = 3; squareix < 18; squareix += 2)
         {
             char piecech = line[squareix];
             int colnum = (squareix-3) / 2;
             ulong squarebit = 1UL << (((7-lineix)*8) + (7-colnum));
-            if (std.string.find("xX .", piecech) != -1)
+            if (find("xX .", piecech) != -1)
             {
                 bitboards[0] |= squarebit;
                 continue;
             }
-            int piece = std.string.find("RCDHMErcdhme", piecech);
+            int piece = find("RCDHMErcdhme", piecech);
             if (piece == -1)
                 throw new InvalidBoardException("Invalid piece encountered.");
 
@@ -1836,16 +1853,16 @@ Position parse_short_str(Side side, int steps, char[] boardstr)
     if (steps > 4 || steps < 1)
         throw new InvalidBoardException("Incorrect number of steps left.");
 
-    boardstr = std.string.strip(boardstr);
+    boardstr = trim!(char)(boardstr);
     if (boardstr.length < 66)
         throw new InvalidBoardException("Not long enough for full board.");
 
     ulong[Piece.max+1] bitboards;
     foreach (int squareix, char piecech; boardstr[1..65])
     {
-        int piece = std.string.find(" RCDHMErcdhme", piecech);
+        int piece = find(" RCDHMErcdhme", piecech);
         if (piece == -1)
-            throw new InvalidBoardException(format("Invalid piece encountered. %s %s", boardstr, piecech));
+            throw new InvalidBoardException(Format("Invalid piece encountered. {} {}", boardstr, piecech));
         bitboards[piece] |= 1UL << (63-squareix);
     }
     return new Position(side, steps, bitboards);
@@ -1866,7 +1883,7 @@ char[] random_setup_move(Side side)
 
     for (int i=0; i < 16; i++)
     {
-        int pix = rand() % (piece_chars.length);
+        int pix = rand.uniformR!(int)(piece_chars.length);
         char piece = piece_chars[pix];
         piece_chars[pix] = piece_chars[length-1];
         piece_chars.length = piece_chars.length - 1;
@@ -1911,7 +1928,7 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
             }
             break;
         }
-        int stepix = rand() % steps.numsteps;
+        int stepix = rand.uniformR!(int)(steps.numsteps);
         pos.do_step(steps.steps[stepix]);
         steps.clear();
         if (pos.side != curside)
@@ -2052,7 +2069,7 @@ int population(Position pos)
         {
             int p2c = pop2count(count, p);
             int pc = popcount(pos.bitBoards[p]);
-            assert(p2c == pc, format("p2c %d != pc %d for %d from %X", p2c, pc, p, count));
+            assert(p2c == pc, Format("p2c {} != pc {} for {} from {:X}", p2c, pc, p, count));
         }
     }
 

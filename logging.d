@@ -1,7 +1,6 @@
 
-import std.format;
-import std.stdio;
-import std.utf;
+import tango.io.Stdout;
+import tango.text.convert.Format;
 
 interface LogConsumer
 {
@@ -26,66 +25,41 @@ class Logger
         consumers[length-1] = c;
     }
 
-    void console(...)
+    void console(char[] fmt, ...)
     {
         if (to_console)
         {
-            char[] message;
-            void putc(dchar c)
-            {
-                std.utf.encode(message, c);
-            }
-            std.format.doFormat(&putc, _arguments, _argptr);
-
-            fwritefln(stderr, message);
+            Stderr(Stderr.layout.convert(_arguments, _argptr, fmt)).newline;
         }
     }
 
-    void log(...)
+    void log(char[] fmt, ...)
     {
-        char[] message;
-        void putc(dchar c)
-        {
-            std.utf.encode(message, c);
-        }
-        std.format.doFormat(&putc, _arguments, _argptr);
-
+        char[] message = Format.convert(_arguments, _argptr, fmt);
         foreach(LogConsumer con; consumers)
         {
             con.log(message);
         }
 
         if (to_console)
-            fwritefln(stderr, "log: %s", message);
+            Stderr(Format("log: %s", message));
     }
 
-    void warn(...)
+    void warn(char[] fmt, ...)
     {
-        char[] message;
-        void putc(dchar c)
-        {
-            std.utf.encode(message, c);
-        }
-        std.format.doFormat(&putc, _arguments, _argptr);
-
+        char[] message = Format.convert(_arguments, _argptr, fmt);
         foreach(LogConsumer con; consumers)
         {
             con.warn(message);
         }
 
         if (to_console)
-            fwritefln(stderr, "Warning: %s", message);
+            Stderr(Format("log: %s", message));
     }
 
-    void info(...)
+    void info(char[] fmt, ...)
     {
-        char[] message;
-        void putc(dchar c)
-        {
-            std.utf.encode(message, c);
-        }
-        std.format.doFormat(&putc, _arguments, _argptr);
-
+        char[] message = Format.convert(_arguments, _argptr, fmt);
         foreach(LogConsumer con; consumers)
         {
             con.info(message);

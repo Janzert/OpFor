@@ -1,6 +1,6 @@
 
-import std.random;
-import std.stdio;
+import tango.io.Stdout;
+import tango.math.random.Random;
 
 import position;
 import trapmoves;
@@ -10,7 +10,7 @@ import trap_check;
 private ulong random_bit(ulong bits)
 {
     int num = popcount(bits);
-    int bix = rand() % num;
+    int bix = rand.uniformR!(int)(num);
     ulong b;
     for (int i=0; i <= bix; i++)
     {
@@ -59,12 +59,12 @@ int main(char[][] args)
     {
         gen_position(pos);
         pos_count += 1;
-        writefln("%dw", pos_count);
-        writefln(pos.to_long_str());
+        Stdout.format("{}w", pos_count).newline;
+        Stdout(pos.to_long_str()).newline;
         cap_checker.check_captures(pos, pos, steps);
         Position bpos = pos.reverse();
-        writefln("%db", pos_count);
-        writefln(bpos.to_long_str());
+        Stdout.format("{}b", pos_count).newline;
+        Stdout(bpos.to_long_str()).newline;
         cap_checker.check_captures(bpos, bpos, steps);
         Position.free(bpos);
         assert (steps.numsteps == 0);

@@ -1,8 +1,6 @@
 
-import std.conv;
-import std.stdio;
-
 import tango.core.Memory;
+import tango.util.Convert;
 
 import goalsearch;
 import logging;
@@ -64,7 +62,7 @@ class TransTable
         store.length = store.length < 1 ? 1 : store.length;
         GC.setAttr(cast(void*)store, GC.BlkAttr.NO_SCAN);
         age();
-        log.log("Set transposition table size to %dMB (%d entries)", size, store.length);
+        log.log("Set transposition table size to {}MB ({} entries)", size, store.length);
     }
 
     TTNode* get(Position pos)
@@ -643,31 +641,28 @@ class ABSearch
         switch (option)
         {
             case "hash":
-                try
-                {
-                    ttable.set_size(toInt(value));
-                } catch (ConvError e) { }
+                ttable.set_size(to!(int)(value));
                 break;
             case "history":
-                StepSorter.use_history = cast(bool)(toInt(value));
+                StepSorter.use_history = to!(bool)(value);
                 break;
             case "capture_sort":
-                StepSorter.capture_first = cast(bool)(toInt(value));
+                StepSorter.capture_first = to!(bool)(value);
                 break;
             case "use_lmr":
-                use_lmr = cast(bool)toInt(value);
+                use_lmr = to!(bool)(value);
                 break;
             case "use_nmh":
-                use_nmh = cast(bool)toInt(value);
+                use_nmh = to!(bool)(value);
                 break;
             case "use_early_beta":
-                use_early_beta = cast(bool)toInt(value);
+                use_early_beta = to!(bool)(value);
                 break;
             case "use_killers":
-                StepSorter.use_killers = cast(bool)(toInt(value));
+                StepSorter.use_killers = to!(bool)(value);
                 break;
             case "prune_unrelated":
-                StepSorter.prune_unrelated = cast(bool)(toInt(value));
+                StepSorter.prune_unrelated = to!(bool)(value);
                 break;
             default:
                 handled = false;
@@ -984,8 +979,9 @@ class ABSearch
 
     void report()
     {
-        logger.info("nodes %d", nodes_searched);
-        logger.info("TT hits %d misses %d collisions %d", ttable.hits, ttable.miss, ttable.collisions);
+        logger.info("nodes {}", nodes_searched);
+        logger.info("TT hits {} misses {} collisions {}",
+                ttable.hits, ttable.miss, ttable.collisions);
     }
 }
 

@@ -3,21 +3,39 @@
  * Base for implementing an Arimaa Engine Interface bot.
  */
 
+/*
 import std.conv;
 import std.format;
 import std.string;
 import std.stdio;
 import std.socket;
 import std.utf;
+*/
 
+import tango.core.Exception;
 import tango.core.Thread;
 import tango.core.sync.Mutex;
 import tango.core.sync.Condition;
+import tango.io.Console;
+import tango.io.Stdout;
+import tango.net.Socket;
+import tango.text.convert.Format;
+import tango.text.Text;
+import tango.text.Util;
+import tango.time.Time;
 
 import logging;
 import position;
 
 pragma(lib, "ws2_32.lib");
+
+private int find(char[] src, char[] pattern)
+{
+    int index = locatePattern!(char)(src, pattern);
+    if (index == src.length)
+        index = -1;
+    return index;
+}
 
 class NotImplementedException : Exception
 {
@@ -159,7 +177,7 @@ class _StdioCom : Thread
     void run()
     {
         char[] buf;
-        while (!stop && ((buf = readln()) !is null))
+        while (!stop && Cin.readln(buf))
         {
             inq.set(buf);
         }
@@ -196,22 +214,25 @@ class StdioServer : ServerConnection
 
     void send(char[] msg)
     {
-        fwritef(stdout, msg);
-        fflush(stdout);
+        Stdout(msg);
+        Stdout.flush();
     }
 }
 
 class SocketServer : ServerConnection
 {
-    TcpSocket sock;
+    Socket sock;
 
     this(char[] ip, ushort port)
     {
         try
         {
-            sock = new TcpSocket(new InternetAddress(ip, port));
-            int bufsize;
-            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF, 24*1024);
+            sock = new Socket(AddressFamily.INET, SocketType.STREAM,
+                    ProtocolType.TCP);
+            sock.connect(new IPv4Address(ip, port));
+            int[1] send_buffer_size = 24 * 1024;
+            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SO_SNDBUF,
+                    send_buffer_size);
         } catch (SocketException e)
         {
             throw new ConnectException(e.msg);
@@ -229,7 +250,6 @@ class SocketServer : ServerConnection
         if (sock !is null)
         {
             sock.shutdown(SocketShutdown.BOTH);
-            sock.close();
             delete sock;
             sock = null;
         }
@@ -238,13 +258,15 @@ class SocketServer : ServerConnection
     char[] receive(float timeout=-1)
     {
         SocketSet sset = new SocketSet(1);
+        SocketSet null_set = cast(SocketSet)null;
         sset.add(sock);
         int ready_sockets;
         if (timeout < 0)
         {
-            ready_sockets = Socket.select(sset, null, null);
+            ready_sockets = Socket.select(sset, null_set, null_set);
         } else {
-            ready_sockets = Socket.select(sset, null, null, cast(int)(timeout*1000*1000));
+            ready_sockets = Socket.select(sset, null_set, null_set,
+                    TimeSpan.fromInterval(timeout));
         }
         if (!ready_sockets)
         {
@@ -284,7 +306,7 @@ class SocketServer : ServerConnection
         {
             int val = sock.send(buf[sent..length]);
             if (val == Socket.ERROR)
-                throw new Exception(format("Socket Error, sending. Sent %d bytes", sent));
+                throw new Exception(Format("Socket Error, sending. Sent {} bytes", sent));
             sent += val;
         }
     }
@@ -372,12 +394,13 @@ class ServerInterface : LogConsumer
     this(ServerConnection cn, char[] bot_name, char[] bot_author)
     {
         con = cn;
-        char[] greet = con.receive();
-        if (cmp(strip(greet), "aei") != 0)
+        auto greet = new Text!(char)(con.receive());
+        greet.trim();
+        if (!greet.equals("aei"))
             throw new Exception("Invalid greeting from server.");
         con.send("protocol-version 1\n");
-        con.send(format("id name %s\n", bot_name));
-        con.send(format("id author %s\n", bot_author));
+        con.send(Format("id name {}\n", bot_name));
+        con.send(Format("id author {}\n", bot_author));
         con.send("aeiok\n");
     }
 
@@ -401,7 +424,7 @@ class ServerInterface : LogConsumer
                 packet = partial ~ packet;
                 partial = "";
             }
-            char[][] cmds = splitlines(packet);
+            char[][] cmds = splitLines!(char)(packet)[0..length-1];
             if (got_partial)
             {
                 partial = cmds[length-1];
@@ -409,7 +432,7 @@ class ServerInterface : LogConsumer
             }
             foreach (char[] line; cmds)
             {
-                char[] cmd = strip(split(line)[0]);
+                char[] cmd = trim!(char)(delimit!(char)(line, " \t\n")[0]);
                 switch (cmd)
                 {
                     case "isready":
@@ -424,10 +447,10 @@ class ServerInterface : LogConsumer
                     case "go":
                         GoCmd go_cmd = new GoCmd();
                         cmd_queue ~= go_cmd;
-                        char[][] words = split(line);
+                        char[][] words = delimit!(char)(line, " \t");
                         if (words.length > 1)
                         {
-                            switch (strip(words[1]))
+                            switch (trim!(char)(words[1]))
                             {
                                 case "ponder":
                                     go_cmd.option = GoCmd.Option.PONDER;
@@ -443,14 +466,15 @@ class ServerInterface : LogConsumer
                     case "makemove":
                         MoveCmd move_cmd = new MoveCmd();
                         cmd_queue ~= move_cmd;
-                        int mix = find(line, "makemove") + 8; // end of makemove
-                        move_cmd.move = strip(line[mix..length]);
+                        // find end of makemove
+                        int mix = find(line, "makemove") + 8;
+                        move_cmd.move = trim!(char)(line[mix..length]);
                         break;
                     case "setposition":
                         PositionCmd p_cmd = new PositionCmd();
                         cmd_queue ~= p_cmd;
                         int six = find(line, "setposition") + 11;
-                        switch(stripl(line[six..length])[0])
+                        switch(triml!(char)(line[six..length])[0])
                         {
                             case 'g':
                                 p_cmd.side = Side.WHITE;
@@ -462,7 +486,7 @@ class ServerInterface : LogConsumer
                                 throw new Exception("Bad side sent in setposition from server.");
                         }
                         int pix = find(line, "[");
-                        p_cmd.pos_str = strip(line[pix..length]);
+                        p_cmd.pos_str = trim!(char)(line[pix..length]);
                         break;
                     case "setoption":
                         OptionCmd option_cmd = new OptionCmd();
@@ -470,10 +494,10 @@ class ServerInterface : LogConsumer
                         int nameix = find(line, "name") + 4;
                         int valueix = find(line, "value");
                         valueix = (valueix == -1) ? line.length : valueix;
-                        option_cmd.name = strip(line[nameix..valueix]);
+                        option_cmd.name = trim!(char)(line[nameix..valueix]);
                         if (valueix != line.length)
                         {
-                            option_cmd.value = strip(line[valueix+5..length]);
+                            option_cmd.value = trim!(char)(line[valueix+5..length]);
                         } else {
                             option_cmd.value = "";
                         }
@@ -501,22 +525,22 @@ class ServerInterface : LogConsumer
 
     void bestmove(char[] move)
     {
-        con.send(format("bestmove %s\n", move));
+        con.send(Format("bestmove {}\n", move));
     }
 
     void info(char[] message)
     {
-        con.send(format("info %s\n", message));
+        con.send(Format("info {}\n", message));
     }
 
     void log(char[] message)
     {
-        con.send(format("log %s\n", message));
+        con.send(Format("log {}\n", message));
     }
 
     void warn(char[] message)
     {
-        con.send(format("log Warning: %s\n", message));
+        con.send(Format("log Warning: {}\n", message));
     }
 
     ServerCmd current_cmd()
@@ -552,15 +576,16 @@ class ServerInterface : LogConsumer
         return false;
     }
 
-    static bool is_standard_option(char[] name)
+    static bool is_standard_option(char[] n)
     {
         static char[][] stdopts = ["tcmove", "tcreserve", "tcpercent", "tcmax",
             "tctotal", "tcturns", "tcturntime", "greserve", "sreserve",
             "gused", "sused", "lastmoveused", "moveused", "opponent",
             "opponent_rating", "rated", "event", "hash", "depth"];
+        auto name = new Text!(char)(n);
         for (int i=0; i < stdopts.length; i++)
         {
-            if (cmp(name, stdopts[i]) == 0)
+            if (name.equals(stdopts[i]) == 0)
             {
                 return true;
             }

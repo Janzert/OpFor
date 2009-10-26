@@ -1,5 +1,5 @@
 
-import std.random;
+import tango.math.random.Random;
 
 import position;
 
@@ -56,7 +56,7 @@ class SetupGenerator
             ulong sbit = squares & -squares;
             squares ^= sbit;
 
-            int pix = rand() % pieces.length;
+            int pix = rand.uniformR!(int)(pieces.length);
             int piece = pieces[pix];
             pieces[pix] = pieces[length-1];
             pieces.length = pieces.length - 1;
@@ -96,7 +96,7 @@ class SetupGenerator
             ulong sbit = squares & -squares;
             squares ^= sbit;
 
-            int pix = rand() % pieces.length;
+            int pix = rand.uniformR!(int)(pieces.length);
             Piece piece = pieces[pix];
             pieces[pix] = pieces[length-1];
             pieces.length = pieces.length - 1;
@@ -114,7 +114,7 @@ class SetupGenerator
             int total_weight = 0;
             for (int i=0; i <= RabbitSetup.max; i++)
                 total_weight += setup_weights[i];
-            int choice_weight = rand() % total_weight;
+            int choice_weight = rand.uniformR!(int)(total_weight);
             int cur_weight = 0;
             for (int i=0; i <= RabbitSetup.max; i++)
             {
@@ -150,7 +150,7 @@ class SetupGenerator
     private ulong random_bit(ulong bits)
     {
         int num = popcount(bits);
-        int bix = rand() % num;
+        int bix = rand.uniformR!(int)(num);
         ulong b;
         for (int i=0; i <= bix; i++)
         {

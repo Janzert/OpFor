@@ -1,6 +1,4 @@
 
-import std.stdio;
-
 import position;
 
 struct CaptureInfo
@@ -41,9 +39,10 @@ class TrapGenerator
     {
         debug (static_captures)
         {
-            writefln("cap %s at %s in %d steps %s trap step from %s to %s is push %d",
-                    ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)), steps, ix_to_alg(bitindex(tbit)),
-                    ix_to_alg(bitindex(frombit)), ix_to_alg(bitindex(tobit)), ispush);
+            Stdout.format("cap {} at {} in {} steps {} trap step from {} to {} is push {}",
+                    ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)), steps,
+                    ix_to_alg(bitindex(tbit)), ix_to_alg(bitindex(frombit)),
+                    ix_to_alg(bitindex(tobit)), ispush).newline;
         }
         captures[num_captures].victim = piece;
         captures[num_captures].victim_bit = vbit;
@@ -63,9 +62,11 @@ class TrapGenerator
     {
         debug (static_captures)
         {
-            writefln("cap %s at %s in %d steps %s trap using step %s to %s is push %d",
-                    ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)), steps, ix_to_alg(bitindex(tbit)),
-                    ix_to_alg(bitindex(step.frombit)), ix_to_alg(bitindex(step.tobit)), step.push);
+            Stdout.format("cap {} at {} in {} steps {} trap using step {} to {} is push {}",
+                    ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)),
+                    steps, ix_to_alg(bitindex(tbit)),
+                    ix_to_alg(bitindex(step.frombit)),
+                    ix_to_alg(bitindex(step.tobit)), step.push).newline;
         }
         captures[num_captures].victim = piece;
         captures[num_captures].victim_bit = vbit;

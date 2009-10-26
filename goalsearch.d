@@ -1,6 +1,4 @@
 
-import std.stdio;
-
 import position;
 
 class GoalSearch
