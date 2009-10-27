@@ -3,15 +3,6 @@
  * Base for implementing an Arimaa Engine Interface bot.
  */
 
-/*
-import std.conv;
-import std.format;
-import std.string;
-import std.stdio;
-import std.socket;
-import std.utf;
-*/
-
 import tango.core.Exception;
 import tango.core.Thread;
 import tango.core.sync.Mutex;
@@ -27,7 +18,10 @@ import tango.time.Time;
 import logging;
 import position;
 
-pragma(lib, "ws2_32.lib");
+version(windows)
+{
+    pragma(lib, "ws2_32.lib");
+}
 
 private int find(char[] src, char[] pattern)
 {
