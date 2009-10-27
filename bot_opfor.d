@@ -1,13 +1,4 @@
 
-/*
-import std.conv;
-import std.date;
-import std.math;
-import std.random;
-import std.stdio;
-import std.string;
-*/
-
 import tango.core.Memory;
 import tango.io.Stdout;
 import tango.text.Ascii;
