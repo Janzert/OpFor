@@ -171,9 +171,9 @@ class _StdioCom : Thread
     void run()
     {
         char[] buf;
-        while (!stop && Cin.readln(buf))
+        while (!stop && Cin.readln(buf, true))
         {
-            inq.set(buf);
+            inq.set(buf.dup);
         }
     }
 }
@@ -421,8 +421,13 @@ class ServerInterface : LogConsumer
             char[][] cmds = splitLines!(char)(packet)[0..length-1];
             if (got_partial)
             {
-                partial = cmds[length-1];
-                cmds = cmds[0..length-1];
+                if (cmds.length)
+                {
+                    partial = cmds[length-1];
+                    cmds = cmds[0..length-1];
+                } else {
+                    partial = packet;
+                }
             }
             foreach (char[] line; cmds)
             {

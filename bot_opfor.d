@@ -1006,8 +1006,8 @@ int main(char[][] args)
                                 logger.log("Stopping ponder because of low time for next move.");
                             }
                         }
-                        logger.log("Min search: {} Max: {}", tc_min_search,
-                                tc_max_search);
+                        logger.log("Min search: {} Max: {}",
+                                tc_min_search.interval, tc_max_search.interval);
                     } else {
                         tc_min_search = TimeSpan.zero;
                         tc_max_search = TimeSpan.zero;
@@ -1265,7 +1265,7 @@ int main(char[][] args)
                             end_search += TimeSpan.fromInterval(0.1);
                             tc_target_length = (end_search - search_start);
                             logger.log("next target time set to {}",
-                                    tc_target_length);
+                                    tc_target_length.interval);
                         } else {
                             engine.set_bestmove();
                             engine.state = EngineState.MOVESET;
@@ -1298,7 +1298,8 @@ int main(char[][] args)
                             auto end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
                             end_search += TimeSpan.fromInterval(0.1);
                             tc_min_search = end_search - move_start;
-                            logger.log("next min_search set to {}", tc_min_search);
+                            logger.log("next min_search set to {}",
+                                    tc_min_search.interval);
                         } else {
                             engine.set_bestmove();
                             engine.state = EngineState.MOVESET;

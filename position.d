@@ -579,7 +579,8 @@ class Position
 
     static real reserve_size()
     {
-        return (reservesize * Position.classinfo.init.length) / (1024*1024);
+        return ((reservesize * Position.classinfo.init.length)
+            / cast(real)(1024*1024));
     }
 
     static int rlistsize()
