@@ -610,6 +610,7 @@ class ABSearch
 
     ulong nodes_searched;
     ulong tthits;
+    bool log_tt_stats = false;
 
     ulong check_nodes;
     uint check_interval = 100000;
@@ -663,6 +664,9 @@ class ABSearch
                 break;
             case "prune_unrelated":
                 StepSorter.prune_unrelated = to!(bool)(value);
+                break;
+            case "log_tt_stats":
+                log_tt_stats = to!(bool)(value);
                 break;
             default:
                 handled = false;
@@ -980,8 +984,11 @@ class ABSearch
     void report()
     {
         logger.info("nodes {}", nodes_searched);
-        logger.info("TT hits {} misses {} collisions {}",
+        if (log_tt_stats)
+        {
+            logger.info("TT hits {} misses {} collisions {}",
                 ttable.hits, ttable.miss, ttable.collisions);
+        }
     }
 }
 

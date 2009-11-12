@@ -458,6 +458,9 @@ class Engine : AEIEngine
                     case "FRITZ":
                         board_setup.rabbit_style = SetupGenerator.RabbitSetup.FRITZ;
                         break;
+                    default:
+                        logger.warn("Unrecognized rabbit setup requested '{}'",
+                                value);
                 }
                 break;
             case "setup_random_minor":
@@ -979,7 +982,11 @@ int main(char[][] args)
                         TimeSpan max_reserve = tc_maxmove - tc_permove;
                         if (tc_maxreserve > max_reserve)
                             max_reserve = tc_maxreserve;
+                        // if reserve is unlimited target it to 4 * move time
+                        if (max_reserve == TimeSpan.zero)
+                            max_reserve = tc_permove * 4;
                         real reserve_fill = myreserve.interval / max_reserve.interval;
+                        reserve_fill = reserve_fill > 1.0 ? 1.0 : reserve_fill;
                         tc_min_search = TimeSpan(cast(long)(tc_permove.ticks
                                 * tc_min_search_per));
                         tc_min_search += TimeSpan(cast(long)((tc_permove.ticks
