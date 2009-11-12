@@ -623,13 +623,6 @@ class Engine : AEIEngine
 
             if (score == -ABORT_SCORE)
             {
-                if (aborts_reported < MAX_ABORT_REPORTS)
-                {
-                    auto elapsed_time = search_timer.microsec() / 1000000;
-                    logger.log("Aborted long search after {} seconds.",
-                            elapsed_time);
-                    aborts_reported += 1;
-                }
                 break;
             }
 
@@ -999,6 +992,8 @@ int main(char[][] args)
                             tc_max_search = tc_maxmove;
                         }
                         tc_max_search -= tc_safety_margin;
+                        if (tc_max_search < TimeSpan.zero)
+                            tc_max_search = TimeSpan.zero;
 
                         if (pondering)
                         {
