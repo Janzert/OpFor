@@ -383,6 +383,11 @@ class StepSorter
                         break;
                     }
                     logger.warn("Did not find hash step in step list");
+                    version (debug_hashstep)
+                    {
+                        logger.log("step: f{} t{} p{}", ix_to_alg(best.fromix), ix_to_alg(best.toix), best.push);
+                        logger.log("pos: {}{} {}", "gs"[pos.side], pos.stepsLeft, pos.to_short_str());
+                    }
                 }
                 stage++;
             case 1:

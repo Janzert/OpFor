@@ -274,9 +274,15 @@ class StepList
     Step[] steps;
     int numsteps = 0;
 
+    private static Object reserve_lock;
     private static StepList[] reservelists;
     private static int reservesize;
     static int allocated = 0;
+
+    static this()
+    {
+        reserve_lock = new Object();
+    }
 
     static int reserved()
     {
@@ -285,13 +291,16 @@ class StepList
 
     static StepList allocate()
     {
-        if (reservesize)
+        synchronized (reserve_lock)
         {
-            reservesize--;
-            StepList returnlist = reservelists[reservesize];
-            reservelists[reservesize] = null;
-            returnlist.clear();
-            return returnlist;
+            if (reservesize)
+            {
+                reservesize--;
+                StepList returnlist = reservelists[reservesize];
+                reservelists[reservesize] = null;
+                returnlist.clear();
+                return returnlist;
+            }
         }
 
         return new StepList();
@@ -299,10 +308,13 @@ class StepList
 
     static void free(StepList list)
     {
-        if (reservelists.length == reservesize)
-            reservelists.length = (reservelists.length+1) * 2;
+        synchronized (reserve_lock)
+        {
+            if (reservelists.length == reservesize)
+                reservelists.length = (reservelists.length+1) * 2;
 
-        reservelists[reservesize++] = list;
+            reservelists[reservesize++] = list;
+        }
     }
 
     this(int startlength=32)
@@ -568,9 +580,15 @@ class Position
         }
     }
 
+    private static Object reserve_lock;
     private static Position[] reserve;
     private static int reservesize;
     static int allocated;
+
+    static this()
+    {
+        reserve_lock = new Object();
+    }
 
     static int reserved()
     {
@@ -590,12 +608,15 @@ class Position
 
     static Position allocate()
     {
-        if (reservesize)
+        synchronized (reserve_lock)
         {
-            reservesize--;
-            Position pos = reserve[reservesize];
-            reserve[reservesize] = null;
-            return pos;
+            if (reservesize)
+            {
+                reservesize--;
+                Position pos = reserve[reservesize];
+                reserve[reservesize] = null;
+                return pos;
+            }
         }
 
         return new Position();
@@ -603,13 +624,16 @@ class Position
 
     static Position allocate(Position other)
     {
-        if (reservesize)
+        synchronized (reserve_lock)
         {
-            reservesize--;
-            Position pos = reserve[reservesize];
-            reserve[reservesize] = null;
-            pos.copy(other);
-            return pos;
+            if (reservesize)
+            {
+                reservesize--;
+                Position pos = reserve[reservesize];
+                reserve[reservesize] = null;
+                pos.copy(other);
+                return pos;
+            }
         }
 
         return new Position(other);
@@ -617,22 +641,28 @@ class Position
 
     static void free(Position pos)
     {
-        if (reserve.length == reservesize)
+        synchronized (reserve_lock)
         {
-            reserve.length = (reserve.length+1) * 2;
-        }
+            if (reserve.length == reservesize)
+            {
+                reserve.length = (reserve.length+1) * 2;
+            }
 
-        reserve[reservesize++] = pos;
+            reserve[reservesize++] = pos;
+        }
     }
 
     static void reduce_reserve(real size)
     {
-        int max_num = cast(int)((size * 1024*1024) / Position.classinfo.init.length);
-        while (reservesize > max_num)
+        synchronized (reserve_lock)
         {
-            delete reserve[--reservesize];
-            reserve[reservesize] = null;
-            allocated--;
+            int max_num = cast(int)((size * 1024*1024) / Position.classinfo.init.length);
+            while (reservesize > max_num)
+            {
+                delete reserve[--reservesize];
+                reserve[reservesize] = null;
+                allocated--;
+            }
         }
     }
 

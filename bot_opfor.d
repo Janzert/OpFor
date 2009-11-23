@@ -172,9 +172,14 @@ class FullSearch : ABSearch
                     bool duplicate = false;
                     for (int cix=0; cix < steps.numsteps; cix++)
                     {
-                        if (trap_search.captures[six].first_step == steps.steps[cix])
+                        if (trap_search.captures[six].first_step.frombit == steps.steps[cix].frombit
+                                && trap_search.captures[six].first_step.tobit == steps.steps[cix].tobit)
                         {
                             duplicate = true;
+                            if (trap_search.captures[six].first_step.push != steps.steps[cix].push)
+                            {
+                                steps.steps[cix].push = false;
+                            }
                             break;
                         }
                     }
