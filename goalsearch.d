@@ -1041,7 +1041,8 @@ class GoalSearchDT
                     pr ^= rbit;
 
                     if (popcount(neighbors_of(rbit) & start.placement[side^1]
-                                & ~start.bitBoards[erabbit]) < 2)
+                                & ~start.bitBoards[erabbit]) < 2
+                            && (back_bit & ~start.bitBoards[erabbit]))
                         return 4;
                 }
             }
