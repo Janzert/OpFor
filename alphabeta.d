@@ -382,12 +382,36 @@ class StepSorter
                         stage++;
                         break;
                     }
-                    logger.warn("Did not find hash step in step list");
-                    version (debug_hashstep)
+
+                    debug (badhashstep)
                     {
-                        logger.log("step: f{} t{} p{}", ix_to_alg(best.fromix), ix_to_alg(best.toix), best.push);
-                        logger.log("pos: {}{} {}", "gs"[pos.side], pos.stepsLeft, pos.to_short_str());
+                        logger.log("step: f{} t{} p {}", ix_to_alg(best.fromix),
+                                ix_to_alg(best.toix), best.push);
+                        logger.log("pos: {}{} {}", "gs"[pos.side],
+                                pos.stepsLeft, pos.to_short_str());
                     }
+                    if (best.push)
+                    {
+                        bix = 0;
+                        while (bix < steps.numsteps
+                                && (steps.steps[bix].frombit != best.frombit
+                                    || steps.steps[bix].tobit != best.tobit))
+                        {
+                            ++bix;
+                        }
+                        if (bix < steps.numsteps)
+                        {
+                            logger.warn("Hash step had push instead of pull.");
+                            best.push = false;
+                            steps.steps[bix] = steps.steps[0];
+                            steps.steps[0] = best;
+                            num++;
+                            step = &best;
+                            stage++;
+                            break;
+                        }
+                    }
+                    logger.warn("Did not find hash step in step list");
                 }
                 stage++;
             case 1:

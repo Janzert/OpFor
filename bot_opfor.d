@@ -176,8 +176,9 @@ class FullSearch : ABSearch
                                 && trap_search.captures[six].first_step.tobit == steps.steps[cix].tobit)
                         {
                             duplicate = true;
-                            if (trap_search.captures[six].first_step.push != steps.steps[cix].push)
+                            if (trap_search.captures[six].first_step.push == false)
                             {
+                                // make sure we use a pull if available
                                 steps.steps[cix].push = false;
                             }
                             break;
