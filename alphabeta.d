@@ -639,7 +639,6 @@ class ABSearch
 
     ulong nodes_searched;
     ulong tthits;
-    bool log_tt_stats = false;
 
     ulong check_nodes;
     uint check_interval = 100000;
@@ -649,11 +648,11 @@ class ABSearch
     bool use_nmh = true;
     bool use_early_beta = true;
 
-    this(Logger l)
+    this(Logger l, TransTable t)
     {
         logger = l;
         StepSorter.logger = l;
-        ttable = new TransTable(l, 10);
+        ttable = t;
         cuthistory = new HistoryHeuristic();
         StepSorter.cuthistory = cuthistory;
         trap_search = new TrapGenerator();
@@ -670,9 +669,6 @@ class ABSearch
         bool handled = true;
         switch (option)
         {
-            case "hash":
-                ttable.set_size(to!(int)(value));
-                break;
             case "history":
                 StepSorter.use_history = to!(bool)(value);
                 break;
@@ -693,9 +689,6 @@ class ABSearch
                 break;
             case "prune_unrelated":
                 StepSorter.prune_unrelated = to!(bool)(value);
-                break;
-            case "log_tt_stats":
-                log_tt_stats = to!(bool)(value);
                 break;
             default:
                 handled = false;
@@ -1013,11 +1006,6 @@ class ABSearch
     void report()
     {
         logger.info("nodes {}", nodes_searched);
-        if (log_tt_stats)
-        {
-            logger.info("TT hits {} misses {} collisions {}",
-                ttable.hits, ttable.miss, ttable.collisions);
-        }
     }
 }
 

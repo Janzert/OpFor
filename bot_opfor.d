@@ -7,6 +7,7 @@ import tango.text.convert.Integer;
 import tango.time.Clock;
 import tango.time.StopWatch;
 import tango.time.Time;
+import tango.util.Convert;
 // Lifted from tango trunk, should be included in some release after 0.99.7
 import Arguments;
 
@@ -42,9 +43,9 @@ class FullSearch : ABSearch
 
     int qdepth;
 
-    this(Logger l)
+    this(Logger l, TransTable t)
     {
-        super(l);
+        super(l, t);
         goal_searcher = new GoalSearchDT();
         evaluator = new StaticEval(l, goal_searcher, trap_search);
     }
@@ -391,6 +392,7 @@ class PositionNode
 
 class Engine : AEIEngine
 {
+    TransTable ttable;
     SetupGenerator board_setup;
     ABSearch searcher;
     PositionNode pos_list;
@@ -401,6 +403,8 @@ class Engine : AEIEngine
     int num_best;
     int num_losing;
     int losing_score;
+
+    bool log_tt_stats = false;
 
     int depth;
     int best_score;
@@ -427,8 +431,8 @@ class Engine : AEIEngine
     {
         super(l);
         board_setup = new SetupGenerator();
-        searcher = new FullSearch(l);
-        //searcher = new ScoreSearch();
+        ttable = new TransTable(l, 10);
+        searcher = new FullSearch(l, ttable);
         in_step = false;
         max_depth = -1;
     }
@@ -438,6 +442,12 @@ class Engine : AEIEngine
         bool handled = true;
         switch (option)
         {
+            case "hash":
+                ttable.set_size(to!(int)(value));
+                break;
+            case "log_tt_stats":
+                log_tt_stats = to!(bool)(value);
+                break;
             case "opening_book":
                 position_record = cast(bool)toInt(value);
                 if (position_record)
@@ -769,6 +779,11 @@ class Engine : AEIEngine
         StepList bestline = get_bestline();
         logger.info("pv {}", bestline.to_move_str(position));
         StepList.free(bestline);
+        if (log_tt_stats)
+        {
+            logger.info("TT hits {} misses {} collisions {}",
+                ttable.hits, ttable.miss, ttable.collisions);
+        }
     }
 
     void cleanup_search()
