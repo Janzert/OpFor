@@ -1,6 +1,7 @@
 
 import std.intrinsic;
 
+import tango.io.Stdout;
 import tango.core.Memory;
 import tango.math.random.Random;
 import tango.text.convert.Format;
@@ -2075,7 +2076,7 @@ const static int[] pop_mask = [0, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1, 0xF, 0x3, 0x3, 0
 
 int population(Position pos)
 {
-    int count;
+    int count = 0;
     if (pos.bitBoards[Piece.WELEPHANT])
         count = 1 << pop_offset[Piece.WELEPHANT];
     if (pos.bitBoards[Piece.WCAMEL])
@@ -2094,13 +2095,25 @@ int population(Position pos)
     count |= popcount(pos.bitBoards[Piece.BCAT]) << pop_offset[Piece.BCAT];
     count |= popcount(pos.bitBoards[Piece.BRABBIT]) << pop_offset[Piece.BRABBIT];
 
-    debug
+    debug (check_population)
     {
-        for (Piece p = Piece.WRABBIT; p < Piece.BELEPHANT; p++)
+        Stdout("Check population count").newline;
+        for (Piece p = Piece.WRABBIT; p <= Piece.BELEPHANT; p++)
         {
             int p2c = pop2count(count, p);
             int pc = popcount(pos.bitBoards[p]);
-            assert(p2c == pc, Format("p2c {} != pc {} for {} from {:X}", p2c, pc, p, count));
+            if (p2c != pc)
+            {
+                Stdout.format("p2c {} != pc {} for {} from {:X}", p2c, pc, p,
+                        count).newline;
+                Stdout.format("piece board: {:X}", pos.bitBoards[p]).newline;
+                Stdout.format("offset: {} mask: {:X}", pop_offset[p],
+                        pop_mask[p]).newline;
+                debug
+                {
+                    assert(false, "Bad population count");
+                }
+            }
         }
     }
 

@@ -9,7 +9,7 @@ import tango.core.sync.Mutex;
 import tango.core.sync.Condition;
 import tango.io.Console;
 import tango.io.Stdout;
-import tango.net.Socket;
+import tango.net.device.Socket;
 import tango.text.convert.Format;
 import tango.text.Text;
 import tango.text.Util;
@@ -133,18 +133,18 @@ class StdioServer : ServerConnection
 
 class SocketServer : ServerConnection
 {
-    Socket sock;
+    Berkeley sock;
 
     this(char[] ip, ushort port)
     {
         try
         {
-            sock = new Socket(AddressFamily.INET, SocketType.STREAM,
+            sock.open(AddressFamily.INET, SocketType.STREAM,
                     ProtocolType.TCP);
             sock.connect(new IPv4Address(ip, port));
             int[1] send_buffer_size = 24 * 1024;
-            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SO_SNDBUF,
-                    send_buffer_size);
+            sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF,
+                    cast(void[])send_buffer_size);
         } catch (SocketException e)
         {
             throw new ConnectException(e.msg);
@@ -159,11 +159,12 @@ class SocketServer : ServerConnection
 
     void shutdown()
     {
-        if (sock !is null)
+        if (sock.isAlive())
         {
             sock.shutdown(SocketShutdown.BOTH);
-            delete sock;
-            sock = null;
+            sock.detach();
+            //delete sock;
+            //sock = null;
         }
     }
 
@@ -171,14 +172,15 @@ class SocketServer : ServerConnection
     {
         SocketSet sset = new SocketSet(1);
         SocketSet null_set = cast(SocketSet)null;
-        sset.add(sock);
+        sset.add(&sock);
         int ready_sockets;
         if (timeout < 0)
         {
-            ready_sockets = Socket.select(sset, null_set, null_set);
+            ready_sockets = SocketSet.select(sset, null_set, null_set);
         } else {
-            ready_sockets = Socket.select(sset, null_set, null_set,
-                    TimeSpan.fromInterval(timeout));
+            long utimeout = cast(long)(timeout * 1000000);
+            ready_sockets = SocketSet.select(sset, null_set, null_set,
+                    utimeout);
         }
         if (!ready_sockets)
         {
@@ -195,7 +197,7 @@ class SocketServer : ServerConnection
         int val = 0;
         do {
             val = sock.receive(buf);
-            if (val == Socket.ERROR)
+            if (val == SOCKET_ERROR)
             {
                 throw new Exception("Socket Error, receiving");
             } else if (val > 0)
@@ -217,7 +219,7 @@ class SocketServer : ServerConnection
         while (sent < buf.length)
         {
             int val = sock.send(buf[sent..length]);
-            if (val == Socket.ERROR)
+            if (val == SOCKET_ERROR)
                 throw new Exception(Format("Socket Error, sending. Sent {} bytes", sent));
             sent += val;
         }

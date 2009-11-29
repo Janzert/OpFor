@@ -908,8 +908,8 @@ int main(char[][] args)
     TimeSpan tc_target_length = TimeSpan.fromSeconds(0);
     TimeSpan tc_max_length =  TimeSpan.fromSeconds(0);
 
-    TimeSpan search_time = 0;
-    TimeSpan search_max = 0;
+    TimeSpan search_time = TimeSpan.fromSeconds(0);
+    TimeSpan search_max = TimeSpan.fromSeconds(0);
     int search_num = 0;
     Time search_start;
     Time move_start;
