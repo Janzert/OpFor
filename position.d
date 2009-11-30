@@ -2084,7 +2084,7 @@ int population(Position pos)
     count |= popcount(pos.bitBoards[Piece.WHORSE]) << pop_offset[Piece.WHORSE];
     count |= popcount(pos.bitBoards[Piece.WDOG]) << pop_offset[Piece.WDOG];
     count |= popcount(pos.bitBoards[Piece.WCAT]) << pop_offset[Piece.WCAT];
-    count |= popcount(pos.bitBoards[Piece.WRABBIT]) << pop_offset[Piece.WRABBIT];
+    count |= popcount(pos.bitBoards[Piece.WRABBIT]) << 0; //pop_offset[Piece.WRABBIT]; workaround compiler bug
 
     if (pos.bitBoards[Piece.BELEPHANT])
         count |= 1 << pop_offset[Piece.BELEPHANT];
