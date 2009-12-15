@@ -1,10 +1,12 @@
 
 import tango.core.Memory;
+import tango.core.sync.Mutex;
 import tango.util.Convert;
 
 import goalsearch;
 import logging;
 import position;
+import staticeval;
 import trapmoves;
 
 static const int MAX_EVAL_SCORE = 63979;
@@ -218,51 +220,51 @@ class KillerHeuristic
 
 class StepSorter
 {
+    private static Mutex cache_lock;
     private static StepSorter[] reserve;
     private static int reservesize;
 
-    static StepSorter allocate(int d, Position p, Step* b, Step* l)
+    static this()
     {
-        if (reservesize)
+        cache_lock = new Mutex();
+    }
+
+    static StepSorter allocate(ABSearch s, int d, Position p, Step* b, Step* l)
+    {
+        synchronized (cache_lock)
         {
-            reservesize--;
-            StepSorter ss = reserve[reservesize];
-            reserve[reservesize] = null;
-            ss.init(d, p, b, l);
-            return ss;
+            if (reservesize)
+            {
+                reservesize--;
+                StepSorter ss = reserve[reservesize];
+                reserve[reservesize] = null;
+                ss.init(s, d, p, b, l);
+                return ss;
+            }
         }
 
-        return new StepSorter(d, p, b, l);
+        return new StepSorter(s, d, p, b, l);
     }
 
     static void free(StepSorter s)
     {
-        if (reserve.length == reservesize)
+        synchronized (cache_lock)
         {
-            reserve.length = (reserve.length+1) * 2;
-        }
+            if (reserve.length == reservesize)
+            {
+                reserve.length = (reserve.length+1) * 2;
+            }
 
-        StepList.free(s.steps);
-        s.steps = null;
-        if (s.capture_steps !is null)
-        {
-            StepList.free(s.capture_steps);
-            s.capture_steps = null;
+            reserve[reservesize++] = s;
         }
-        reserve[reservesize++] = s;
     }
-
-    static Logger logger;
-
-    static KillerHeuristic killers;
-    static HistoryHeuristic cuthistory;
-    static TrapGenerator trap_search;
 
     static bool use_killers = true;
     static bool use_history = true;
     static bool capture_first = true;
     static bool prune_unrelated = true;
 
+    ABSearch parent;
     int height;
     Position pos;
     StepList steps;
@@ -284,16 +286,20 @@ class StepSorter
 
     int sub_ix;
 
-    this(int d, Position p, Step* b, Step* l)
+    this(ABSearch s, int d, Position p, Step* b, Step* l)
     {
-        init(d, p, b, l);
+        init(s, d, p, b, l);
     }
 
-    void init(int h, Position p, Step* b, Step* l)
+    void init(ABSearch s, int h, Position p, Step* b, Step* l)
     {
+        parent = s;
         height = h;
         pos = p;
-        steps = StepList.allocate();
+        if (steps is null)
+            steps = StepList.allocate();
+        else
+            steps.clear();
         p.get_steps(steps);
         if (b !is null)
         {
@@ -385,9 +391,9 @@ class StepSorter
 
                     debug (badhashstep)
                     {
-                        logger.log("step: f{} t{} p {}", ix_to_alg(best.fromix),
+                        parent.logger.log("step: f{} t{} p {}", ix_to_alg(best.fromix),
                                 ix_to_alg(best.toix), best.push);
-                        logger.log("pos: {}{} {}", "gs"[pos.side],
+                        parent.logger.log("pos: {}{} {}", "gs"[pos.side],
                                 pos.stepsLeft, pos.to_short_str());
                     }
                     if (best.push)
@@ -401,7 +407,7 @@ class StepSorter
                         }
                         if (bix < steps.numsteps)
                         {
-                            logger.warn("Hash step had push instead of pull.");
+                            parent.logger.warn("Hash step had push instead of pull.");
                             best.push = false;
                             steps.steps[bix] = steps.steps[0];
                             steps.steps[0] = best;
@@ -411,7 +417,7 @@ class StepSorter
                             break;
                         }
                     }
-                    logger.warn("Did not find hash step in step list");
+                    parent.logger.warn("Did not find hash step in step list");
                 }
                 stage++;
             case 1:
@@ -419,18 +425,21 @@ class StepSorter
                 {
                     if (!captures_generated)
                     {
-                        trap_search.find_captures(pos, pos.side);
-                        capture_steps = StepList.allocate();
-                        for (int i=0; i < trap_search.num_captures; i++)
+                        parent.trap_search.find_captures(pos, pos.side);
+                        if (capture_steps is null)
+                            capture_steps = StepList.allocate();
+                        else
+                            capture_steps.clear();
+                        for (int i=0; i < parent.trap_search.num_captures; i++)
                         {
-                            if (trap_search.captures[i].length <= pos.stepsLeft
-                                        && trap_search.captures[i].first_step != best)
+                            if (parent.trap_search.captures[i].length <= pos.stepsLeft
+                                        && parent.trap_search.captures[i].first_step != best)
                             {
                                 Step* nstep = capture_steps.newstep();
-                                *nstep = trap_search.captures[i].first_step;
+                                *nstep = parent.trap_search.captures[i].first_step;
                             }
                         }
-                        trap_search.clear();
+                        parent.trap_search.clear();
                         capture_num = 0;
                         captures_generated = true;
                     }
@@ -513,7 +522,7 @@ class StepSorter
                                     writefln("Did not find capture step in list");
                                     assert (0);
                                 }
-                                logger.warn("Did not find capture step in legal step list.");
+                                parent.logger.warn("Did not find capture step in legal step list.");
                             }
                             capture_num++;
                         }
@@ -529,12 +538,12 @@ class StepSorter
                 }
                 stage++;
             case 2:
-                if (use_killers && !pos.inpush && height < killers.MAX_HEIGHT)
+                if (use_killers && !pos.inpush && height < parent.killers.MAX_HEIGHT)
                 {
                     bool foundkiller = false;
                     while (sub_ix < 2)
                     {
-                        Step* possible = &killers.steps[height][pos.side][sub_ix++];
+                        Step* possible = &parent.killers.steps[height][pos.side][sub_ix++];
                         if (possible.frombit != 0 || possible.tobit != 0)
                         {
                             if (possible.frombit != INV_STEP
@@ -594,11 +603,11 @@ class StepSorter
                 }
                 if (use_history)
                 {
-                    uint score = cuthistory.get_score(pos, steps.steps[num]);
+                    uint score = parent.cuthistory.get_score(pos, steps.steps[num]);
                     int bix = num;
                     for (int i = num+1; i < steps.numsteps; i++)
                     {
-                        int t = cuthistory.get_score(pos, steps.steps[i]);
+                        int t = parent.cuthistory.get_score(pos, steps.steps[i]);
                         if (t > score)
                         {
                             score = t;
@@ -633,6 +642,9 @@ class ABSearch
     KillerHeuristic killers;
     TrapGenerator trap_search;
     GoalSearchDT goal_search;
+    StepSorter[] sorters;
+    Position[] position_cache;
+    Position[] nullposition_cache;
 
     Position nullmove;
     int max_depth;
@@ -651,15 +663,11 @@ class ABSearch
     this(Logger l, TransTable t)
     {
         logger = l;
-        StepSorter.logger = l;
         ttable = t;
         cuthistory = new HistoryHeuristic();
-        StepSorter.cuthistory = cuthistory;
         trap_search = new TrapGenerator();
-        StepSorter.trap_search = trap_search;
         goal_search = new GoalSearchDT();
         killers = new KillerHeuristic();
-        StepSorter.killers = killers;
         nodes_searched = 0;
         tthits = 0;
     }
@@ -813,21 +821,48 @@ class ABSearch
                     return short_score;
             }
 
-            StepSorter sorted_steps = StepSorter.allocate(height, pos, prev_best, last_step);
+            StepSorter sorted_steps;
+            if (sorters.length > height)
+            {
+                sorted_steps = sorters[height];
+                sorted_steps.init(this, height, pos, prev_best, last_step);
+            } else {
+                sorted_steps = StepSorter.allocate(this, height, pos, prev_best, last_step);
+                sorters.length = height+1;
+                sorters[height] = sorted_steps;
+            }
             if (depth > max_depth - 4 && depth > max_depth / 2)
                 sorted_steps.remove_unrelated = false;
             Step* curstep = sorted_steps.next_step();
             if (curstep is null)
             {
                 // immobilized
-                StepSorter.free(sorted_steps);
                 return -WIN_SCORE;
+            }
+
+            Position npos;
+            if (position_cache.length > height)
+            {
+                npos = position_cache[height];
+            } else {
+                npos = Position.allocate();
+                position_cache.length = height+1;
+                position_cache[height] = npos;
+            }
+            Position nullreplace;
+            if (nullposition_cache.length > height)
+            {
+                nullreplace = nullposition_cache[height];
+            } else {
+                nullreplace = Position.allocate();
+                nullposition_cache.length = height+1;
+                nullposition_cache[height] = nullreplace;
             }
             while (curstep !is null)
             {
                 int cal;
 
-                Position npos = pos.dup;
+                npos.copy(pos);
                 npos.do_step(*curstep);
 
                 if (npos == nullmove)
@@ -845,12 +880,12 @@ class ABSearch
                         if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
-                            nullmove = npos.dup;
+                            nullreplace.copy(npos);
+                            nullmove = nullreplace;
                             nullmove.do_step(NULL_STEP);
 
                             first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha, height+1, curstep);
 
-                            Position.free(nullmove);
                             nullmove = mynull;
                         } else {
                             first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1, curstep);
@@ -863,12 +898,12 @@ class ABSearch
                         if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
-                            nullmove = npos.dup;
+                            nullreplace.copy(npos);
+                            nullmove = nullreplace;
                             nullmove.do_step(NULL_STEP);
 
                             first_val = -alphabeta(npos, depth-1, -(alpha+1), -alpha, height+1, curstep);
 
-                            Position.free(nullmove);
                             nullmove = mynull;
                         } else {
                             first_val = alphabeta(npos, depth-1, alpha, alpha+1, height+1, curstep);
@@ -876,17 +911,23 @@ class ABSearch
                         had_nw = true;
                     }
 
+                    if (first_val == ABORT_SCORE || first_val == -ABORT_SCORE)
+                    {
+                        score = ABORT_SCORE;
+                        break;
+                    }
+
                     if (!had_nw)
                     {
                         if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
-                            nullmove = npos.dup;
+                            nullreplace.copy(npos);
+                            nullmove = nullreplace;
                             nullmove.do_step(NULL_STEP);
 
                             cal = -alphabeta(npos, depth-1, -beta, -alpha, height+1, curstep);
 
-                            Position.free(nullmove);
                             nullmove = mynull;
                         } else {
                             cal = alphabeta(npos, depth-1, alpha, beta, height+1, curstep);
@@ -897,12 +938,12 @@ class ABSearch
                         if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
-                            nullmove = npos.dup;
+                            nullreplace.copy(npos);
+                            nullmove = nullreplace;
                             nullmove.do_step(NULL_STEP);
 
                             cal = -alphabeta(npos, depth-1, -beta, -(first_val-1), height+1, curstep);
 
-                            Position.free(nullmove);
                             nullmove = mynull;
                         } else {
                             cal = alphabeta(npos, depth-1, first_val-1, beta, height+1, curstep);
@@ -911,8 +952,6 @@ class ABSearch
                         cal = first_val;
                     }
                 }
-
-                Position.free(npos);
 
                 if (cal == ABORT_SCORE
                         || cal == -ABORT_SCORE)
@@ -946,8 +985,6 @@ class ABSearch
                 cuthistory.update(pos, new_best, depth);
                 killers.set_killer(height, pos.side, new_best);
             }
-
-            StepSorter.free(sorted_steps);
 
             if (score == ABORT_SCORE)
                 return ABORT_SCORE;
@@ -1006,6 +1043,317 @@ class ABSearch
     void report()
     {
         logger.info("nodes {}", nodes_searched);
+    }
+}
+
+class ABQSearch : ABSearch
+{
+    GoalSearchDT goal_searcher;
+    StaticEval evaluator;
+
+    ulong nodes_quiesced = 0;
+
+    int max_qdepth = -16;
+    int do_qsearch = 1;
+
+    int qdepth;
+
+    this(Logger l, TransTable t)
+    {
+        super(l, t);
+        goal_searcher = new GoalSearchDT();
+        evaluator = new StaticEval(l, goal_searcher, trap_search);
+    }
+
+    void prepare()
+    {
+        super.prepare();
+        nodes_quiesced = 0;
+    }
+
+    bool set_option(char[] option, char[] value)
+    {
+        bool handled = true;
+        switch (option)
+        {
+            case "eval_quiesce":
+                do_qsearch = to!(int)(value);
+                break;
+            case "eval_qdepth":
+                max_qdepth = 0 - to!(int)(value);
+                qdepth = max_qdepth;
+                break;
+            default:
+                handled = evaluator.set_option(option, value);
+                if (!handled)
+                    handled = super.set_option(option, value);
+        }
+        return handled;
+    }
+
+    void set_depth(int depth)
+    {
+        super.set_depth(depth);
+    }
+
+    int eval(Position pos, int alpha, int beta)
+    {
+        switch (do_qsearch)
+        {
+            case 0:
+                return evaluator.static_eval(pos);
+            default:
+                int score = quiesce(pos, 0, alpha, beta);
+                return score;
+        }
+    }
+
+    int static_eval(Position pos)
+    {
+        return evaluator.static_eval(pos);
+    }
+
+    int quiesce(Position pos, int depth, int alpha, int beta)
+    {
+        nodes_searched++;
+        nodes_quiesced++;
+
+        int score = MIN_SCORE;
+        if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1)) || pos.stepsLeft < 2))
+        {
+            score = pos.endscore() * WIN_SCORE;
+            if (pos.side == Side.BLACK)
+            {
+                score = -score;
+            }
+            return score;
+        }
+
+        SType sflag = SType.ALPHA;
+        TTNode* node = ttable.get(pos);
+        Step* prev_best;
+        if (node.zobrist == pos.zobrist)
+        {
+            node.aged = false;
+            if (node.depth >= depth)
+            {
+                if (node.type == SType.EXACT
+                    || (node.type == SType.ALPHA && node.score <= alpha)
+                    || (node.type == SType.BETA && node.score >= beta))
+                {
+                    tthits++;
+                    return node.score;
+                }
+            }
+            prev_best = &node.beststep;
+        }
+
+        if (!pos.inpush)
+        {
+            score = evaluator.static_eval(pos);
+
+            debug (eval_bias)
+            {
+                Position reversed = pos.reverse();
+                int rscore = evaluator.static_eval(reversed);
+                if ((score < rscore-2) || (score > rscore+2))
+                {
+                    fwritefln(stderr, "%s\n%s", "wb"[pos.side], pos.to_long_str());
+                    fwritefln(stderr, "reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
+                    throw new Exception(Format("Biased eval, {} != {}", score, rscore));
+                }
+                Position.free(reversed);
+            }
+
+            if (depth < qdepth)
+                return score;
+
+            if (score >= beta)
+                return score;
+            if (score > alpha)
+            {
+                alpha = score;
+                sflag = SType.EXACT;
+            }
+        }
+
+        StepList steps = StepList.allocate();
+        if (!pos.inpush)
+        {
+            trap_search.find_captures(pos, pos.side);
+            for (int six=0; six < trap_search.num_captures; six++)
+            {
+                if (trap_search.captures[six].length <= pos.stepsLeft + 2)
+                {
+                    bool duplicate = false;
+                    for (int cix=0; cix < steps.numsteps; cix++)
+                    {
+                        if (trap_search.captures[six].first_step.frombit == steps.steps[cix].frombit
+                                && trap_search.captures[six].first_step.tobit == steps.steps[cix].tobit)
+                        {
+                            duplicate = true;
+                            if (trap_search.captures[six].first_step.push == false)
+                            {
+                                // make sure we use a pull if available
+                                steps.steps[cix].push = false;
+                            }
+                            break;
+                        }
+                    }
+                    if (!duplicate && (pos.stepsLeft > 1
+                                || !trap_search.captures[six].first_step.push))
+                    {
+                        Step* step = steps.newstep();
+                        *step = trap_search.captures[six].first_step;
+                    }
+                }
+            }
+            if (trap_search.find_captures(pos, cast(Side)(pos.side^1)))
+            {
+                StepList esteps = StepList.allocate();
+                trap_search.evasion_steps(esteps);
+                for (int eix=0; eix < esteps.numsteps; eix++)
+                {
+                    bool duplicate = false;
+                    for (int i=0; i < steps.numsteps; i++)
+                    {
+                        if (esteps.steps[eix] == steps.steps[i])
+                        {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                    if (!duplicate)
+                    {
+                        Step* step = steps.newstep();
+                        *step = esteps.steps[eix];
+                    }
+                }
+                StepList.free(esteps);
+            }
+            trap_search.clear();
+            debug (check_qsteps)
+            {
+                StepList rsteps = StepList.allocate();
+                pos.get_steps(rsteps);
+                for (int six=0; six < steps.numsteps; six++)
+                {
+                    bool invalid = true;
+                    for (int rix=0; rix < rsteps.numsteps; rix++)
+                    {
+                        if (steps.steps[six].frombit == rsteps.steps[rix].frombit
+                                && steps.steps[six].tobit == rsteps.steps[rix].tobit)
+                        {
+                            invalid = false;
+                            break;
+                        }
+                    }
+                    if (invalid)
+                    {
+                        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
+                        for (int rix=0; rix < rsteps.numsteps; rix++)
+                            writef("%s ", rsteps.steps[rix].toString(true));
+                        writefln();
+                        throw new Exception(format("Bad step found in qsearch %s",
+                                    steps.steps[six].toString(true)));
+                    }
+                }
+                StepList.free(rsteps);
+            }
+        } else {
+            pos.get_steps(steps);
+        }
+        Position npos = Position.allocate();
+        Position nullreplace = Position.allocate();
+        int best_ix = -1;
+        for (int six = 0; six < steps.numsteps; six++)
+        {
+            int cal;
+            npos.copy(pos);
+            npos.do_step(steps.steps[six]);
+
+            if (npos == nullmove)
+            {
+                cal = -(WIN_SCORE+1);   // Make this worse than a normal
+                                        // loss since it's actually an illegal move
+            } else if (npos.stepsLeft == 4)
+            {
+                Position mynull = nullmove;
+                nullreplace.copy(npos);
+                nullmove = nullreplace;
+                nullmove.do_step(NULL_STEP);
+
+                cal = -quiesce(npos, depth-1, -beta, -alpha);
+
+                nullmove = mynull;
+            } else {
+                cal = quiesce(npos, depth-1, alpha, beta);
+            }
+
+            if (cal == ABORT_SCORE
+                    || cal == -ABORT_SCORE)
+            {
+                score = ABORT_SCORE;
+                break;
+            }
+
+            if (cal > score)
+            {
+                score = cal;
+                best_ix = six;
+
+                if (cal > alpha)
+                {
+                    alpha = cal;
+                    sflag = SType.EXACT;
+
+                    if (cal >= beta)
+                    {
+                        sflag = SType.BETA;
+                        break;
+                    }
+                }
+            }
+        }
+        Position.free(nullreplace);
+        Position.free(npos);
+
+        Step bstep;
+        if (best_ix != -1)
+        {
+           bstep = steps.steps[best_ix];
+        } else {
+            bstep.clear();
+        }
+        StepList.free(steps);
+
+        if (score != ABORT_SCORE)
+        {
+            node.set(pos, depth, score, sflag, bstep);
+
+            if (nodes_searched > check_nodes)
+            {
+                if (should_abort())
+                {
+                    return ABORT_SCORE;
+                }
+                check_nodes += check_interval;
+            }
+        }
+
+        return score;
+    }
+
+    int logged_eval(Position pos)
+    {
+        return evaluator.logged_eval(pos);
+    }
+
+    void report()
+    {
+        super.report();
+        if (do_qsearch)
+            logger.info("qnodes {}", nodes_quiesced);
     }
 }
 

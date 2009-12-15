@@ -611,6 +611,815 @@ class TrapGenerator
         }
     }
 
+    // 1 enemy neighboring the trap and enemy on the trap
+    private void gen_1n_et(ulong tbit, bitix tix, ulong t_neighbors,
+            ulong pbit, bitix pix, ulong lastbit,
+            int enemyoffset, int pieceoffset)
+    {
+        ulong pneighbors = neighbors_of(pbit);
+        if ((side == pos.side) && (pneighbors & lastbit)
+                && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
+        {
+            add_capture(pos.pieces[tix], tbit, 1, tbit, pbit, lastbit);
+        }
+
+        while (pneighbors)
+        {
+            ulong pnbit = pneighbors & -pneighbors;
+            pneighbors ^= pnbit;
+            bitix pnix = bitindex(pnbit);
+
+            if (pnbit & pos.placement[side])
+            {
+                if (pnbit & ~pos.frozen)
+                {
+                    if (pos.pieces[pnix] > pos.pieces[pix] + enemyoffset)
+                    {
+                        ulong pushtos = neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY];
+                        while (pushtos)
+                        {
+                            ulong tobit = pushtos & -pushtos;
+                            pushtos ^= tobit;
+
+                            add_capture(pos.pieces[tix], tbit, 2, tbit, pbit, tobit, true);
+                        }
+                        ulong pulltos = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
+                        while (pulltos)
+                        {
+                            ulong tobit = pulltos & -pulltos;
+                            pulltos ^= tobit;
+
+                            add_capture(pos.pieces[tix], tbit, 2, tbit, pnbit, tobit);
+                        }
+
+                        ulong clear = neighbors_of(pbit) & pos.placement[side] & ~pnbit;
+                        while (clear)
+                        {
+                            ulong cbit = clear & -clear;
+                            clear ^= cbit;
+
+                            ulong pobits = neighbors_of(cbit) & ~pbit;
+                            ulong ebits = pobits & pos.bitBoards[Piece.EMPTY];
+                            if (cbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                            {
+                                ulong backward = (side == Side.WHITE) ? cbit >> 8 : cbit << 8;
+                                pobits &= ~backward;
+                            }
+                            if (cbit & ~pos.frozen)
+                            {
+                                bitix cix = bitindex(cbit);
+                                bool canfreeze = popcount(neighbors_of(cbit) & pos.placement[side]) == 1
+                                    && pos.pieces[cix] < pos.strongest[side^1][cix] + enemyoffset;
+                                while (pobits)
+                                {
+                                    ulong pobit = pobits & -pobits;
+                                    pobits ^= pobit;
+
+                                    if (pobit & pos.bitBoards[Piece.EMPTY])
+                                    {
+                                        add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, pobit);
+                                    }
+                                    else if (pobit & pos.placement[side] && !canfreeze)
+                                    {
+                                        ulong aways = neighbors_of(pobit) & pos.bitBoards[Piece.EMPTY];
+                                        if (pobit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                                        {
+                                            ulong backward = (side == Side.WHITE) ? pobit >> 8 : pobit << 8;
+                                            aways &= ~backward;
+                                        }
+                                        while (aways)
+                                        {
+                                            ulong abit = aways & -aways;
+                                            aways ^= abit;
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, abit);
+                                        }
+                                    }
+                                    else if (pobit & pos.placement[side^1])
+                                    {
+                                        bitix opix = bitindex(pobit);
+                                        if (pos.pieces[cix] > pos.pieces[opix] + enemyoffset)
+                                        {
+                                            ulong tobits = neighbors_of(pobit)
+                                                & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
+                                            while (tobits)
+                                            {
+                                                ulong tobit = tobits & -tobits;
+                                                tobits ^= tobit;
+                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit, true);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            else if (ebits != (ebits & -ebits))
+                            {
+                                // clear is frozen and has more than one empty space around it
+                                pobits &= ebits;
+                                if (pobits == (pobits & -pobits))
+                                    ebits ^= pobits;
+                                while (ebits)
+                                {
+                                    ulong empty = ebits & -ebits;
+                                    ebits ^= empty;
+
+                                    ulong forward = (side == Side.WHITE) ? empty << 8 : empty >> 8;
+                                    ulong unfreezers = neighbors_of(empty) & pos.placement[side]
+                                        & ~pos.frozen & ~(pos.bitBoards[Piece.WRABBIT + pieceoffset]
+                                                & forward);
+                                    while (unfreezers)
+                                    {
+                                        ulong unbit = unfreezers & -unfreezers;
+                                        unfreezers ^= unbit;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, empty);
+                                    }
+                                }
+                            }
+                        }
+
+                        bool pn_safe = false;
+                        clear = neighbors_of(pnbit) & pos.placement[side];
+                        if (pos.pieces[pnix] >= pos.strongest[side^1][pnix] + enemyoffset
+                                || (clear != (clear & -clear)))
+                        {
+                            pn_safe = true;
+                            while (clear)
+                            {
+                                ulong cbit = clear & -clear;
+                                clear ^= cbit;
+                                bitix cix = bitindex(cbit);
+
+                                ulong posouts = neighbors_of(cbit) & ~pnbit;
+                                if (cbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                                {
+                                    ulong backward = (side == Side.WHITE) ? cbit >> 8 : cbit << 8;
+                                    posouts &= ~backward;
+                                }
+                                while (posouts)
+                                {
+                                    ulong pobit = posouts & -posouts;
+                                    posouts ^= pobit;
+
+                                    if (pobit & pos.bitBoards[Piece.EMPTY])
+                                    {
+                                        add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, pobit);
+                                    }
+                                    else if (pobit & pos.placement[side])
+                                    {
+                                        ulong empties = neighbors_of(pobit) & pos.bitBoards[Piece.EMPTY];
+                                        if (pobit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                                        {
+                                            ulong backward = (side == Side.WHITE) ? pobit >> 8 : pobit << 8;
+                                            empties &= ~backward;
+                                        }
+                                        while (empties)
+                                        {
+                                            ulong tobit = empties & -empties;
+                                            empties ^= tobit;
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit);
+                                        }
+                                    } else {
+                                        // pobit must be opponent peice
+                                        assert (pobit & pos.placement[side^1]);
+                                        bitix poix = bitindex(pobit);
+                                        if (pos.pieces[cix] > pos.pieces[poix] + enemyoffset)
+                                        {
+                                            ulong tobits = neighbors_of(pobit)
+                                                & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
+                                            if (pos.pieces[pnix] < pos.pieces[poix] + enemyoffset
+                                                    && !(neighbors_of(pnbit) & pos.placement[side] & ~cbit))
+                                                tobits &= ~neighbors_of(pnbit);
+                                            while (tobits)
+                                            {
+                                                ulong tobit = tobits & -tobits;
+                                                tobits ^= tobit;
+                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit, true);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // can we pull an opponent away from p so pn can push it
+                        clear = neighbors_of(pbit) & pos.placement[side^1] & ~tbit;
+                        while (clear)
+                        {
+                            ulong cbit = clear & -clear;
+                            clear ^= cbit;
+                            bitix cix = bitindex(cbit);
+
+                            ulong c_neighbors = neighbors_of(cbit);
+                            if ((c_neighbors & lastbit) && (lastbit & ~t_neighbors)
+                                    && pos.lastpiece > pos.pieces[cix] + enemyoffset
+                                    && ((lastbit & ~neighbors_of(pnbit))
+                                            || pos.pieces[pnix] >= pos.pieces[cix] + enemyoffset
+                                            || (neighbors_of(pnbit) & pos.placement[side])))
+                            {
+                                add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
+                            }
+                            ulong pullers = c_neighbors & ~t_neighbors & ~pos.frozen
+                                & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
+                                & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
+                            if (!pn_safe)
+                                pullers &= ~neighbors_of(pnbit);
+                            while (pullers)
+                            {
+                                ulong pullbit = pullers & -pullers;
+                                pullers ^= pullbit;
+                                bitix pullix = bitindex(pullbit);
+                                if ((pullbit & neighbors_of(pnbit))
+                                        && pos.pieces[pnix] < pos.pieces[cix] + enemyoffset
+                                        && !(neighbors_of(pnbit) & pos.placement[side] & ~pullbit))
+                                    continue;
+                                if (pos.pieces[pullix] > pos.pieces[cix] + enemyoffset)
+                                {
+                                    ulong tobits = neighbors_of(pullbit) & pos.bitBoards[Piece.EMPTY];
+                                    while (tobits)
+                                    {
+                                        ulong tobit = tobits & -tobits;
+                                        tobits ^= tobit;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
+                                    }
+                                }
+                            }
+                        }
+
+                        // can we pull an opponent away from pn so it has space to pull
+                        clear = neighbors_of(pnbit) & pos.placement[side^1] & ~pbit;
+                        while (clear)
+                        {
+                            ulong cbit = clear & -clear;
+                            clear ^= cbit;
+                            bitix cix = bitindex(cbit);
+
+                            ulong c_neighbors = neighbors_of(cbit);
+                            if ((c_neighbors & lastbit)
+                                    && pos.lastpiece > pos.pieces[cix] + enemyoffset)
+                            {
+                                add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
+                            }
+                            if ((cbit & TRAPS)
+                                    && (neighbors_of(neighbors_of(cbit) & pos.placement[side^1])
+                                        & lastbit))
+                            {
+                                ulong holder = neighbors_of(cbit) & pos.placement[side^1];
+                                if (holder == (holder & -holder))
+                                {
+                                    assert (neighbors_of(holder) & lastbit);
+                                    Piece hpiece = pos.pieces[bitindex(holder)];
+                                    if (pos.lastpiece > hpiece + enemyoffset)
+                                    {
+                                        add_capture(pos.pieces[tix], tbit, 3, tbit, holder, lastbit);
+                                    }
+                                }
+                            }
+                            ulong pullers = c_neighbors & ~pnbit & ~pos.frozen
+                                & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
+                                & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
+                            while (pullers)
+                            {
+                                ulong pullbit = pullers & -pullers;
+                                pullers ^= pullbit;
+                                bitix pullix = bitindex(pullbit);
+                                if (pos.pieces[pullix] > pos.pieces[cix] + enemyoffset)
+                                {
+                                    ulong tobits = neighbors_of(pullbit) & pos.bitBoards[Piece.EMPTY];
+                                    while (tobits)
+                                    {
+                                        ulong tobit = tobits & -tobits;
+                                        tobits ^= tobit;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // can this piece move out of the way and have another piece do the push/pull
+                    ulong finishers = neighbors_of(pnbit);
+                    if ((finishers & pos.bitBoards[Piece.EMPTY])
+                            && (finishers & pos.placement[side] & ~pos.frozen))
+                    {
+                        finishers &= pos.placement[side] & ~pos.frozen;
+                        while (finishers)
+                        {
+                            ulong fbit = finishers & -finishers;
+                            finishers ^= fbit;
+                            bitix fix = bitindex(fbit);
+
+                            if ((pos.pieces[fix] > pos.pieces[pix] + enemyoffset)
+                                    && ((neighbors_of(fbit) & pos.placement[side] & ~pnbit)
+                                        || ((fbit & ~TRAPS)
+                                            && (pos.pieces[fix] >= pos.strongest[side^1][fix] + enemyoffset))))
+                            {
+                                // finisher can push pix and won't be frozen or safe in pn moves away
+                                ulong tobits = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
+                                if (pos.pieces[pnix] == Piece.WRABBIT + pieceoffset)
+                                {
+                                    if (side == Side.WHITE)
+                                    {
+                                        tobits &= ~((pnbit & NOT_RANK_1) >> 8);
+                                    } else {
+                                        tobits &= ~((pnbit & NOT_RANK_8) << 8);
+                                    }
+                                }
+
+                                bool real_finish = false;
+                                while (tobits)
+                                {
+                                    ulong tobit = tobits & -tobits;
+                                    tobits ^= tobit;
+
+                                    if ((tobit & ~TRAPS)
+                                            || (neighbors_of(pnbit) & pos.placement[side] & ~fbit)
+                                            || (neighbors_of(tobit) & pos.placement[side] & ~pnbit & ~fbit)
+                                            || (pos.pieces[fix] >= pos.strongest[side^1][pnix] + enemyoffset))
+                                    {
+                                        // pn square will be safe for finisher after pn piece moves away
+                                        real_finish = true;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, pnbit, tobit);
+                                    }
+                                }
+                                if (real_finish)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else if (pos.pieces[pnix] > pos.pieces[pix] + enemyoffset)
+                {
+                    assert(pnbit & pos.frozen);
+                    // pn is frozen can we unfreeze in two steps or less
+                    ulong pn_neighbors = neighbors_of(pnbit) & ~pbit;
+                    while (pn_neighbors)
+                    {
+                        ulong pnnbit = pn_neighbors & -pn_neighbors;
+                        pn_neighbors ^= pnnbit;
+
+                        if (pnnbit & pos.bitBoards[Piece.EMPTY])
+                        {
+                            ulong pnn_neighbors = neighbors_of(pnnbit) & ~pos.placement[side^1] & ~pnbit;
+                            while (pnn_neighbors)
+                            {
+                                ulong pnnnbit = pnn_neighbors & -pnn_neighbors;
+                                pnn_neighbors ^= pnnnbit;
+                                bitix pnnnix = bitindex(pnnnbit);
+
+                                if ((pnnnbit & pos.bitBoards[Piece.EMPTY])
+                                        && ((neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY])
+                                            || (neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~pnnbit)))
+                                {
+                                    ulong unfreezers = neighbors_of(pnnnbit) & pos.placement[side] & ~pos.frozen;
+                                    while (unfreezers)
+                                    {
+                                        ulong unbit = unfreezers & -unfreezers;
+                                        unfreezers ^= unbit;
+                                        bitix unix = bitindex(unbit);
+
+                                        if ((pos.placement[side] & neighbors_of(pnnnbit) & ~unbit)
+                                                || ((pnnnbit & ~TRAPS)
+                                                    && (pos.pieces[unix] >= pos.strongest[side^1][pnnnix] + enemyoffset)))
+                                        {
+                                            if (pos.pieces[unix] == Piece.WRABBIT + pieceoffset)
+                                            {
+                                                // can it really make the two steps to pnn
+                                                ulong rsteps;
+                                                if (side == Side.WHITE)
+                                                {
+                                                    rsteps = (unbit & ~B_FILE) << 2;
+                                                    rsteps |= (unbit & ~G_FILE) >> 2;
+                                                    rsteps |= (unbit & NOT_RANK_8 & NOT_A_FILE) << 9;
+                                                    rsteps |= (unbit & NOT_RANK_8 & NOT_H_FILE) << 7;
+                                                    rsteps |= (unbit & ~RANK_7) << 16;
+                                                } else {
+                                                    rsteps = (unbit & ~B_FILE) << 2;
+                                                    rsteps |= (unbit & ~G_FILE) >> 2;
+                                                    rsteps |= (unbit & NOT_RANK_1 & NOT_A_FILE) >> 7;
+                                                    rsteps |= (unbit & NOT_RANK_1 & NOT_H_FILE) >> 9;
+                                                    rsteps |= (unbit & ~RANK_2) >> 16;
+                                                }
+                                                if (!(rsteps & pnnbit))
+                                                {
+                                                    // rabbit can't get there.
+                                                    continue;
+                                                }
+                                            }
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, pnnnbit);
+                                        }
+                                    }
+                                }
+                                else if (pnnnbit & pos.placement[side])
+                                {
+                                    if (pos.pieces[pnnnix] == Piece.WRABBIT + pieceoffset)
+                                    {
+                                        ulong rsteps = neighbors_of(pnnnbit);
+                                        if (side == Side.WHITE)
+                                        {
+                                            rsteps &= ~((pnnnbit & NOT_RANK_1) >> 8);
+                                        } else {
+                                            rsteps &= ~((pnnnbit & NOT_RANK_8) << 8);
+                                        }
+                                        if (!(rsteps & pnnbit))
+                                        {
+                                            continue;
+                                        }
+                                    }
+
+                                    if (pnnnbit & pos.frozen)
+                                    {
+                                        if (!(neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~pnnbit)
+                                            && !(neighbors_of(pbit) & (pos.bitBoards[Piece.EMPTY] | pnnnbit)))
+                                            continue;
+                                        // can we unfreeze in one step
+                                        ulong unfreezers = neighbors_of(neighbors_of(pnnnbit) & pos.bitBoards[Piece.EMPTY])
+                                            & pos.placement[side] & ~pos.frozen;
+                                        while (unfreezers)
+                                        {
+                                            ulong unbit = unfreezers & -unfreezers;
+                                            unfreezers ^= unbit;
+                                            bitix unix = bitindex(unbit);
+
+                                            ulong tobits = neighbors_of(unbit) & neighbors_of(pnnnbit) & pos.bitBoards[Piece.EMPTY];
+                                            if (pos.pieces[unix] == Piece.WRABBIT + pieceoffset)
+                                            {
+                                                ulong rsteps = neighbors_of(unbit);
+                                                if (side == Side.WHITE)
+                                                {
+                                                    rsteps &= ~((unbit & NOT_RANK_1) >> 8);
+                                                } else {
+                                                    rsteps &= ~((unbit & NOT_RANK_8) << 8);
+                                                }
+                                                tobits &= rsteps;
+                                            }
+                                            while (tobits)
+                                            {
+                                                ulong tobit = tobits & -tobits;
+                                                tobits ^= tobit;
+                                                add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, tobit);
+                                            }
+                                        }
+                                    }
+                                    else if ((neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~pnnbit)
+                                            || (neighbors_of(pbit) & (pos.bitBoards[Piece.EMPTY] | pnnnbit)))
+                                    {
+                                        add_capture(pos.pieces[tix], tbit, 3, tbit, pnnnbit, pnnbit);
+                                    } else {
+                                        // can unfreeze pn (attacker) in one step but have no where to push or
+                                        // pull pbit to. Can we move another piece away from pbit to create space?
+                                        ulong clear = neighbors_of(pbit) & pos.placement[side] & ~pos.frozen
+                                            & neighbors_of(pos.bitBoards[Piece.EMPTY]);
+                                        if (clear & ~pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                                        {
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
+                                        } else {
+                                            // any clear pieces must be rabbits
+                                            while (clear)
+                                            {
+                                                ulong cbit = clear & -clear;
+                                                clear ^= cbit;
+                                                ulong backward = (side == Side.WHITE) ? cbit >> 8 : cbit << 8;
+                                                if (neighbors_of(cbit) & pos.bitBoards[Piece.EMPTY] & ~backward)
+                                                {
+                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        clear = neighbors_of(pnnnbit) & neighbors_of(pnbit) & pos.placement[side^1];
+                                        if (clear)
+                                        {
+                                            Piece pupiece = pos.pieces[bitindex(pnnnbit)];
+                                            Piece cpiece = pos.pieces[bitindex(clear)];
+                                            if (pupiece > cpiece + enemyoffset)
+                                            {
+                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // pnn must have enemy piece can we push it away or pull and unfreeze pn
+                            ulong ofreezers = neighbors_of(pnbit) & pos.placement[side^1] & ~pnnbit;
+                            while (ofreezers)
+                            {
+                                ulong fbit = ofreezers & -ofreezers;
+                                bitix fix = bitindex(fbit);
+                                if (pos.pieces[pnix] < pos.pieces[fix] + enemyoffset)
+                                    break;
+                                ofreezers ^= fbit;
+                            }
+
+                            bitix pnnix = bitindex(pnnbit);
+                            if (!ofreezers && (neighbors_of(pnnbit) & (1UL << pos.lastfrom))
+                                        && (pos.lastpiece > pos.pieces[pnnix] + enemyoffset))
+                            {
+                                add_capture(pos.pieces[tix], tbit, 3, tbit,
+                                        pnnbit, (1UL << pos.lastfrom));
+                            }
+                            if (!ofreezers || (neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY]))
+                            {
+                                bool can_push = false;
+                                ulong pushers = neighbors_of(pnnbit) & pos.placement[side] & ~pos.frozen;
+                                while (pushers)
+                                {
+                                    ulong perbit = pushers & -pushers;
+                                    pushers ^= perbit;
+                                    bitix perix = bitindex(perbit);
+
+                                    if (pos.pieces[perix] > pos.pieces[pnnix] + enemyoffset)
+                                    {
+                                        can_push = true;
+                                        if (!ofreezers)
+                                        {
+                                            ulong pulltos = neighbors_of(perbit) & pos.bitBoards[Piece.EMPTY];
+                                            while (pulltos)
+                                            {
+                                                ulong tobit = pulltos & -pulltos;
+                                                pulltos ^= tobit;
+
+                                                add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, tobit);
+                                            }
+                                        }
+                                    }
+                                }
+                                if (can_push)
+                                {
+                                    ulong pushtos = neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY];
+                                    if (popcount(neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY]) == 1
+                                            && !(neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY]))
+                                        pushtos &= ~neighbors_of(pbit);
+                                    while (pushtos)
+                                    {
+                                        ulong tobit = pushtos & -pushtos;
+                                        pushtos ^= tobit;
+
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, tobit, true);
+                                    }
+                                }
+                            }
+                            if (!ofreezers && (pnnbit & TRAPS)
+                                    && popcount(neighbors_of(pnnbit) & pos.placement[side^1]) == 1)
+                            {
+                                ulong holder = neighbors_of(pnnbit) & pos.placement[side^1];
+                                bitix hix = bitindex(holder);
+
+                                if ((neighbors_of(holder) & (1UL << pos.lastfrom))
+                                        && pos.lastpiece > pos.pieces[hix] + enemyoffset)
+                                {
+                                    add_capture(pos.pieces[tix], tbit, 3, tbit,
+                                            holder, (1UL << pos.lastfrom));
+                                }
+
+                                bool can_push = false;
+                                ulong pushers = neighbors_of(holder) & pos.placement[side] & ~pos.frozen
+                                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
+                                while (pushers)
+                                {
+                                    ulong pubit = pushers & -pushers;
+                                    pushers ^= pubit;
+                                    bitix puix = bitindex(pubit);
+
+                                    if (pos.pieces[puix] > pos.pieces[hix] + enemyoffset)
+                                    {
+                                        can_push = true;
+                                        ulong tobits = neighbors_of(pubit) & pos.bitBoards[Piece.EMPTY];
+                                        while (tobits)
+                                        {
+                                            ulong tobit = tobits & -tobits;
+                                            tobits ^= tobit;
+
+                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pubit, tobit);
+                                        }
+                                    }
+                                }
+                                if (can_push)
+                                {
+                                    ulong tobits = neighbors_of(holder) & pos.bitBoards[Piece.EMPTY];
+                                    if (pos.pieces[pnix] < pos.pieces[hix] + enemyoffset)
+                                        tobits &= ~neighbors_of(pnbit);
+                                    while (tobits)
+                                    {
+                                        ulong tobit = tobits & -tobits;
+                                        tobits ^= tobit;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, holder, tobit, true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (pnbit & pos.bitBoards[Piece.EMPTY])
+            {
+                // Can we get a piece here to push pbit in two steps or less
+                ulong pn_neighbors = neighbors_of(pnbit) & ~pos.placement[side^1];
+                while (pn_neighbors)
+                {
+                    ulong pnnbit = pn_neighbors & -pn_neighbors;
+                    pn_neighbors ^= pnnbit;
+                    bitix pnnix = bitindex(pnnbit);
+
+                    if (pnnbit & pos.bitBoards[Piece.EMPTY]
+                            && (pos.strongest[side][pnnix] > pos.pieces[pix] + enemyoffset))
+                    {
+                        ulong pushers = neighbors_of(pnnbit) & pos.placement[side] & ~pos.frozen;
+                        while (pushers)
+                        {
+                            ulong perbit = pushers & -pushers;
+                            pushers ^= perbit;
+                            bitix perix = bitindex(perbit);
+
+                            if ((pos.pieces[perix] > pos.pieces[pix] + enemyoffset)
+                                    && ((pos.pieces[perix] >= pos.strongest[side^1][pnix] + enemyoffset)
+                                        || (pos.placement[side] & neighbors_of(pnbit)
+                                            & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~perbit))))
+                                    && ((pos.placement[side] & neighbors_of(pnnbit) & ~perbit)
+                                        || !((pnnbit & TRAPS)
+                                            || (pos.pieces[perix] < pos.strongest[side^1][pnnix] + enemyoffset))))
+                            {
+                                add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, pnnbit);
+                            }
+                        }
+                    } else if (pos.pieces[pnnix] > pos.pieces[pix] + enemyoffset)
+                    {
+                        // pnn must be a friendly piece that can push pix
+                        if (pnnbit & pos.frozen)
+                        {
+                            if ((neighbors_of(pnbit) & pos.placement[side] & ~pnnbit)
+                                    || pos.pieces[pnnix] >= pos.strongest[side^1][pnix] + enemyoffset)
+                            {
+                                ulong unfreezers = neighbors_of(neighbors_of(pnnbit)
+                                        & pos.bitBoards[Piece.EMPTY] & ~pnbit)
+                                    & pos.placement[side] & ~pos.frozen;
+                                if (pos.pieces[pnnix] < pos.strongest[side^1][pnix] + enemyoffset)
+                                    unfreezers &= ~neighbors_of(pnbit);
+                                while (unfreezers)
+                                {
+                                    ulong unbit = unfreezers & -unfreezers;
+                                    unfreezers ^= unbit;
+                                    bitix unix = bitindex(unbit);
+
+                                    ulong tobits = neighbors_of(unbit) & neighbors_of(pnnbit)
+                                        & pos.bitBoards[Piece.EMPTY] & ~pnbit;
+                                    if (pos.pieces[unix] == Piece.WRABBIT + pieceoffset)
+                                    {
+                                        ulong rsteps = neighbors_of(unbit);
+                                        if (side == Side.WHITE)
+                                        {
+                                            rsteps &= ~((unbit & NOT_RANK_1) >> 8);
+                                        } else {
+                                            rsteps &= ~((unbit & NOT_RANK_8) << 8);
+                                        }
+                                        tobits &= rsteps;
+                                    }
+                                    while (tobits)
+                                    {
+                                        ulong tobit = tobits & -tobits;
+                                        tobits ^= tobit;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, tobit);
+                                    }
+                                }
+                            }
+                        }
+                        else if (pos.pieces[pnnix] >= pos.strongest[side^1][pnix] + enemyoffset
+                                || (neighbors_of(pnbit) & pos.placement[side] & ~pnnbit))
+                        {
+                            add_capture(pos.pieces[tix], tbit, 3, tbit, pnnbit, pnbit);
+                        } else {
+                            // pnn is unfrozen but will freeze when moving to pn
+                            bool pnn_first = false;
+                            ulong pnb_neighbors = neighbors_of(pnbit);
+                            ulong pnn_neighbors = neighbors_of(pnnbit);
+                            ulong unfreezers = neighbors_of(pbit)
+                                & pnn_neighbors & pos.placement[side];
+                            if ((pnb_neighbors | (neighbors_of(pbit) & ~pnbit))
+                                    & pos.bitBoards[Piece.EMPTY])
+                            {
+                                unfreezers |= (neighbors_of(pnb_neighbors
+                                            & pos.bitBoards[Piece.EMPTY])
+                                        & pos.placement[side])
+                                    | (pnn_neighbors & pos.placement[side]);
+                            }
+                            unfreezers &= ~pos.frozen;
+                            while (unfreezers)
+                            {
+                                ulong unfbit = unfreezers & -unfreezers;
+                                unfreezers ^= unfbit;
+                                bitix unfix = bitindex(unfbit);
+                                ulong unf_neighbors = neighbors_of(unfbit);
+                                ulong tobits = unf_neighbors & pnb_neighbors & pos.bitBoards[Piece.EMPTY]
+                                    & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~unfbit));
+                                ulong backward = 0UL;
+                                if (unfbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+                                {
+                                    backward = (side == Side.WHITE) ? unfbit >> 8 : unfbit << 8;
+                                    tobits &= ~backward;
+                                }
+                                if (tobits && ((unfbit & ~pnn_neighbors)
+                                            || (pnn_neighbors & pos.placement[side] & ~unfbit)
+                                            || ((pos.pieces[pnnix] >= pos.strongest[side^1][pnnix] + enemyoffset)
+                                                && (pnnbit & ~TRAPS))))
+                                {
+                                    // unfreezer can move first
+                                    while (tobits)
+                                    {
+                                        ulong tobit = tobits & -tobits;
+                                        tobits ^= tobit;
+                                        add_capture(pos.pieces[tix], tbit, 4, tbit, unfbit, tobit);
+                                    }
+                                }
+                                else if ((tobits || (unf_neighbors & (pnnbit
+                                                    | (TRAPS & pnb_neighbors & pos.bitBoards[Piece.EMPTY])) & ~backward))
+                                        && ((unf_neighbors & pos.placement[side] & ~pnnbit)
+                                            || ((unfbit & ~TRAPS)
+                                                && (pos.pieces[unfix] >= pos.strongest[side^1][unfix] + enemyoffset))))
+                                {
+                                    pnn_first = true;
+                                }
+                            }
+                            if (!pnn_first && (pnb_neighbors & pos.placement[side^1]
+                                        & (TRAPS & neighbors_of(pnn_neighbors & pos.placement[side^1]))
+                                        & ~(TRAPS & neighbors_of(pos.placement[side^1] & ~pnn_neighbors))))
+                            {
+                                ulong pulled = pnn_neighbors & pos.placement[side^1]
+                                    & neighbors_of(TRAPS & pnb_neighbors);
+                                assert (popcount(pulled) == 1);
+                                Piece ppiece = pos.pieces[bitindex(pulled)];
+                                if (pos.pieces[pnnix] > ppiece + enemyoffset)
+                                {
+                                    ulong ofreezers = pnb_neighbors & pos.placement[side^1] & ~TRAPS
+                                        & ~pos.bitBoards[Piece.WRABBIT + pieceoffset - enemyoffset];
+                                    while (ofreezers)
+                                    {
+                                        ulong obit = ofreezers & -ofreezers;
+                                        if (pos.pieces[pnnix] < pos.pieces[bitindex(obit)])
+                                            break;
+                                        ofreezers ^= obit;
+                                    }
+                                    if (!ofreezers)
+                                        pnn_first = true;
+                                }
+                            }
+                            if (pnn_first)
+                            {
+                                add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, pnbit);
+                            }
+                        }
+                    }
+                }
+            } else if ((pos.strongest[side][pnix] > pos.pieces[pnix] + enemyoffset)
+                    && (pos.strongest[side][pnix] > pos.pieces[pix] + enemyoffset))
+            {
+                // pn must be an enemy
+                ulong pushtos = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~neighbors_of(tbit);
+                if (pushtos)
+                {
+                    ulong pushers = neighbors_of(pnbit) & pos.placement[side] & ~pos.frozen;
+                    while (pushers)
+                    {
+                        ulong perbit = pushers & -pushers;
+                        pushers ^= perbit;
+                        bitix perix = bitindex(perbit);
+
+                        if ((pos.pieces[perix] > pos.pieces[pnix] + enemyoffset)
+                                && (pos.pieces[perix] > pos.pieces[pix] + enemyoffset))
+                        {
+                            if (!(neighbors_of(pnbit) & pos.placement[side] & ~perbit)
+                                    && pos.pieces[perix] < pos.strongest[side^1][pnix] + enemyoffset)
+                            {
+                                // pusher will freeze unless freezer is trapped by first step
+                                ulong freezers = neighbors_of(pnbit) & pos.placement[side^1];
+                                if (!(freezers & (TRAPS & ~neighbors_of(pos.placement[side^1] & ~pnbit))))
+                                    continue;
+                                freezers &= ~(TRAPS & ~neighbors_of(pos.placement[side^1] & ~pnbit));
+                                while (freezers)
+                                {
+                                    ulong fbit = freezers & -freezers;
+                                    bitix fix = bitindex(fbit);
+                                    if (pos.pieces[perix] < pos.pieces[fix] + enemyoffset)
+                                        break;
+                                    freezers ^= fbit;
+                                }
+                                if (freezers)
+                                    continue;
+                            }
+
+                            // pusher can finish it
+                            while (pushtos)
+                            {
+                                ulong tobit = pushtos & -pushtos;
+                                pushtos ^= tobit;
+                                add_capture(pos.pieces[tix], tbit, 4, tbit, pnbit, tobit, true);
+                                pushers = 0UL;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void gen_1n(ulong tbit)
     {
         // One enemy piece neighboring the trap
@@ -629,808 +1438,8 @@ class TrapGenerator
         ulong lastbit = 1UL << pos.lastfrom;
         if (tbit & pos.placement[side^1])
         {
-            ulong pneighbors = neighbors_of(pbit);
-            if ((side == pos.side) && (pneighbors & lastbit)
-                    && (pos.lastpiece > pos.pieces[pix] + enemyoffset))
-            {
-                add_capture(pos.pieces[tix], tbit, 1, tbit, pbit, lastbit);
-            }
-
-            while (pneighbors)
-            {
-                ulong pnbit = pneighbors & -pneighbors;
-                pneighbors ^= pnbit;
-                bitix pnix = bitindex(pnbit);
-
-                if (pnbit & pos.placement[side])
-                {
-                    if (pnbit & ~pos.frozen)
-                    {
-                        if (pos.pieces[pnix] > pos.pieces[pix] + enemyoffset)
-                        {
-                            ulong pushtos = neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY];
-                            while (pushtos)
-                            {
-                                ulong tobit = pushtos & -pushtos;
-                                pushtos ^= tobit;
-
-                                add_capture(pos.pieces[tix], tbit, 2, tbit, pbit, tobit, true);
-                            }
-                            ulong pulltos = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
-                            while (pulltos)
-                            {
-                                ulong tobit = pulltos & -pulltos;
-                                pulltos ^= tobit;
-
-                                add_capture(pos.pieces[tix], tbit, 2, tbit, pnbit, tobit);
-                            }
-
-                            ulong clear = neighbors_of(pbit) & pos.placement[side] & ~pnbit;
-                            while (clear)
-                            {
-                                ulong cbit = clear & -clear;
-                                clear ^= cbit;
-
-                                ulong pobits = neighbors_of(cbit) & ~pbit;
-                                ulong ebits = pobits & pos.bitBoards[Piece.EMPTY];
-                                if (cbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                {
-                                    ulong backward = (side == Side.WHITE) ? cbit >> 8 : cbit << 8;
-                                    pobits &= ~backward;
-                                }
-                                if (cbit & ~pos.frozen)
-                                {
-                                    bitix cix = bitindex(cbit);
-                                    bool canfreeze = popcount(neighbors_of(cbit) & pos.placement[side]) == 1
-                                        && pos.pieces[cix] < pos.strongest[side^1][cix] + enemyoffset;
-                                    while (pobits)
-                                    {
-                                        ulong pobit = pobits & -pobits;
-                                        pobits ^= pobit;
-
-                                        if (pobit & pos.bitBoards[Piece.EMPTY])
-                                        {
-                                            add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, pobit);
-                                        }
-                                        else if (pobit & pos.placement[side] && !canfreeze)
-                                        {
-                                            ulong aways = neighbors_of(pobit) & pos.bitBoards[Piece.EMPTY];
-                                            if (pobit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                            {
-                                                ulong backward = (side == Side.WHITE) ? pobit >> 8 : pobit << 8;
-                                                aways &= ~backward;
-                                            }
-                                            while (aways)
-                                            {
-                                                ulong abit = aways & -aways;
-                                                aways ^= abit;
-                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, abit);
-                                            }
-                                        }
-                                        else if (pobit & pos.placement[side^1])
-                                        {
-                                            bitix opix = bitindex(pobit);
-                                            if (pos.pieces[cix] > pos.pieces[opix] + enemyoffset)
-                                            {
-                                                ulong tobits = neighbors_of(pobit)
-                                                    & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
-                                                while (tobits)
-                                                {
-                                                    ulong tobit = tobits & -tobits;
-                                                    tobits ^= tobit;
-                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit, true);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                else if (ebits != (ebits & -ebits))
-                                {
-                                    // clear is frozen and has more than one empty space around it
-                                    pobits &= ebits;
-                                    if (pobits == (pobits & -pobits))
-                                        ebits ^= pobits;
-                                    while (ebits)
-                                    {
-                                        ulong empty = ebits & -ebits;
-                                        ebits ^= empty;
-
-                                        ulong forward = (side == Side.WHITE) ? empty << 8 : empty >> 8;
-                                        ulong unfreezers = neighbors_of(empty) & pos.placement[side]
-                                            & ~pos.frozen & ~(pos.bitBoards[Piece.WRABBIT + pieceoffset]
-                                                    & forward);
-                                        while (unfreezers)
-                                        {
-                                            ulong unbit = unfreezers & -unfreezers;
-                                            unfreezers ^= unbit;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, empty);
-                                        }
-                                    }
-                                }
-                            }
-
-                            bool pn_safe = false;
-                            clear = neighbors_of(pnbit) & pos.placement[side];
-                            if (pos.pieces[pnix] >= pos.strongest[side^1][pnix] + enemyoffset
-                                    || (clear != (clear & -clear)))
-                            {
-                                pn_safe = true;
-                                while (clear)
-                                {
-                                    ulong cbit = clear & -clear;
-                                    clear ^= cbit;
-                                    bitix cix = bitindex(cbit);
-
-                                    ulong posouts = neighbors_of(cbit) & ~pnbit;
-                                    if (cbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                    {
-                                        ulong backward = (side == Side.WHITE) ? cbit >> 8 : cbit << 8;
-                                        posouts &= ~backward;
-                                    }
-                                    while (posouts)
-                                    {
-                                        ulong pobit = posouts & -posouts;
-                                        posouts ^= pobit;
-
-                                        if (pobit & pos.bitBoards[Piece.EMPTY])
-                                        {
-                                            add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, pobit);
-                                        }
-                                        else if (pobit & pos.placement[side])
-                                        {
-                                            ulong empties = neighbors_of(pobit) & pos.bitBoards[Piece.EMPTY];
-                                            if (pobit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                            {
-                                                ulong backward = (side == Side.WHITE) ? pobit >> 8 : pobit << 8;
-                                                empties &= ~backward;
-                                            }
-                                            while (empties)
-                                            {
-                                                ulong tobit = empties & -empties;
-                                                empties ^= tobit;
-                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit);
-                                            }
-                                        } else {
-                                            // pobit must be opponent peice
-                                            assert (pobit & pos.placement[side^1]);
-                                            bitix poix = bitindex(pobit);
-                                            if (pos.pieces[cix] > pos.pieces[poix] + enemyoffset)
-                                            {
-                                                ulong tobits = neighbors_of(pobit)
-                                                    & pos.bitBoards[Piece.EMPTY] & ~t_neighbors;
-                                                if (pos.pieces[pnix] < pos.pieces[poix] + enemyoffset
-                                                        && !(neighbors_of(pnbit) & pos.placement[side] & ~cbit))
-                                                    tobits &= ~neighbors_of(pnbit);
-                                                while (tobits)
-                                                {
-                                                    ulong tobit = tobits & -tobits;
-                                                    tobits ^= tobit;
-                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pobit, tobit, true);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // can we pull an opponent away from p so pn can push it
-                            clear = neighbors_of(pbit) & pos.placement[side^1] & ~tbit;
-                            while (clear)
-                            {
-                                ulong cbit = clear & -clear;
-                                clear ^= cbit;
-                                bitix cix = bitindex(cbit);
-
-                                ulong c_neighbors = neighbors_of(cbit);
-                                if ((c_neighbors & lastbit) && (lastbit & ~t_neighbors)
-                                        && pos.lastpiece > pos.pieces[cix] + enemyoffset
-                                        && ((lastbit & ~neighbors_of(pnbit))
-                                                || pos.pieces[pnix] >= pos.pieces[cix] + enemyoffset
-                                                || (neighbors_of(pnbit) & pos.placement[side])))
-                                {
-                                    add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
-                                }
-                                ulong pullers = c_neighbors & ~t_neighbors & ~pos.frozen
-                                    & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
-                                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
-                                if (!pn_safe)
-                                    pullers &= ~neighbors_of(pnbit);
-                                while (pullers)
-                                {
-                                    ulong pullbit = pullers & -pullers;
-                                    pullers ^= pullbit;
-                                    bitix pullix = bitindex(pullbit);
-                                    if ((pullbit & neighbors_of(pnbit))
-                                            && pos.pieces[pnix] < pos.pieces[cix] + enemyoffset
-                                            && !(neighbors_of(pnbit) & pos.placement[side] & ~pullbit))
-                                        continue;
-                                    if (pos.pieces[pullix] > pos.pieces[cix] + enemyoffset)
-                                    {
-                                        ulong tobits = neighbors_of(pullbit) & pos.bitBoards[Piece.EMPTY];
-                                        while (tobits)
-                                        {
-                                            ulong tobit = tobits & -tobits;
-                                            tobits ^= tobit;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // can we pull an opponent away from pn so it has space to pull
-                            clear = neighbors_of(pnbit) & pos.placement[side^1] & ~pbit;
-                            while (clear)
-                            {
-                                ulong cbit = clear & -clear;
-                                clear ^= cbit;
-                                bitix cix = bitindex(cbit);
-
-                                ulong c_neighbors = neighbors_of(cbit);
-                                if ((c_neighbors & lastbit)
-                                        && pos.lastpiece > pos.pieces[cix] + enemyoffset)
-                                {
-                                    add_capture(pos.pieces[tix], tbit, 3, tbit, cbit, lastbit);
-                                }
-                                if ((cbit & TRAPS)
-                                        && (neighbors_of(neighbors_of(cbit) & pos.placement[side^1])
-                                            & lastbit))
-                                {
-                                    ulong holder = neighbors_of(cbit) & pos.placement[side^1];
-                                    if (holder == (holder & -holder))
-                                    {
-                                        assert (neighbors_of(holder) & lastbit);
-                                        Piece hpiece = pos.pieces[bitindex(holder)];
-                                        if (pos.lastpiece > hpiece + enemyoffset)
-                                        {
-                                            add_capture(pos.pieces[tix], tbit, 3, tbit, holder, lastbit);
-                                        }
-                                    }
-                                }
-                                ulong pullers = c_neighbors & ~pnbit & ~pos.frozen
-                                    & pos.placement[side] & neighbors_of(pos.bitBoards[Piece.EMPTY])
-                                    & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
-                                while (pullers)
-                                {
-                                    ulong pullbit = pullers & -pullers;
-                                    pullers ^= pullbit;
-                                    bitix pullix = bitindex(pullbit);
-                                    if (pos.pieces[pullix] > pos.pieces[cix] + enemyoffset)
-                                    {
-                                        ulong tobits = neighbors_of(pullbit) & pos.bitBoards[Piece.EMPTY];
-                                        while (tobits)
-                                        {
-                                            ulong tobit = tobits & -tobits;
-                                            tobits ^= tobit;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pullbit, tobit);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // can this piece move out of the way and have another piece do the push/pull
-                        ulong finishers = neighbors_of(pnbit);
-                        if ((finishers & pos.bitBoards[Piece.EMPTY])
-                                && (finishers & pos.placement[side] & ~pos.frozen))
-                        {
-                            finishers &= pos.placement[side] & ~pos.frozen;
-                            while (finishers)
-                            {
-                                ulong fbit = finishers & -finishers;
-                                finishers ^= fbit;
-                                bitix fix = bitindex(fbit);
-
-                                if ((pos.pieces[fix] > pos.pieces[pix] + enemyoffset)
-                                        && ((neighbors_of(fbit) & pos.placement[side] & ~pnbit)
-                                            || ((fbit & ~TRAPS)
-                                                && (pos.pieces[fix] >= pos.strongest[side^1][fix] + enemyoffset))))
-                                {
-                                    // finisher can push pix and won't be frozen or safe in pn moves away
-                                    ulong tobits = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY];
-                                    if (pos.pieces[pnix] == Piece.WRABBIT + pieceoffset)
-                                    {
-                                        if (side == Side.WHITE)
-                                        {
-                                            tobits &= ~((pnbit & NOT_RANK_1) >> 8);
-                                        } else {
-                                            tobits &= ~((pnbit & NOT_RANK_8) << 8);
-                                        }
-                                    }
-
-                                    bool real_finish = false;
-                                    while (tobits)
-                                    {
-                                        ulong tobit = tobits & -tobits;
-                                        tobits ^= tobit;
-
-                                        if ((tobit & ~TRAPS)
-                                                || (neighbors_of(pnbit) & pos.placement[side] & ~fbit)
-                                                || (neighbors_of(tobit) & pos.placement[side] & ~pnbit & ~fbit)
-                                                || (pos.pieces[fix] >= pos.strongest[side^1][pnix] + enemyoffset))
-                                        {
-                                            // pn square will be safe for finisher after pn piece moves away
-                                            real_finish = true;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pnbit, tobit);
-                                        }
-                                    }
-                                    if (real_finish)
-                                    {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } else if (pos.pieces[pnix] > pos.pieces[pix] + enemyoffset)
-                    {
-                        assert(pnbit & pos.frozen);
-                        // pn is frozen can we unfreeze in two steps or less
-                        ulong pn_neighbors = neighbors_of(pnbit) & ~pbit;
-                        while (pn_neighbors)
-                        {
-                            ulong pnnbit = pn_neighbors & -pn_neighbors;
-                            pn_neighbors ^= pnnbit;
-
-                            if (pnnbit & pos.bitBoards[Piece.EMPTY])
-                            {
-                                ulong pnn_neighbors = neighbors_of(pnnbit) & ~pos.placement[side^1] & ~pnbit;
-                                while (pnn_neighbors)
-                                {
-                                    ulong pnnnbit = pnn_neighbors & -pnn_neighbors;
-                                    pnn_neighbors ^= pnnnbit;
-                                    bitix pnnnix = bitindex(pnnnbit);
-
-                                    if ((pnnnbit & pos.bitBoards[Piece.EMPTY])
-                                            && ((neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY])
-                                                || (neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~pnnbit)))
-                                    {
-                                        ulong unfreezers = neighbors_of(pnnnbit) & pos.placement[side] & ~pos.frozen;
-                                        while (unfreezers)
-                                        {
-                                            ulong unbit = unfreezers & -unfreezers;
-                                            unfreezers ^= unbit;
-                                            bitix unix = bitindex(unbit);
-
-                                            if ((pos.placement[side] & neighbors_of(pnnnbit) & ~unbit)
-                                                    || ((pnnnbit & ~TRAPS)
-                                                        && (pos.pieces[unix] >= pos.strongest[side^1][pnnnix] + enemyoffset)))
-                                            {
-                                                if (pos.pieces[unix] == Piece.WRABBIT + pieceoffset)
-                                                {
-                                                    // can it really make the two steps to pnn
-                                                    ulong rsteps;
-                                                    if (side == Side.WHITE)
-                                                    {
-                                                        rsteps = (unbit & ~B_FILE) << 2;
-                                                        rsteps |= (unbit & ~G_FILE) >> 2;
-                                                        rsteps |= (unbit & NOT_RANK_8 & NOT_A_FILE) << 9;
-                                                        rsteps |= (unbit & NOT_RANK_8 & NOT_H_FILE) << 7;
-                                                        rsteps |= (unbit & ~RANK_7) << 16;
-                                                    } else {
-                                                        rsteps = (unbit & ~B_FILE) << 2;
-                                                        rsteps |= (unbit & ~G_FILE) >> 2;
-                                                        rsteps |= (unbit & NOT_RANK_1 & NOT_A_FILE) >> 7;
-                                                        rsteps |= (unbit & NOT_RANK_1 & NOT_H_FILE) >> 9;
-                                                        rsteps |= (unbit & ~RANK_2) >> 16;
-                                                    }
-                                                    if (!(rsteps & pnnbit))
-                                                    {
-                                                        // rabbit can't get there.
-                                                        continue;
-                                                    }
-                                                }
-                                                add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, pnnnbit);
-                                            }
-                                        }
-                                    }
-                                    else if (pnnnbit & pos.placement[side])
-                                    {
-                                        if (pos.pieces[pnnnix] == Piece.WRABBIT + pieceoffset)
-                                        {
-                                            ulong rsteps = neighbors_of(pnnnbit);
-                                            if (side == Side.WHITE)
-                                            {
-                                                rsteps &= ~((pnnnbit & NOT_RANK_1) >> 8);
-                                            } else {
-                                                rsteps &= ~((pnnnbit & NOT_RANK_8) << 8);
-                                            }
-                                            if (!(rsteps & pnnbit))
-                                            {
-                                                continue;
-                                            }
-                                        }
-
-                                        if (pnnnbit & pos.frozen)
-                                        {
-                                            if (!(neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~pnnbit)
-                                                && !(neighbors_of(pbit) & (pos.bitBoards[Piece.EMPTY] | pnnnbit)))
-                                                continue;
-                                            // can we unfreeze in one step
-                                            ulong unfreezers = neighbors_of(neighbors_of(pnnnbit) & pos.bitBoards[Piece.EMPTY])
-                                                & pos.placement[side] & ~pos.frozen;
-                                            while (unfreezers)
-                                            {
-                                                ulong unbit = unfreezers & -unfreezers;
-                                                unfreezers ^= unbit;
-                                                bitix unix = bitindex(unbit);
-
-                                                ulong tobits = neighbors_of(unbit) & neighbors_of(pnnnbit) & pos.bitBoards[Piece.EMPTY];
-                                                if (pos.pieces[unix] == Piece.WRABBIT + pieceoffset)
-                                                {
-                                                    ulong rsteps = neighbors_of(unbit);
-                                                    if (side == Side.WHITE)
-                                                    {
-                                                        rsteps &= ~((unbit & NOT_RANK_1) >> 8);
-                                                    } else {
-                                                        rsteps &= ~((unbit & NOT_RANK_8) << 8);
-                                                    }
-                                                    tobits &= rsteps;
-                                                }
-                                                while (tobits)
-                                                {
-                                                    ulong tobit = tobits & -tobits;
-                                                    tobits ^= tobit;
-                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, tobit);
-                                                }
-                                            }
-                                        }
-                                        else if ((neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~pnnbit)
-                                                || (neighbors_of(pbit) & (pos.bitBoards[Piece.EMPTY] | pnnnbit)))
-                                        {
-                                            add_capture(pos.pieces[tix], tbit, 3, tbit, pnnnbit, pnnbit);
-                                        } else {
-                                            // can unfreeze pn (attacker) in one step but have no where to push or
-                                            // pull pbit to. Can we move another piece away from pbit to create space?
-                                            ulong clear = neighbors_of(pbit) & pos.placement[side] & ~pos.frozen
-                                                & neighbors_of(pos.bitBoards[Piece.EMPTY]);
-                                            if (clear & ~pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                            {
-                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
-                                            } else {
-                                                // any clear pieces must be rabbits
-                                                while (clear)
-                                                {
-                                                    ulong cbit = clear & -clear;
-                                                    clear ^= cbit;
-                                                    ulong backward = (side == Side.WHITE) ? cbit >> 8 : cbit << 8;
-                                                    if (neighbors_of(cbit) & pos.bitBoards[Piece.EMPTY] & ~backward)
-                                                    {
-                                                        add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            clear = neighbors_of(pnnnbit) & neighbors_of(pnbit) & pos.placement[side^1];
-                                            if (clear)
-                                            {
-                                                Piece pupiece = pos.pieces[bitindex(pnnnbit)];
-                                                Piece cpiece = pos.pieces[bitindex(clear)];
-                                                if (pupiece > cpiece + enemyoffset)
-                                                {
-                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pnnnbit, pnnbit);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                // pnn must have enemy piece can we push it away or pull and unfreeze pn
-                                ulong ofreezers = neighbors_of(pnbit) & pos.placement[side^1] & ~pnnbit;
-                                while (ofreezers)
-                                {
-                                    ulong fbit = ofreezers & -ofreezers;
-                                    bitix fix = bitindex(fbit);
-                                    if (pos.pieces[pnix] < pos.pieces[fix] + enemyoffset)
-                                        break;
-                                    ofreezers ^= fbit;
-                                }
-
-                                bitix pnnix = bitindex(pnnbit);
-                                if (!ofreezers && (neighbors_of(pnnbit) & (1UL << pos.lastfrom))
-                                            && (pos.lastpiece > pos.pieces[pnnix] + enemyoffset))
-                                {
-                                    add_capture(pos.pieces[tix], tbit, 3, tbit,
-                                            pnnbit, (1UL << pos.lastfrom));
-                                }
-                                if (!ofreezers || (neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY]))
-                                {
-                                    bool can_push = false;
-                                    ulong pushers = neighbors_of(pnnbit) & pos.placement[side] & ~pos.frozen;
-                                    while (pushers)
-                                    {
-                                        ulong perbit = pushers & -pushers;
-                                        pushers ^= perbit;
-                                        bitix perix = bitindex(perbit);
-
-                                        if (pos.pieces[perix] > pos.pieces[pnnix] + enemyoffset)
-                                        {
-                                            can_push = true;
-                                            if (!ofreezers)
-                                            {
-                                                ulong pulltos = neighbors_of(perbit) & pos.bitBoards[Piece.EMPTY];
-                                                while (pulltos)
-                                                {
-                                                    ulong tobit = pulltos & -pulltos;
-                                                    pulltos ^= tobit;
-
-                                                    add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, tobit);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (can_push)
-                                    {
-                                        ulong pushtos = neighbors_of(pnnbit) & pos.bitBoards[Piece.EMPTY];
-                                        if (popcount(neighbors_of(pbit) & pos.bitBoards[Piece.EMPTY]) == 1
-                                                && !(neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY]))
-                                            pushtos &= ~neighbors_of(pbit);
-                                        while (pushtos)
-                                        {
-                                            ulong tobit = pushtos & -pushtos;
-                                            pushtos ^= tobit;
-
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, tobit, true);
-                                        }
-                                    }
-                                }
-                                if (!ofreezers && (pnnbit & TRAPS)
-                                        && popcount(neighbors_of(pnnbit) & pos.placement[side^1]) == 1)
-                                {
-                                    ulong holder = neighbors_of(pnnbit) & pos.placement[side^1];
-                                    bitix hix = bitindex(holder);
-
-                                    if ((neighbors_of(holder) & (1UL << pos.lastfrom))
-                                            && pos.lastpiece > pos.pieces[hix] + enemyoffset)
-                                    {
-                                        add_capture(pos.pieces[tix], tbit, 3, tbit,
-                                                holder, (1UL << pos.lastfrom));
-                                    }
-
-                                    bool can_push = false;
-                                    ulong pushers = neighbors_of(holder) & pos.placement[side] & ~pos.frozen
-                                        & ~pos.bitBoards[Piece.WRABBIT + pieceoffset];
-                                    while (pushers)
-                                    {
-                                        ulong pubit = pushers & -pushers;
-                                        pushers ^= pubit;
-                                        bitix puix = bitindex(pubit);
-
-                                        if (pos.pieces[puix] > pos.pieces[hix] + enemyoffset)
-                                        {
-                                            can_push = true;
-                                            ulong tobits = neighbors_of(pubit) & pos.bitBoards[Piece.EMPTY];
-                                            while (tobits)
-                                            {
-                                                ulong tobit = tobits & -tobits;
-                                                tobits ^= tobit;
-
-                                                add_capture(pos.pieces[tix], tbit, 4, tbit, pubit, tobit);
-                                            }
-                                        }
-                                    }
-                                    if (can_push)
-                                    {
-                                        ulong tobits = neighbors_of(holder) & pos.bitBoards[Piece.EMPTY];
-                                        if (pos.pieces[pnix] < pos.pieces[hix] + enemyoffset)
-                                            tobits &= ~neighbors_of(pnbit);
-                                        while (tobits)
-                                        {
-                                            ulong tobit = tobits & -tobits;
-                                            tobits ^= tobit;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, holder, tobit, true);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else if (pnbit & pos.bitBoards[Piece.EMPTY])
-                {
-                    // Can we get a piece here to push pbit in two steps or less
-                    ulong pn_neighbors = neighbors_of(pnbit) & ~pos.placement[side^1];
-                    while (pn_neighbors)
-                    {
-                        ulong pnnbit = pn_neighbors & -pn_neighbors;
-                        pn_neighbors ^= pnnbit;
-                        bitix pnnix = bitindex(pnnbit);
-
-                        if (pnnbit & pos.bitBoards[Piece.EMPTY]
-                                && (pos.strongest[side][pnnix] > pos.pieces[pix] + enemyoffset))
-                        {
-                            ulong pushers = neighbors_of(pnnbit) & pos.placement[side] & ~pos.frozen;
-                            while (pushers)
-                            {
-                                ulong perbit = pushers & -pushers;
-                                pushers ^= perbit;
-                                bitix perix = bitindex(perbit);
-
-                                if ((pos.pieces[perix] > pos.pieces[pix] + enemyoffset)
-                                        && ((pos.pieces[perix] >= pos.strongest[side^1][pnix] + enemyoffset)
-                                            || (pos.placement[side] & neighbors_of(pnbit)
-                                                & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~perbit))))
-                                        && ((pos.placement[side] & neighbors_of(pnnbit) & ~perbit)
-                                            || !((pnnbit & TRAPS)
-                                                || (pos.pieces[perix] < pos.strongest[side^1][pnnix] + enemyoffset))))
-                                {
-                                    add_capture(pos.pieces[tix], tbit, 4, tbit, perbit, pnnbit);
-                                }
-                            }
-                        } else if (pos.pieces[pnnix] > pos.pieces[pix] + enemyoffset)
-                        {
-                            // pnn must be a friendly piece that can push pix
-                            if (pnnbit & pos.frozen)
-                            {
-                                if ((neighbors_of(pnbit) & pos.placement[side] & ~pnnbit)
-                                        || pos.pieces[pnnix] >= pos.strongest[side^1][pnix] + enemyoffset)
-                                {
-                                    ulong unfreezers = neighbors_of(neighbors_of(pnnbit)
-                                            & pos.bitBoards[Piece.EMPTY] & ~pnbit)
-                                        & pos.placement[side] & ~pos.frozen;
-                                    if (pos.pieces[pnnix] < pos.strongest[side^1][pnix] + enemyoffset)
-                                        unfreezers &= ~neighbors_of(pnbit);
-                                    while (unfreezers)
-                                    {
-                                        ulong unbit = unfreezers & -unfreezers;
-                                        unfreezers ^= unbit;
-                                        bitix unix = bitindex(unbit);
-
-                                        ulong tobits = neighbors_of(unbit) & neighbors_of(pnnbit)
-                                            & pos.bitBoards[Piece.EMPTY] & ~pnbit;
-                                        if (pos.pieces[unix] == Piece.WRABBIT + pieceoffset)
-                                        {
-                                            ulong rsteps = neighbors_of(unbit);
-                                            if (side == Side.WHITE)
-                                            {
-                                                rsteps &= ~((unbit & NOT_RANK_1) >> 8);
-                                            } else {
-                                                rsteps &= ~((unbit & NOT_RANK_8) << 8);
-                                            }
-                                            tobits &= rsteps;
-                                        }
-                                        while (tobits)
-                                        {
-                                            ulong tobit = tobits & -tobits;
-                                            tobits ^= tobit;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, unbit, tobit);
-                                        }
-                                    }
-                                }
-                            }
-                            else if (pos.pieces[pnnix] >= pos.strongest[side^1][pnix] + enemyoffset
-                                    || (neighbors_of(pnbit) & pos.placement[side] & ~pnnbit))
-                            {
-                                add_capture(pos.pieces[tix], tbit, 3, tbit, pnnbit, pnbit);
-                            } else {
-                                // pnn is unfrozen but will freeze when moving to pn
-                                bool pnn_first = false;
-                                ulong pnb_neighbors = neighbors_of(pnbit);
-                                ulong pnn_neighbors = neighbors_of(pnnbit);
-                                ulong unfreezers = neighbors_of(pbit)
-                                    & pnn_neighbors & pos.placement[side];
-                                if ((pnb_neighbors | (neighbors_of(pbit) & ~pnbit))
-                                        & pos.bitBoards[Piece.EMPTY])
-                                {
-                                    unfreezers |= (neighbors_of(pnb_neighbors
-                                                & pos.bitBoards[Piece.EMPTY])
-                                            & pos.placement[side])
-                                        | (pnn_neighbors & pos.placement[side]);
-                                }
-                                unfreezers &= ~pos.frozen;
-                                while (unfreezers)
-                                {
-                                    ulong unfbit = unfreezers & -unfreezers;
-                                    unfreezers ^= unfbit;
-                                    bitix unfix = bitindex(unfbit);
-                                    ulong unf_neighbors = neighbors_of(unfbit);
-                                    ulong tobits = unf_neighbors & pnb_neighbors & pos.bitBoards[Piece.EMPTY]
-                                        & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~unfbit));
-                                    ulong backward = 0UL;
-                                    if (unfbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
-                                    {
-                                        backward = (side == Side.WHITE) ? unfbit >> 8 : unfbit << 8;
-                                        tobits &= ~backward;
-                                    }
-                                    if (tobits && ((unfbit & ~pnn_neighbors)
-                                                || (pnn_neighbors & pos.placement[side] & ~unfbit)
-                                                || ((pos.pieces[pnnix] >= pos.strongest[side^1][pnnix] + enemyoffset)
-                                                    && (pnnbit & ~TRAPS))))
-                                    {
-                                        // unfreezer can move first
-                                        while (tobits)
-                                        {
-                                            ulong tobit = tobits & -tobits;
-                                            tobits ^= tobit;
-                                            add_capture(pos.pieces[tix], tbit, 4, tbit, unfbit, tobit);
-                                        }
-                                    }
-                                    else if ((tobits || (unf_neighbors & (pnnbit
-                                                        | (TRAPS & pnb_neighbors & pos.bitBoards[Piece.EMPTY])) & ~backward))
-                                            && ((unf_neighbors & pos.placement[side] & ~pnnbit)
-                                                || ((unfbit & ~TRAPS)
-                                                    && (pos.pieces[unfix] >= pos.strongest[side^1][unfix] + enemyoffset))))
-                                    {
-                                        pnn_first = true;
-                                    }
-                                }
-                                if (!pnn_first && (pnb_neighbors & pos.placement[side^1]
-                                            & (TRAPS & neighbors_of(pnn_neighbors & pos.placement[side^1]))
-                                            & ~(TRAPS & neighbors_of(pos.placement[side^1] & ~pnn_neighbors))))
-                                {
-                                    ulong pulled = pnn_neighbors & pos.placement[side^1]
-                                        & neighbors_of(TRAPS & pnb_neighbors);
-                                    assert (popcount(pulled) == 1);
-                                    Piece ppiece = pos.pieces[bitindex(pulled)];
-                                    if (pos.pieces[pnnix] > ppiece + enemyoffset)
-                                    {
-                                        ulong ofreezers = pnb_neighbors & pos.placement[side^1] & ~TRAPS
-                                            & ~pos.bitBoards[Piece.WRABBIT + pieceoffset - enemyoffset];
-                                        while (ofreezers)
-                                        {
-                                            ulong obit = ofreezers & -ofreezers;
-                                            if (pos.pieces[pnnix] < pos.pieces[bitindex(obit)])
-                                                break;
-                                            ofreezers ^= obit;
-                                        }
-                                        if (!ofreezers)
-                                            pnn_first = true;
-                                    }
-                                }
-                                if (pnn_first)
-                                {
-                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pnnbit, pnbit);
-                                }
-                            }
-                        }
-                    }
-                } else if ((pos.strongest[side][pnix] > pos.pieces[pnix] + enemyoffset)
-                        && (pos.strongest[side][pnix] > pos.pieces[pix] + enemyoffset))
-                {
-                    // pn must be an enemy
-                    ulong pushtos = neighbors_of(pnbit) & pos.bitBoards[Piece.EMPTY] & ~neighbors_of(tbit);
-                    if (pushtos)
-                    {
-                        ulong pushers = neighbors_of(pnbit) & pos.placement[side] & ~pos.frozen;
-                        while (pushers)
-                        {
-                            ulong perbit = pushers & -pushers;
-                            pushers ^= perbit;
-                            bitix perix = bitindex(perbit);
-
-                            if ((pos.pieces[perix] > pos.pieces[pnix] + enemyoffset)
-                                    && (pos.pieces[perix] > pos.pieces[pix] + enemyoffset))
-                            {
-                                if (!(neighbors_of(pnbit) & pos.placement[side] & ~perbit)
-                                        && pos.pieces[perix] < pos.strongest[side^1][pnix] + enemyoffset)
-                                {
-                                    // pusher will freeze unless freezer is trapped by first step
-                                    ulong freezers = neighbors_of(pnbit) & pos.placement[side^1];
-                                    if (!(freezers & (TRAPS & ~neighbors_of(pos.placement[side^1] & ~pnbit))))
-                                        continue;
-                                    freezers &= ~(TRAPS & ~neighbors_of(pos.placement[side^1] & ~pnbit));
-                                    while (freezers)
-                                    {
-                                        ulong fbit = freezers & -freezers;
-                                        bitix fix = bitindex(fbit);
-                                        if (pos.pieces[perix] < pos.pieces[fix] + enemyoffset)
-                                            break;
-                                        freezers ^= fbit;
-                                    }
-                                    if (freezers)
-                                        continue;
-                                }
-
-                                // pusher can finish it
-                                while (pushtos)
-                                {
-                                    ulong tobit = pushtos & -pushtos;
-                                    pushtos ^= tobit;
-                                    add_capture(pos.pieces[tix], tbit, 4, tbit, pnbit, tobit, true);
-                                    pushers = 0UL;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            gen_1n_et(tbit, tix, t_neighbors, pbit, pix, lastbit,
+                    enemyoffset, pieceoffset);
         } else {
             // Trap is either empty or has a friendly on it
             int min_clear_steps = 0;

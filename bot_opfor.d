@@ -1,5 +1,15 @@
 
+// Give traceback when an exception is thrown
+// does not work in release mode
+// does not work if placed in a debug section
+//import tango.core.tools.TraceExceptions;
+
 import tango.core.Memory;
+import tango.core.Atomic;
+import tango.core.Thread;
+import tango.core.sync.Condition;
+import tango.core.sync.Mutex;
+import tango.core.sync.ReadWriteMutex;
 import tango.io.Stdout;
 import tango.text.Ascii;
 import tango.text.convert.Float;
@@ -13,11 +23,10 @@ import Arguments;
 
 import alphabeta;
 import aeibot;
-import goalsearch;
 import logging;
 import position;
 import setupboard;
-import staticeval;
+import utility;
 
 const char[] BOT_NAME = "OpFor";
 const char[] BOT_AUTHOR = "Janzert";
@@ -31,313 +40,6 @@ struct PositionRecord
     int gold_wins;
 }
 
-class FullSearch : ABSearch
-{
-    GoalSearchDT goal_searcher;
-    StaticEval evaluator;
-
-    ulong nodes_quiesced = 0;
-
-    int max_qdepth = -16;
-    int do_qsearch = 1;
-
-    int qdepth;
-
-    this(Logger l, TransTable t)
-    {
-        super(l, t);
-        goal_searcher = new GoalSearchDT();
-        evaluator = new StaticEval(l, goal_searcher, trap_search);
-    }
-
-    void prepare()
-    {
-        super.prepare();
-        nodes_quiesced = 0;
-    }
-
-    bool set_option(char[] option, char[] value)
-    {
-        bool handled = true;
-        switch (option)
-        {
-            case "eval_quiesce":
-                do_qsearch = toInt(value);
-                break;
-            case "eval_qdepth":
-                max_qdepth = 0 - toInt(value);
-                qdepth = max_qdepth;
-                break;
-            default:
-                handled = evaluator.set_option(option, value);
-                if (!handled)
-                    handled = super.set_option(option, value);
-        }
-        return handled;
-    }
-
-    void set_depth(int depth)
-    {
-        super.set_depth(depth);
-    }
-
-    int eval(Position pos, int alpha, int beta)
-    {
-        switch (do_qsearch)
-        {
-            case 0:
-                return evaluator.static_eval(pos);
-            default:
-                int score = quiesce(pos, 0, alpha, beta);
-                return score;
-        }
-    }
-
-    int static_eval(Position pos)
-    {
-        return evaluator.static_eval(pos);
-    }
-
-    int quiesce(Position pos, int depth, int alpha, int beta)
-    {
-        nodes_searched++;
-        nodes_quiesced++;
-
-        int score = MIN_SCORE;
-        if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1)) || pos.stepsLeft < 2))
-        {
-            score = pos.endscore() * WIN_SCORE;
-            if (pos.side == Side.BLACK)
-            {
-                score = -score;
-            }
-            return score;
-        }
-
-        SType sflag = SType.ALPHA;
-        TTNode* node = ttable.get(pos);
-        Step* prev_best;
-        if (node.zobrist == pos.zobrist)
-        {
-            node.aged = false;
-            if (node.depth >= depth)
-            {
-                if (node.type == SType.EXACT
-                    || (node.type == SType.ALPHA && node.score <= alpha)
-                    || (node.type == SType.BETA && node.score >= beta))
-                {
-                    tthits++;
-                    return node.score;
-                }
-            }
-            prev_best = &node.beststep;
-        }
-
-        if (!pos.inpush)
-        {
-            score = evaluator.static_eval(pos);
-
-            debug (eval_bias)
-            {
-                Position reversed = pos.reverse();
-                int rscore = evaluator.static_eval(reversed);
-                if ((score < rscore-2) || (score > rscore+2))
-                {
-                    fwritefln(stderr, "%s\n%s", "wb"[pos.side], pos.to_long_str());
-                    fwritefln(stderr, "reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
-                    throw new Exception(Format("Biased eval, {} != {}", score, rscore));
-                }
-                Position.free(reversed);
-            }
-
-            if (depth < qdepth)
-                return score;
-
-            if (score >= beta)
-                return score;
-            if (score > alpha)
-            {
-                alpha = score;
-                sflag = SType.EXACT;
-            }
-        }
-
-        StepList steps = StepList.allocate();
-        if (!pos.inpush)
-        {
-            trap_search.find_captures(pos, pos.side);
-            for (int six=0; six < trap_search.num_captures; six++)
-            {
-                if (trap_search.captures[six].length <= pos.stepsLeft + 2)
-                {
-                    bool duplicate = false;
-                    for (int cix=0; cix < steps.numsteps; cix++)
-                    {
-                        if (trap_search.captures[six].first_step.frombit == steps.steps[cix].frombit
-                                && trap_search.captures[six].first_step.tobit == steps.steps[cix].tobit)
-                        {
-                            duplicate = true;
-                            if (trap_search.captures[six].first_step.push == false)
-                            {
-                                // make sure we use a pull if available
-                                steps.steps[cix].push = false;
-                            }
-                            break;
-                        }
-                    }
-                    if (!duplicate && (pos.stepsLeft > 1
-                                || !trap_search.captures[six].first_step.push))
-                    {
-                        Step* step = steps.newstep();
-                        *step = trap_search.captures[six].first_step;
-                    }
-                }
-            }
-            if (trap_search.find_captures(pos, cast(Side)(pos.side^1)))
-            {
-                StepList esteps = StepList.allocate();
-                trap_search.evasion_steps(esteps);
-                for (int eix=0; eix < esteps.numsteps; eix++)
-                {
-                    bool duplicate = false;
-                    for (int i=0; i < steps.numsteps; i++)
-                    {
-                        if (esteps.steps[eix] == steps.steps[i])
-                        {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-                    if (!duplicate)
-                    {
-                        Step* step = steps.newstep();
-                        *step = esteps.steps[eix];
-                    }
-                }
-                StepList.free(esteps);
-            }
-            trap_search.clear();
-            debug (check_qsteps)
-            {
-                StepList rsteps = StepList.allocate();
-                pos.get_steps(rsteps);
-                for (int six=0; six < steps.numsteps; six++)
-                {
-                    bool invalid = true;
-                    for (int rix=0; rix < rsteps.numsteps; rix++)
-                    {
-                        if (steps.steps[six].frombit == rsteps.steps[rix].frombit
-                                && steps.steps[six].tobit == rsteps.steps[rix].tobit)
-                        {
-                            invalid = false;
-                            break;
-                        }
-                    }
-                    if (invalid)
-                    {
-                        writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
-                        for (int rix=0; rix < rsteps.numsteps; rix++)
-                            writef("%s ", rsteps.steps[rix].toString(true));
-                        writefln();
-                        throw new Exception(format("Bad step found in qsearch %s",
-                                    steps.steps[six].toString(true)));
-                    }
-                }
-                StepList.free(rsteps);
-            }
-        } else {
-            pos.get_steps(steps);
-        }
-        int best_ix = -1;
-        for (int six = 0; six < steps.numsteps; six++)
-        {
-            int cal;
-            Position npos = pos.dup;
-            npos.do_step(steps.steps[six]);
-
-            if (npos == nullmove)
-            {
-                cal = -(WIN_SCORE+1);   // Make this worse than a normal
-                                        // loss since it's actually an illegal move
-            } else if (npos.stepsLeft == 4)
-            {
-                Position mynull = nullmove;
-                nullmove = npos.dup;
-                nullmove.do_step(NULL_STEP);
-
-                cal = -quiesce(npos, depth-1, -beta, -alpha);
-
-                Position.free(nullmove);
-                nullmove = mynull;
-            } else {
-                cal = quiesce(npos, depth-1, alpha, beta);
-            }
-
-            Position.free(npos);
-
-            if (cal == ABORT_SCORE
-                    || cal == -ABORT_SCORE)
-            {
-                score = ABORT_SCORE;
-                break;
-            }
-
-            if (cal > score)
-            {
-                score = cal;
-                best_ix = six;
-
-                if (cal > alpha)
-                {
-                    alpha = cal;
-                    sflag = SType.EXACT;
-
-                    if (cal >= beta)
-                    {
-                        sflag = SType.BETA;
-                        break;
-                    }
-                }
-            }
-        }
-
-        Step bstep;
-        if (best_ix != -1)
-        {
-           bstep = steps.steps[best_ix];
-        } else {
-            bstep.clear();
-        }
-        StepList.free(steps);
-
-        if (score != ABORT_SCORE)
-            node.set(pos, depth, score, sflag, bstep);
-
-        if (nodes_searched > check_nodes)
-        {
-            if (should_abort())
-            {
-                return ABORT_SCORE;
-            }
-            check_nodes += check_interval;
-        }
-
-        return score;
-    }
-
-    int logged_eval(Position pos)
-    {
-        return evaluator.logged_eval(pos);
-    }
-
-    void report()
-    {
-        super.report();
-        if (do_qsearch)
-            logger.info("qnodes {}", nodes_quiesced);
-    }
-}
-
 class PositionNode
 {
     private static PositionNode cache_head;
@@ -349,8 +51,10 @@ class PositionNode
 
     Position pos;
     StepList move;
-    int last_score;
-    int last_depth;
+    int last_score = 0;
+    int last_depth = 0;
+    int last_nodes = 0;
+    bool in_best = false;
 
     this()
     {
@@ -383,6 +87,10 @@ class PositionNode
             StepList.free(n.move);
             n.move = null;
         }
+        n.last_score = 0;
+        n.last_depth = 0;
+        n.last_nodes = 0;
+        n.in_best = false;
         n.prev = null;
         n.next = cache_head;
         cache_head = n;
@@ -390,17 +98,748 @@ class PositionNode
     }
 }
 
+class SearcherMsg
+{
+    SearchThread sender;
+
+    this (SearchThread s)
+    {
+        sender = s;
+    }
+}
+
+class ResultSMessage : SearcherMsg
+{
+    private
+    {
+    static Mutex cache_lock;
+    static ResultSMessage[] msg_store;
+    static uint num_msgs;
+    }
+
+    static this()
+    {
+        cache_lock = new Mutex();
+    }
+
+    static ResultSMessage allocate(SearchThread t, PositionNode s)
+    {
+        synchronized (cache_lock)
+        {
+            if (num_msgs)
+            {
+                ResultSMessage msg = msg_store[--num_msgs];
+                msg.sender = t;
+                msg.search = s;
+                return msg;
+            }
+        }
+
+        return new ResultSMessage(t, s);
+    }
+
+    static void free(ResultSMessage m)
+    {
+        synchronized (cache_lock)
+        {
+            if (num_msgs == msg_store.length)
+                msg_store.length = (msg_store.length * 2) + 1;
+            msg_store[num_msgs++] = m;
+        }
+    }
+
+    PositionNode search;
+
+    this(SearchThread t, PositionNode s)
+    {
+        super(t);
+        search = s;
+    }
+
+}
+
+class SearchThread : Thread
+{
+    bool shutdown = false;
+    bool abort_search = false;
+
+    private {
+    Mutex search_lock;
+    ABQSearch searcher;
+    ThreadEngine control;
+    int depth;
+
+    Mutex search_check_lock;
+    Atomic!(bool) searching;
+
+    bool root_lmr = true;
+    const static int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
+    }
+
+    this(ThreadEngine ctl)
+    {
+        super(&run);
+        control = ctl;
+        search_lock = new Mutex();
+        searching.store(false);
+        searcher = new ABQSearch(ctl.logger, ctl.ttable);
+        class ACheck
+        {
+            SearchThread ctl;
+
+            this(SearchThread t)
+            {
+                ctl = t;
+            }
+
+            bool sa()
+            {
+                return ctl.abort_search;
+            }
+        }
+        auto chk = new ACheck(this);
+        searcher.should_abort = &chk.sa;
+    }
+
+    void cleanup_search()
+    {
+        synchronized (search_lock)
+        {
+            searcher.cleanup();
+        }
+    }
+
+    bool is_searching()
+    {
+        return searching.load();
+    }
+
+    bool set_option(char[] name, char[] value)
+    {
+        synchronized (search_lock)
+        {
+            return searcher.set_option(name, value);
+        }
+    }
+
+    void set_depth(int d)
+    {
+        synchronized (search_lock)
+        {
+            depth = d;
+            searcher.set_depth(d);
+        }
+    }
+
+    void prepare_search()
+    {
+        synchronized (search_lock)
+        {
+            searcher.prepare();
+        }
+    }
+
+    private void search_pos(PositionNode search)
+    {
+        ulong pos_nodes;
+        int score;
+        int search_depth;
+        synchronized (search_lock)
+        {
+            // FIXME: check_nodes should be based on 1 second
+            ulong check_nodes = 100000;
+            searcher.check_interval = check_nodes;
+            ulong next_check = searcher.nodes_searched + check_nodes;
+            searcher.check_nodes = next_check;
+
+            ulong start_nodes = searcher.nodes_searched;
+            int cur_score = control.cur_score();
+            Position pos = search.pos;
+            searcher.nullmove = pos.dup;
+            searcher.nullmove.do_step(NULL_STEP);
+            if (root_lmr && depth > 2
+                && !search.in_best)
+            {
+                search_depth = depth - 1;
+                if ((search_depth > 2) && (search.move.numsteps < 4))
+                    search_depth--;
+                if ((search_depth > 3)
+                        && (search.move.steps[search.move.numsteps-1]
+                            == NULL_STEP))
+                    search_depth--;
+                uint margin_num = 0;
+                while ((search_depth > 2+margin_num)
+                        && (margin_num < reduction_margins.length)
+                        && (search.last_score < (cur_score
+                                - reduction_margins[margin_num])))
+                {
+                    search_depth--;
+                    margin_num++;
+                }
+                if (search_depth > search.last_depth)
+                {
+                    ulong sd = search.last_depth;
+                    while (sd < search_depth && score != -ABORT_SCORE)
+                        score = -searcher.alphabeta(pos, ++sd,
+                                -(cur_score+1), -cur_score, 0);
+                } else {
+                    score = search.last_score;
+                    search_depth = search.last_depth;
+                }
+            } else {
+                score = -searcher.alphabeta(pos, depth, MIN_SCORE,
+                        -cur_score, 0);
+                search_depth = depth;
+            }
+
+            while (search_depth < depth && score > cur_score)
+            {
+                score = -searcher.alphabeta(pos, ++search_depth, MIN_SCORE,
+                        -cur_score, 0);
+            }
+            Position.free(searcher.nullmove);
+            searcher.nodes_searched++;
+            pos_nodes = searcher.nodes_searched - start_nodes;
+        }
+
+        if (score != -ABORT_SCORE)
+        {
+            int best_score;
+            do
+            {
+                best_score = control.best_score.load();
+                if (best_score >= score)
+                    break;
+            } while (!control.best_score.storeIf(score, best_score))
+            synchronized (control.pn_lock)
+            {
+                search.last_score = score;
+                search.last_depth = search_depth;
+                search.last_nodes = pos_nodes;
+            }
+            control.msg_q.set(ResultSMessage.allocate(this, search));
+        }
+    }
+
+    void run()
+    {
+        try
+        {
+            while (!shutdown)
+            {
+                if (control.run_search.load())
+                {
+                    searching.store(true);
+                    PositionNode search = control.pos_q.get();
+                    while (search !is null)
+                    {
+                        search_pos(search);
+                        search = control.pos_q.get();
+                    }
+                    searching.store(false);
+                } else {
+                    synchronized (control.search_wait_lock)
+                    {
+                        control.search_wait.wait(0.1);
+                    }
+                }
+            }
+        } catch (Exception err)
+        {
+            control.logger.warn("Caught error in search thread");
+            char[] exception_msg = "".dup;
+            void excwriter(char[] str)
+            {
+                exception_msg ~= str;
+            }
+            err.writeOut(&excwriter);
+            control.logger.console(exception_msg);
+        }
+    }
+}
+
+class ThreadEngine : AEIEngine
+{
+    TransTable ttable;
+    Logger logger;
+    Queue!(SearcherMsg) msg_q;
+    Queue!(PositionNode) pos_q;
+    Atomic!(bool) run_search;
+    Condition search_wait;
+    Mutex search_wait_lock;
+
+    private {
+    SetupGenerator board_setup;
+    SearchThread[] threads;
+
+    Atomic!(int) best_score;
+    int update_score;
+    int last_score;
+    Mutex pn_lock;
+    PositionNode last_best;
+    PositionNode pos_list;
+    PositionNode loss_list;
+    int num_moves;
+    int checked_moves;
+    int to_check;
+    int num_losing;
+    int losing_score;
+    ulong nodes_searched;
+    bool in_step;
+
+    int depth;
+
+    StopWatch search_timer;
+
+    bool log_tt_stats = false;
+    }
+
+    this(Logger l)
+    {
+        super(l);
+        logger = l;
+        ttable = new TransTable(l, 10);
+        pn_lock = new Mutex();
+        pos_q = new Queue!(PositionNode)();
+        msg_q = new Queue!(SearcherMsg)();
+        search_wait_lock = new Mutex();
+        search_wait = new Condition(search_wait_lock);
+        run_search.store(false);
+        set_num_threads(1);
+    }
+
+    void set_num_threads(uint thread_num)
+    {
+        if (thread_num > threads.length)
+        {
+            auto cur_num = threads.length;
+            threads.length = thread_num;
+            for (int t=cur_num; t < thread_num; t++)
+            {
+                threads[t] = new SearchThread(this);
+                threads[t].start();
+            }
+        }
+        else if (thread_num < threads.length)
+        {
+            for (int t=threads.length-1; t >= thread_num; t--)
+            {
+                threads[t].shutdown = true;
+            }
+            threads.length = thread_num;
+        }
+    }
+
+    bool set_option(char[] name, char[] value)
+    {
+        bool handled = true;
+        switch(name)
+        {
+            case "threads":
+                set_num_threads(to!(uint)(value));
+                break;
+            case "hash":
+                if (state != EngineState.SEARCHING)
+                {
+                    ttable.set_size(to!(int)(value));
+                } else {
+                    logger.warn("Cannot change transposition table size while searching.");
+                }
+                break;
+            case "log_tt_stats":
+                log_tt_stats = to!(bool)(value);
+                break;
+            case "setup_rabbits":
+                switch (toUpper(value))
+                {
+                    case "ANY":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.ANY;
+                        break;
+                    case "STANDARD":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.STANDARD;
+                        break;
+                    case "99OF9":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.NINETY_NINE;
+                        break;
+                    case "FRITZ":
+                        board_setup.rabbit_style = SetupGenerator.RabbitSetup.FRITZ;
+                        break;
+                    default:
+                        logger.warn("Unrecognized rabbit setup requested '{}'",
+                                value);
+                }
+                break;
+            case "setup_random_minor":
+                board_setup.random_minor = cast(bool)toInt(value);
+                break;
+            case "history":
+                StepSorter.use_history = to!(bool)(value);
+                break;
+            case "capture_sort":
+                StepSorter.capture_first = to!(bool)(value);
+                break;
+            case "use_killers":
+                StepSorter.use_killers = to!(bool)(value);
+                break;
+            case "prune_unrelated":
+                StepSorter.prune_unrelated = to!(bool)(value);
+                break;
+            default:
+                if (state != EngineState.SEARCHING)
+                {
+                    foreach (thread; threads)
+                    {
+                        handled = handled && thread.set_option(name, value);
+                    }
+                } else {
+                    logger.warn("Currently searching did not try to set option {} on search threads.");
+                    handled = false;
+                }
+        }
+        return handled;
+    }
+
+    void cleanup_search()
+    {
+        stop_search();
+        foreach(thread; threads)
+        {
+            thread.cleanup_search();
+        }
+        while (pos_list !is null)
+        {
+            PositionNode n = pos_list;
+            pos_list = n.next;
+            PositionNode.free(n);
+        }
+        while (loss_list !is null)
+        {
+            PositionNode n = loss_list;
+            loss_list = n.next;
+            PositionNode.free(n);
+        }
+        pos_list = null;
+        last_best = null;
+        num_moves = 0;
+        nodes_searched = 0;
+        last_score = MIN_SCORE;
+        update_score = MIN_SCORE;
+        best_score.store(MIN_SCORE);
+        state = EngineState.IDLE;
+    }
+
+    int cur_score()
+    {
+        return best_score.load();
+    }
+
+    void logged_eval(Position pos)
+    {
+        if (run_search.load())
+        {
+            logger.warn("Cannot do a logged eval while searching.");
+            return;
+        }
+        threads[0].searcher.logged_eval(pos);
+    }
+
+    void start_search()
+    {
+        if (ply < 3)
+        {
+            Position pos = position.dup;
+            board_setup.setup_board(pos.side, pos);
+            bestmove = pos.to_placing_move(pos.side);
+            Position.free(pos);
+            state = EngineState.MOVESET;
+        } else {
+            PosStore pstore = position.get_moves();
+            PositionNode last_pos;
+            PositionNode repeated;
+            int[ulong] repetitions;
+            for (int i=0; i < past.length; i++)
+            {
+                repetitions[past[i].zobrist] += 1;
+            }
+            foreach (Position pos; pstore)
+            {
+                PositionNode n = PositionNode.allocate();
+                n.pos = pos;
+                n.move = pstore.getpos(pos);
+                n.last_score = MAX_SCORE;
+
+                if ((pos.zobrist in repetitions) && (repetitions[pos.zobrist] > 1))
+                {
+                    if (repeated !is null)
+                    {
+                        PositionNode.free(repeated);
+                    }
+                    repeated = n;
+                    continue;
+                }
+
+                num_moves++;
+
+                n.prev = last_pos;
+                if (last_pos !is null)
+                {
+                    last_pos.next = n;
+                } else {
+                    pos_list = n;
+                }
+                last_pos = n;
+            }
+            delete pstore;
+
+            if (pos_list is null)
+            {
+                // only repetition moves available
+                pos_list = repeated;
+                num_moves = 1;
+            }
+            best_score.store(MIN_SCORE);
+            depth = 0;
+            checked_moves = 0;
+            num_losing = 0;
+            losing_score = -MIN_WIN_SCORE;
+            foreach (thread; threads)
+            {
+                thread.set_depth(0);
+                thread.prepare_search();
+            }
+            state = EngineState.SEARCHING;
+            PositionNode next_pos = pos_list;
+            to_check = 0;
+            while (next_pos !is null)
+            {
+                pos_q.set(next_pos);
+                next_pos = next_pos.next;
+                ++to_check;
+            }
+            run_search.store(true);
+            search_wait.notifyAll();
+        }
+    }
+
+    private void stop_search()
+    {
+        if (run_search.load())
+        {
+            run_search.store(false);
+            pos_q.clear();
+            foreach(thread; threads)
+            {
+                thread.abort_search = true;
+            }
+            bool still_searching = true;
+            while (still_searching)
+            {
+                still_searching = false;
+                foreach(thread; threads)
+                {
+                    if (thread.is_searching())
+                    {
+                        still_searching = true;
+                        Thread.sleep(0.2);
+                    }
+                }
+            }
+            foreach(thread; threads)
+            {
+                thread.abort_search = false;
+            }
+        }
+    }
+
+    void search(double check_time, bool delegate() should_abort)
+    {
+        in_step = true;
+        search_timer.start();
+        uint check_usecs = cast(uint)(check_time * 1000000);
+        while (search_timer.microsec() < check_usecs && in_step && best_score.load() < WIN_SCORE)
+        {
+            bool depth_finished = false;
+            SearcherMsg msg;
+            do {
+                auto time = cast(double)(search_timer.microsec()) / 1000000;
+                time = time < 1 ? 1 - time : 0;
+                msg = msg_q.get(time);
+                if (auto result = cast(ResultSMessage)msg)
+                {
+                    update_pos(result.search);
+                    ResultSMessage.free(result);
+                    if (checked_moves >= to_check)
+                    {
+                        depth_finished = true;
+                        break;
+                    }
+                }
+                else if (msg !is null)
+                {
+                    logger.warn("Got unknown message from search thread.");
+                    assert(false, "Bad search thread message");
+                }
+            } while (msg !is null);
+
+            if (depth_finished)
+            {
+                run_search.store(false);
+                depth++;
+                checked_moves = 0;
+                foreach (thread; threads)
+                {
+                    thread.set_depth(depth);
+                }
+                last_score = best_score.load();
+                last_best = pos_list;
+                update_score = MIN_SCORE;
+                best_score.store(MIN_SCORE);
+                PositionNode next_pos = pos_list;
+                to_check = 0;
+                while (next_pos !is null)
+                {
+                    pos_q.set(next_pos);
+                    next_pos = next_pos.next;
+                    ++to_check;
+                }
+                run_search.store(true);
+                search_wait.notifyAll();
+                in_step = false;
+            }
+        }
+    }
+
+    void set_bestmove()
+    {
+        bestmove = pos_list.move.to_move_str(position);
+        stop_search();
+        state = EngineState.MOVESET;
+    }
+
+    void shutdown()
+    {
+        foreach (thread; threads)
+        {
+            thread.shutdown = true;
+        }
+        search_wait.notifyAll();
+    }
+
+    private void update_pos(PositionNode result)
+    {
+        auto score = result.last_score;
+        if (score > update_score)
+        {
+            update_score = score;
+            if (result !is pos_list)
+            {
+                result.in_best = true;
+
+                synchronized (pn_lock)
+                {
+                    if (result.next !is null)
+                        result.next.prev = result.prev;
+                    result.prev.next = result.next;
+                    result.next = pos_list;
+                    result.prev = null;
+                    pos_list.prev = result;
+                    pos_list = result;
+                }
+            }
+        }
+        if (score <= losing_score
+                && result !is pos_list)
+        {
+            synchronized (pn_lock)
+            {
+                auto next_pos = result.next;
+                if (result.next !is null)
+                    result.next.prev = result.prev;
+
+                result.prev.next = result.next;
+
+                result.prev = null;
+                result.next = loss_list;
+                if (loss_list !is null)
+                    loss_list.prev = result;
+                loss_list = result;
+                num_losing += 1;
+
+                if (next_pos is pos_list
+                        && next_pos.next is null
+                        && next_pos.last_score <= losing_score
+                        && losing_score > -WIN_SCORE)
+                {
+                    logger.info("msg All moves lose, searching for longest loss");
+                    num_losing = 0;
+                    losing_score = -WIN_SCORE;
+                    next_pos.next = loss_list;
+                    if (loss_list !is null)
+                        loss_list.prev = next_pos;
+                    loss_list = null;
+                }
+            }
+        }
+        nodes_searched += result.last_nodes;
+        checked_moves += 1;
+    }
+
+    StepList get_bestline()
+    {
+        StepList bestline = pos_list.move.dup;
+        Position pos = pos_list.pos.dup;
+        TTNode* n = ttable.get(pos);
+        for (int pvdepth = 0; pvdepth < depth * 2; pvdepth++)
+        {
+            if (n.zobrist != pos.zobrist
+                || (n.beststep.frombit == 0 && n.beststep.tobit == 0))
+            {
+                break;
+            }
+            Step* next_step = bestline.newstep();
+            *next_step = n.beststep;
+            pos.do_step(n.beststep);
+            n = ttable.get(pos);
+        }
+
+        Position.free(pos);
+        return bestline;
+    }
+
+    void report()
+    {
+        logger.info("nodes {}", nodes_searched);
+        if (num_losing)
+            logger.info("losing_moves {}", num_losing);
+        if (in_step)
+        {
+            logger.info("depth_searched {}", checked_moves);
+            logger.info("to_search {}", to_check - checked_moves);
+            logger.info("score {}", cast(int)(best_score.load() / 1.96));
+        } else {
+            logger.info("score {}", cast(int)(last_score / 1.96));
+        }
+        StepList bestline = get_bestline();
+        logger.info("pv {}", bestline.to_move_str(position));
+        StepList.free(bestline);
+        if (log_tt_stats)
+        {
+            logger.info("TT hits {} misses {} collisions {}",
+                ttable.hits, ttable.miss, ttable.collisions);
+        }
+    }
+}
+
 class Engine : AEIEngine
 {
     TransTable ttable;
     SetupGenerator board_setup;
-    ABSearch searcher;
+    ABQSearch searcher;
     PositionNode pos_list;
     PositionNode loss_list;
     PositionNode next_pos;
     int num_moves;
     int checked_moves;
-    int num_best;
     int num_losing;
     int losing_score;
 
@@ -413,8 +852,6 @@ class Engine : AEIEngine
     int last_score;
     PositionNode last_best;
 
-    int max_depth;
-
     const static int BOOK_SIZE = 1000000;
     PositionRecord[] opening_book;
     bool position_record = false;
@@ -425,16 +862,15 @@ class Engine : AEIEngine
     bool root_lmr = true;
     const static int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
 
-    StopWatch search_timer;
+    StopWatch search_length;
 
     this(Logger l)
     {
         super(l);
         board_setup = new SetupGenerator();
         ttable = new TransTable(l, 10);
-        searcher = new FullSearch(l, ttable);
+        searcher = new ABQSearch(l, ttable);
         in_step = false;
-        max_depth = -1;
     }
 
     bool set_option(char[] option, char[] value)
@@ -486,6 +922,16 @@ class Engine : AEIEngine
                 handled = searcher.set_option(option, value);
         }
         return handled;
+    }
+
+    int cur_score()
+    {
+        return best_score;
+    }
+
+    void logged_eval(Position pos)
+    {
+        searcher.logged_eval(pos);
     }
 
     void new_game()
@@ -568,19 +1014,27 @@ class Engine : AEIEngine
             best_score = MIN_SCORE;
             depth = 0;
             checked_moves = 0;
-            num_best = 0;
             num_losing = 0;
             losing_score = -MIN_WIN_SCORE;
-            searcher.set_depth(4);
+            searcher.set_depth(4); // FIXME: Should be same as depth, i.e. 0
             searcher.prepare();
             state = EngineState.SEARCHING;
+            search_length.start();
         }
     }
 
-    void search(uint check_nodes, bool delegate() should_abort)
+    void search(double check_time, bool delegate() should_abort)
     {
         in_step = true;
-        search_timer.start();
+        uint check_nodes;
+        if (searcher.nodes_searched
+                && (search_length.microsec > 2000000))
+        {
+            check_nodes = cast(uint)(searcher.nodes_searched
+                    / (cast(double)(search_length.microsec) / 1000000));
+        } else {
+            check_nodes = START_SEARCH_NODES;
+        }
         searcher.check_interval = check_nodes;
         ulong stop_nodes = searcher.nodes_searched + check_nodes;
         searcher.check_nodes = stop_nodes;
@@ -593,7 +1047,7 @@ class Engine : AEIEngine
             int score;
             int search_depth;
             if (root_lmr && depth > 2
-                    && checked_moves > num_best)
+                    && !next_pos.in_best)
             {
                 search_depth = depth - 1;
                 if ((search_depth > 2) && (next_pos.move.numsteps < 4))
@@ -610,7 +1064,7 @@ class Engine : AEIEngine
                 if (search_depth > next_pos.last_depth)
                 {
                     ulong sd = next_pos.last_depth;
-                    while (sd < search_depth)
+                    while (sd < search_depth && score != -ABORT_SCORE)
                         score = -searcher.alphabeta(pos, ++sd, -(best_score+1), -best_score, 0);
                 } else {
                     score = next_pos.last_score;
@@ -696,6 +1150,7 @@ class Engine : AEIEngine
 
                 if (next_pos !is pos_list)
                 {
+                    next_pos.in_best = true;
                     PositionNode n = next_pos;
                     next_pos = n.prev;
 
@@ -711,11 +1166,6 @@ class Engine : AEIEngine
                 if (score >= WIN_SCORE)
                 {
                     break;
-                }
-
-                if (checked_moves > num_best)
-                {
-                    num_best++;
                 }
             }
 
@@ -734,12 +1184,13 @@ class Engine : AEIEngine
 
             next_pos = next_pos.next;
         }
-        search_timer.stop();
     }
 
     void set_bestmove()
     {
         bestmove = pos_list.move.to_move_str(position);
+        search_length.stop();
+        state = EngineState.MOVESET;
     }
 
     StepList get_bestline()
@@ -808,15 +1259,17 @@ class Engine : AEIEngine
         best_score = MIN_SCORE;
         aborts_reported = 0;
         searcher.cleanup();
+        state = EngineState.IDLE;
     }
 
+    void shutdown() { }
 }
 
 
 int main(char[][] args)
 {
     char[] ip = "127.0.0.1";
-    ushort port = 40007;
+    ushort port = 40015;
     bool use_stdio = true;
 
     Arguments arguments = new Arguments();
@@ -873,6 +1326,8 @@ int main(char[][] args)
     }
     logger.register(server);
     Engine engine = new Engine(logger);
+    //auto engine = new ThreadEngine(logger);
+    int max_depth = -1;
 
     class AbortChecker
     {
@@ -947,6 +1402,7 @@ int main(char[][] args)
                     break;
                 case ServerCmd.CmdType.QUIT:
                     logger.log("Exiting by server command.");
+                    engine.shutdown();
                     server.shutdown();
                     return 0;
                 case ServerCmd.CmdType.NEWGAME:
@@ -954,7 +1410,6 @@ int main(char[][] args)
                     if (engine.state != EngineState.IDLE)
                     {
                         engine.cleanup_search();
-                        engine.state = EngineState.IDLE;
                     }
                     engine.new_game();
                     server.clear_cmd();
@@ -964,7 +1419,6 @@ int main(char[][] args)
                     if (engine.state != EngineState.IDLE)
                     {
                         engine.cleanup_search();
-                        engine.state = EngineState.IDLE;
                     }
                     logger.log("Starting search");
                     logger.console("{}\n{}", "wb"[engine.position.side], engine.position.to_long_str);
@@ -989,7 +1443,7 @@ int main(char[][] args)
                     } else {
                         pondering = false;
                     }
-                    if (tc_permove.interval && engine.max_depth == -1)
+                    if (tc_permove.interval && max_depth == -1)
                     {
                         Side myside = engine.position.side;
                         TimeSpan myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;
@@ -1025,7 +1479,6 @@ int main(char[][] args)
                             {
                                 pondering = false;
                                 engine.cleanup_search();
-                                engine.state = EngineState.IDLE;
                                 logger.log("Stopping ponder because of low time for next move.");
                             }
                         }
@@ -1041,7 +1494,6 @@ int main(char[][] args)
                     if (engine.state == EngineState.SEARCHING)
                     {
                         engine.set_bestmove();
-                        engine.state = EngineState.MOVESET;
                     }
                     server.clear_cmd();
                     break;
@@ -1050,7 +1502,6 @@ int main(char[][] args)
                     if (engine.state != EngineState.IDLE)
                     {
                         engine.cleanup_search();
-                        engine.state = EngineState.IDLE;
                         logger.log("Stopping engine for incoming move.");
                     }
                     engine.make_move(mcmd.move);
@@ -1072,12 +1523,13 @@ int main(char[][] args)
                         case "depth":
                             if (scmd.value == "infinite")
                             {
-                                engine.max_depth = -1;
+                                max_depth = -1;
                                 logger.log("Search depth set to infinite");
                             } else {
                                 int depth = toInt(scmd.value);
-                                engine.max_depth = (depth > 3) ? depth - 4 : 0;
-                                logger.log("Search depth set to {}", engine.max_depth+4);
+                                max_depth = (depth > 3) ? depth - 4 : 0;
+                                logger.log("Search depth set to {}",
+                                        max_depth+4);
                             }
                             break;
                         case "tcmove":
@@ -1124,7 +1576,7 @@ int main(char[][] args)
                                     toFloat(scmd.value));
                             break;
                         case "log_console":
-                            logger.to_console = cast(bool)toInt(scmd.value);
+                            logger.to_console = to!(bool)(scmd.value);
                             break;
                         case "run_gc":
                             auto collect_timer = new StopWatch();
@@ -1135,7 +1587,7 @@ int main(char[][] args)
                                     collect_time);
                             break;
                         case "check_eval":
-                            engine.searcher.logged_eval(engine.position);
+                            engine.logged_eval(engine.position);
                             break;
                         default:
                             if (!engine.set_option(scmd.name, scmd.value)
@@ -1165,13 +1617,13 @@ int main(char[][] args)
                 {
                     search_time += search_length;
                     search_num += 1;
-                    if (engine.best_score >= WIN_SCORE)
+                    if (engine.cur_score >= WIN_SCORE)
                     {
                         logger.log("Sending forced win move in {} seconds.",
                                 seconds);
                     } else if (engine.pos_list.next is null)
                     {
-                        auto score = engine.best_score;
+                        auto score = engine.cur_score;
                         if (!engine.in_step)
                             score = engine.last_score;
                         if (score <= -MIN_WIN_SCORE)
@@ -1188,10 +1640,12 @@ int main(char[][] args)
                     average = search_time.interval() / search_num;
                 }
                 double max_seconds = search_max.interval();
+                /*
                 logger.log("Searched {} nodes, {:d} nps, {} tthits.",
                         engine.searcher.nodes_searched,
                         engine.searcher.nodes_searched/seconds,
                         engine.searcher.tthits);
+                */
                 logger.log("Finished search in {} seconds, average {}, max {}.",
                         seconds, average, max_seconds);
                 logger.console("Sending move {}", engine.bestmove);
@@ -1204,25 +1658,19 @@ int main(char[][] args)
                         Position.allocated, Position.reserved, Position.reserve_size);
                 if (PositionNode.allocated != PositionNode.reserved)
                 {
-                    logger.warn("PNodes allocated {} != in reserve {}.", PositionNode.allocated, PositionNode.reserved);
+                    logger.warn("PNodes allocated {} != in reserve {}.",
+                            PositionNode.allocated, PositionNode.reserved);
                 }
                 if (StepList.allocated != StepList.reserved)
                 {
-                    logger.warn("StepList allocated {} != in reserve {}", StepList.allocated, StepList.reserved);
+                    logger.log("StepList allocated {}, in reserve {}",
+                            StepList.allocated, StepList.reserved);
                 }
-                engine.state = EngineState.IDLE;
                 break;
             case EngineState.SEARCHING:
                 PositionNode cur_best = engine.pos_list;
-                int check_nodes;
-                if (engine.searcher.nodes_searched
-                        && (search_length.seconds > 2))
-                {
-                    check_nodes = cast(int)(engine.searcher.nodes_searched
-                            / search_length.interval);
-                } else {
-                    check_nodes = START_SEARCH_NODES;
-                }
+                Time now = Clock.now();
+                double check_time = 1.0;
                 if (tc_max_search != TimeSpan.zero && !pondering)
                 {
                     Time abort_time = move_start + tc_max_search;
@@ -1233,20 +1681,25 @@ int main(char[][] args)
                             abort_time = length_abort;
                     }
                     abort_checker.abort_time = abort_time;
+                    auto abort_length = abort_time - now;
+                    if (abort_length.interval < 1.0)
+                    {
+                        check_time = abort_length.interval;
+                        check_time = check_time > 0 ? check_time : 0;
+                    }
                 } else {
                     abort_checker.abort_time = Time.max;
                 }
-                engine.search(check_nodes, &abort_checker.should_abort);
+                engine.search(check_time, &abort_checker.should_abort);
                 check_num += 1;
-                Time now = Clock.now();
                 if (cur_best != engine.pos_list)
                 {
                     last_decision_change = now;
                 }
                 if (!pondering)
                 {
-                    if (((engine.max_depth != -1) && (engine.depth > engine.max_depth))
-                        || (engine.best_score >= WIN_SCORE)
+                    if (((max_depth != -1) && (engine.depth > max_depth))
+                        || (engine.cur_score >= WIN_SCORE)
                         || (engine.pos_list.next is null)
                         || (tc_permove != TimeSpan.zero
                             && (now >= (move_start + tc_max_search)))
@@ -1254,7 +1707,6 @@ int main(char[][] args)
                             && (now >= (search_start + tc_max_length))))
                     {
                         engine.set_bestmove();
-                        engine.state = EngineState.MOVESET;
                     } else if (tc_target_length != TimeSpan.zero
                             && (now > (search_start + tc_target_length)))
                     {
@@ -1291,7 +1743,6 @@ int main(char[][] args)
                                     tc_target_length.interval);
                         } else {
                             engine.set_bestmove();
-                            engine.state = EngineState.MOVESET;
                         }
                     } else if (tc_permove != TimeSpan.zero
                             && (now > (move_start + tc_min_search)))
@@ -1325,7 +1776,6 @@ int main(char[][] args)
                                     tc_min_search.interval);
                         } else {
                             engine.set_bestmove();
-                            engine.state = EngineState.MOVESET;
                         }
                     }
                     if (now > nextreport

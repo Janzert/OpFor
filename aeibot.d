@@ -88,10 +88,26 @@ class _StdioCom : Thread
 
     void run()
     {
-        char[] buf;
-        while (!stop && Cin.readln(buf, true))
+        try
         {
-            inq.set(buf.dup);
+            char[] buf;
+            while (!stop && Cin.readln(buf, true))
+            {
+                inq.set(buf.dup);
+            }
+        }
+        catch (Exception err)
+        {
+            if (!stop)
+            {
+                void writer(char[] str)
+                {
+                    Stderr(str);
+                }
+                Stderr("Caught error in stdin thread:").newline;
+                err.writeOut(&writer);
+                Stderr.newline;
+            }
         }
     }
 }
@@ -99,9 +115,11 @@ class _StdioCom : Thread
 class StdioServer : ServerConnection
 {
     _StdioCom comt;
+    Mutex out_lock;
 
     this()
     {
+        out_lock = new Mutex();
         comt = new _StdioCom();
         comt.start();
     }
@@ -126,8 +144,11 @@ class StdioServer : ServerConnection
 
     void send(char[] msg)
     {
-        Stdout(msg);
-        Stdout.flush();
+        synchronized (out_lock)
+        {
+            Stdout(msg);
+            Stdout.flush();
+        }
     }
 }
 
@@ -551,14 +572,24 @@ class AEIEngine
         state = EngineState.IDLE;
     }
 
+    void cleanup_search()
+    {
+        throw new NotImplementedException("AEIEngine.cleanup_search() has not been implemented.");
+    }
+
     void start_search()
     {
         throw new NotImplementedException("AEIEngine.start_search() has not been implemented.");
     }
 
-    void search(uint check_nodes, bool delegate() should_abort)
+    void search(double check_time, bool delegate() should_abort)
     {
         throw new NotImplementedException("AEIEngine.search() has not been implemented.");
+    }
+
+    void set_bestmove()
+    {
+        throw new NotImplementedException("AEIEngine.set_bestmove() has not been implemented.");
     }
 
     void make_move(char[] move)

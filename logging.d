@@ -1,4 +1,5 @@
 
+import tango.core.sync.Mutex;
 import tango.io.Stdout;
 import tango.text.convert.Format;
 
@@ -13,9 +14,11 @@ class Logger
 {
     LogConsumer[] consumers;
     bool to_console = false;
+    Mutex console_lock;
 
     this()
     {
+        console_lock = new Mutex();
         consumers.length = 0;
     }
 
@@ -25,11 +28,28 @@ class Logger
         consumers[length-1] = c;
     }
 
+    private
+    {
+    void _console_print(char[] fmt, ...)
+    {
+        _console_print(_arguments, _argptr, fmt);
+    }
+
+    void _console_print(TypeInfo[] _arguments, void* _argptr, char[] fmt)
+    {
+        synchronized (console_lock)
+        {
+            Stderr(Stderr.layout.convert(_arguments, _argptr, fmt)).newline;
+        }
+    }
+    }
+
+
     void console(char[] fmt, ...)
     {
         if (to_console)
         {
-            Stderr(Stderr.layout.convert(_arguments, _argptr, fmt)).newline;
+            _console_print(_arguments, _argptr, fmt);
         }
     }
 
@@ -42,7 +62,7 @@ class Logger
         }
 
         if (to_console)
-            Stderr(Format("log: %s", message));
+            _console_print("log: {}", message);
     }
 
     void warn(char[] fmt, ...)
@@ -54,7 +74,7 @@ class Logger
         }
 
         if (to_console)
-            Stderr(Format("log: %s", message));
+            _console_print("log: {}", message);
     }
 
     void info(char[] fmt, ...)

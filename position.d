@@ -1,8 +1,8 @@
 
 import std.intrinsic;
-
-import tango.io.Stdout;
 import tango.core.Memory;
+import tango.core.sync.Mutex;
+import tango.io.Stdout;
 import tango.math.random.Random;
 import tango.text.convert.Format;
 import tango.text.Text;
@@ -275,14 +275,14 @@ class StepList
     Step[] steps;
     int numsteps = 0;
 
-    private static Object reserve_lock;
+    private static Mutex reserve_lock;
     private static StepList[] reservelists;
     private static int reservesize;
     static int allocated = 0;
 
     static this()
     {
-        reserve_lock = new Object();
+        reserve_lock = new Mutex();
     }
 
     static int reserved()
@@ -581,14 +581,14 @@ class Position
         }
     }
 
-    private static Object reserve_lock;
+    private static Mutex reserve_lock;
     private static Position[] reserve;
     private static int reservesize;
     static int allocated;
 
     static this()
     {
-        reserve_lock = new Object();
+        reserve_lock = new Mutex();
     }
 
     static int reserved()

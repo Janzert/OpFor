@@ -22,6 +22,32 @@ class Queue(T)
         cnd = new Condition(mutex);
     }
 
+    void clear()
+    {
+        synchronized (mutex)
+        {
+            while (qhead !is null)
+            {
+                QMsg* qmsg = qhead;
+                qhead = qhead.next;
+                qmsg.msg = null;
+                qmsg.next = qbuf;
+                qbuf = qmsg;
+            }
+        }
+    }
+
+    bool has_item()
+    {
+        synchronized (mutex)
+        {
+            if (qhead !is null)
+                return true;
+            return false;
+        }
+    }
+
+    // 0 timeout does not wait, a negative timeout will wait forever
     T get(double timeout=0)
     {
         synchronized (mutex)
