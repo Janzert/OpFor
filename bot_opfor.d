@@ -419,6 +419,7 @@ class ThreadEngine : Engine
     {
         super(l);
         logger = l;
+        board_setup = new SetupGenerator();
         ttable = new TransTable(l, 10);
         pn_lock = new Mutex();
         pos_q = new Queue!(PositionNode)();
