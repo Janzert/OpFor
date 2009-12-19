@@ -2,7 +2,10 @@
 // Give traceback when an exception is thrown
 // does not work in release mode
 // does not work if placed in a debug section
-//import tango.core.tools.TraceExceptions;
+version (trace_exceptions)
+{
+import tango.core.tools.TraceExceptions;
+}
 
 import tango.core.Memory;
 import tango.core.Atomic;
@@ -96,6 +99,29 @@ class PositionNode
         cache_head = n;
         reserved++;
     }
+}
+
+class Engine : AEIEngine
+{
+    PositionNode pos_list;
+    bool in_step;
+    int last_score;
+    int depth;
+
+    this(Logger l)
+    {
+        super(l);
+    }
+
+    int cur_score() { return 0; }
+
+    void logged_eval(Position pos) { }
+
+    void report() { }
+
+    bool set_option(char[] name, char[] value) { return false; }
+
+    void shutdown() { }
 }
 
 class SearcherMsg
@@ -358,7 +384,7 @@ class SearchThread : Thread
     }
 }
 
-class ThreadEngine : AEIEngine
+class ThreadEngine : Engine
 {
     TransTable ttable;
     Logger logger;
@@ -374,10 +400,8 @@ class ThreadEngine : AEIEngine
 
     Atomic!(int) best_score;
     int update_score;
-    int last_score;
     Mutex pn_lock;
     PositionNode last_best;
-    PositionNode pos_list;
     PositionNode loss_list;
     int num_moves;
     int checked_moves;
@@ -385,9 +409,6 @@ class ThreadEngine : AEIEngine
     int num_losing;
     int losing_score;
     ulong nodes_searched;
-    bool in_step;
-
-    int depth;
 
     StopWatch search_timer;
 
@@ -830,12 +851,11 @@ class ThreadEngine : AEIEngine
     }
 }
 
-class Engine : AEIEngine
+class SeqEngine : Engine
 {
     TransTable ttable;
     SetupGenerator board_setup;
     ABQSearch searcher;
-    PositionNode pos_list;
     PositionNode loss_list;
     PositionNode next_pos;
     int num_moves;
@@ -845,11 +865,8 @@ class Engine : AEIEngine
 
     bool log_tt_stats = false;
 
-    int depth;
     int best_score;
 
-    bool in_step;
-    int last_score;
     PositionNode last_best;
 
     const static int BOOK_SIZE = 1000000;
@@ -1261,8 +1278,6 @@ class Engine : AEIEngine
         searcher.cleanup();
         state = EngineState.IDLE;
     }
-
-    void shutdown() { }
 }
 
 
@@ -1272,11 +1287,16 @@ int main(char[][] args)
     ushort port = 40015;
     bool use_stdio = true;
 
+    Logger logger = new Logger();
+    Engine engine;
+
     Arguments arguments = new Arguments();
     arguments.define("server").aliases(["s"]).parameters(1);
     arguments.define("port").aliases(["p"]).parameters(1);
     arguments.define("stdio").conflicts(["socket"]);
     arguments.define("socket").conflicts(["stdio"]);
+    arguments.define("seq").conflicts(["threads"]);
+    arguments.define("threads").conflicts(["seq"]);
 
     if (args.length > 1)
     {
@@ -1300,13 +1320,24 @@ int main(char[][] args)
         {
             use_stdio = true;
         }
+        if (arguments.contains("seq"))
+        {
+            engine = new SeqEngine(logger);
+        }
+        if (arguments.contains("threads"))
+        {
+            engine = new ThreadEngine(logger);
+        }
     }
+    if (engine is null)
+        engine = new ThreadEngine(logger);
+
+    int max_depth = -1;
 
     TimeSpan report_interval = TimeSpan.fromMinutes(1);
     Time nextreport = Time.min;
     int report_depth = 0;
 
-    Logger logger = new Logger();
     ServerInterface server;
     if (use_stdio)
     {
@@ -1325,9 +1356,6 @@ int main(char[][] args)
         }
     }
     logger.register(server);
-    Engine engine = new Engine(logger);
-    //auto engine = new ThreadEngine(logger);
-    int max_depth = -1;
 
     class AbortChecker
     {
