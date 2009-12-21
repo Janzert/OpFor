@@ -34,6 +34,7 @@ class Queue(T)
                 qmsg.next = qbuf;
                 qbuf = qmsg;
             }
+            qtail = null;
         }
     }
 

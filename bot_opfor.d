@@ -629,7 +629,6 @@ class ThreadEngine : Engine
                 thread.set_depth(0);
                 thread.prepare_search();
             }
-            state = EngineState.SEARCHING;
             PositionNode next_pos = pos_list;
             to_check = 0;
             while (next_pos !is null)
@@ -639,6 +638,7 @@ class ThreadEngine : Engine
                 ++to_check;
             }
             run_search.store(true);
+            state = EngineState.SEARCHING;
             search_wait.notifyAll();
         }
     }
