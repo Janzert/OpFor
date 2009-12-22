@@ -7,6 +7,7 @@ version (trace_exceptions)
 import tango.core.tools.TraceExceptions;
 }
 
+import tango.util.log.Trace;
 import tango.core.Memory;
 import tango.core.Atomic;
 import tango.core.Thread;
@@ -633,6 +634,21 @@ class ThreadEngine : Engine
             to_check = 0;
             while (next_pos !is null)
             {
+                debug
+                {
+                    if (next_pos !is pos_list)
+                    {
+                        assert (next_pos.prev !is null,
+                                "next_pos.prev is null");
+                        assert (next_pos.prev.next is next_pos,
+                            "next_pos.prev.next is not next_pos");
+                    }
+                    if (next_pos.next !is null)
+                    {
+                        assert (next_pos.next.prev is next_pos,
+                            "next_pos.next.prev is not next_pos");
+                    }
+                }
                 pos_q.set(next_pos);
                 next_pos = next_pos.next;
                 ++to_check;
@@ -670,6 +686,15 @@ class ThreadEngine : Engine
             {
                 thread.abort_search = false;
             }
+            auto msg = msg_q.get();
+            while (msg !is null)
+            {
+                if (auto r = cast(ResultSMessage)msg)
+                {
+                    ResultSMessage.free(r);
+                }
+                msg = msg_q.get();
+            }
         }
     }
 
@@ -678,14 +703,16 @@ class ThreadEngine : Engine
         in_step = true;
         search_timer.start();
         uint check_usecs = cast(uint)(check_time * 1000000);
-        while (search_timer.microsec() < check_usecs && in_step && best_score.load() < WIN_SCORE)
+        while (search_timer.microsec() < check_usecs
+                && in_step && best_score.load() < WIN_SCORE)
         {
             bool depth_finished = false;
             SearcherMsg msg;
             do {
-                auto time = cast(double)(search_timer.microsec()) / 1000000;
-                time = time < 1 ? 1 - time : 0;
-                msg = msg_q.get(time);
+                auto wait_time = cast(double)search_timer.microsec / 1000000.0;
+                wait_time = check_time - wait_time;
+                wait_time = wait_time < 0 ? 0 : wait_time;
+                msg = msg_q.get(wait_time);
                 if (auto result = cast(ResultSMessage)msg)
                 {
                     update_pos(result.search);
@@ -701,7 +728,7 @@ class ThreadEngine : Engine
                     logger.warn("Got unknown message from search thread.");
                     assert(false, "Bad search thread message");
                 }
-            } while (msg !is null);
+            } while (msg !is null && search_timer.microsec() < check_usecs);
 
             if (depth_finished)
             {
@@ -759,8 +786,15 @@ class ThreadEngine : Engine
 
                 synchronized (pn_lock)
                 {
+                    assert (result.prev !is null, "result.prev is null");
+                    assert (result.prev.next is result,
+                            "result.prev.next is not result");
                     if (result.next !is null)
+                    {
+                        assert (result.next.prev is result,
+                                "result.next.prev is not result");
                         result.next.prev = result.prev;
+                    }
                     result.prev.next = result.next;
                     result.next = pos_list;
                     result.prev = null;
@@ -774,10 +808,16 @@ class ThreadEngine : Engine
         {
             synchronized (pn_lock)
             {
+                assert (result.prev !is null, "result.prev is null");
+                assert (result.prev.next is result,
+                    "result.prev.next is not result");
                 auto next_pos = result.next;
                 if (result.next !is null)
+                {
+                    assert (result.next.prev is result,
+                            "result.next.prev is not result");
                     result.next.prev = result.prev;
-
+                }
                 result.prev.next = result.next;
 
                 result.prev = null;
@@ -1034,7 +1074,7 @@ class SeqEngine : Engine
             checked_moves = 0;
             num_losing = 0;
             losing_score = -MIN_WIN_SCORE;
-            searcher.set_depth(4); // FIXME: Should be same as depth, i.e. 0
+            searcher.set_depth(0);
             searcher.prepare();
             state = EngineState.SEARCHING;
             search_length.start();

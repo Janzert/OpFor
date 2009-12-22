@@ -58,7 +58,7 @@ class Queue(T)
                 if (timeout > 0)
                 {
                     cnd.wait(timeout);
-                } else {
+                } else { // timeout must be negative
                     cnd.wait();
                 }
             }
@@ -107,8 +107,8 @@ class Queue(T)
                 qhead = qmsg;
                 qtail = qmsg;
             }
-            cnd.notify();
         }
+        cnd.notify();
     }
 }
 
