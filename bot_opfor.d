@@ -704,7 +704,6 @@ class ThreadEngine : Engine
         in_step = true;
         search_timer.start();
         uint check_usecs = cast(uint)(check_time * 1000000);
-        logger.log("Going into search {}", check_usecs);
         while (search_timer.microsec() < check_usecs && !should_abort()
                 && in_step && update_score < WIN_SCORE)
         {
@@ -885,9 +884,12 @@ class ThreadEngine : Engine
         } else {
             logger.info("score {}", cast(int)(last_score / 1.96));
         }
-        StepList bestline = get_bestline();
-        logger.info("pv {}", bestline.to_move_str(position));
-        StepList.free(bestline);
+        if (pos_list !is null) // no positions are generated for setup moves
+        {
+            StepList bestline = get_bestline();
+            logger.info("pv {}", bestline.to_move_str(position));
+            StepList.free(bestline);
+        }
         if (log_tt_stats)
         {
             logger.info("TT hits {} misses {} collisions {}",
@@ -1289,9 +1291,12 @@ class SeqEngine : Engine
         } else {
             logger.info("score {}", cast(int)(last_score / 1.96));
         }
-        StepList bestline = get_bestline();
-        logger.info("pv {}", bestline.to_move_str(position));
-        StepList.free(bestline);
+        if (pos_list !is null) // no positions are generated for setup moves
+        {
+            StepList bestline = get_bestline();
+            logger.info("pv {}", bestline.to_move_str(position));
+            StepList.free(bestline);
+        }
         if (log_tt_stats)
         {
             logger.info("TT hits {} misses {} collisions {}",
