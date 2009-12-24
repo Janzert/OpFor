@@ -280,7 +280,7 @@ class SearchThread : Thread
             searcher.check_nodes = next_check;
 
             ulong start_nodes = searcher.nodes_searched;
-            int cur_score = control.cur_score();
+            int cur_score = control.best_score.load();
             Position pos = search.pos;
             searcher.nullmove = pos.dup;
             searcher.nullmove.do_step(NULL_STEP);
@@ -553,7 +553,7 @@ class ThreadEngine : Engine
 
     int cur_score()
     {
-        return best_score.load();
+        return update_score;
     }
 
     void logged_eval(Position pos)
@@ -621,6 +621,7 @@ class ThreadEngine : Engine
                 num_moves = 1;
             }
             best_score.store(MIN_SCORE);
+            update_score = MIN_SCORE;
             depth = 0;
             checked_moves = 0;
             num_losing = 0;
@@ -703,8 +704,9 @@ class ThreadEngine : Engine
         in_step = true;
         search_timer.start();
         uint check_usecs = cast(uint)(check_time * 1000000);
-        while (search_timer.microsec() < check_usecs
-                && in_step && best_score.load() < WIN_SCORE)
+        logger.log("Going into search {}", check_usecs);
+        while (search_timer.microsec() < check_usecs && !should_abort()
+                && in_step && update_score < WIN_SCORE)
         {
             bool depth_finished = false;
             SearcherMsg msg;
@@ -732,6 +734,8 @@ class ThreadEngine : Engine
 
             if (depth_finished)
             {
+                assert (best_score.load() == update_score,
+                        "update_score != best_score at depth end");
                 run_search.store(false);
                 depth++;
                 checked_moves = 0;
@@ -739,7 +743,7 @@ class ThreadEngine : Engine
                 {
                     thread.set_depth(depth);
                 }
-                last_score = best_score.load();
+                last_score = update_score;
                 last_best = pos_list;
                 update_score = MIN_SCORE;
                 best_score.store(MIN_SCORE);
@@ -877,7 +881,7 @@ class ThreadEngine : Engine
         {
             logger.info("depth_searched {}", checked_moves);
             logger.info("to_search {}", to_check - checked_moves);
-            logger.info("score {}", cast(int)(best_score.load() / 1.96));
+            logger.info("score {}", cast(int)(update_score / 1.96));
         } else {
             logger.info("score {}", cast(int)(last_score / 1.96));
         }
@@ -1567,6 +1571,7 @@ int main(char[][] args)
                     server.clear_cmd();
                     break;
                 case ServerCmd.CmdType.MAKEMOVE:
+                    move_start = Clock.now();
                     MoveCmd mcmd = cast(MoveCmd)server.current_cmd;
                     if (engine.state != EngineState.IDLE)
                     {
@@ -1709,12 +1714,13 @@ int main(char[][] args)
                     average = search_time.interval() / search_num;
                 }
                 double max_seconds = search_max.interval();
-                /*
-                logger.log("Searched {} nodes, {:d} nps, {} tthits.",
-                        engine.searcher.nodes_searched,
-                        engine.searcher.nodes_searched/seconds,
-                        engine.searcher.tthits);
-                */
+                if (engine.in_step)
+                {
+                    logger.info("depth {}+", engine.depth+3);
+                } else {
+                    logger.info("depth {}", engine.depth+3);
+                }
+                engine.report();
                 logger.log("Finished search in {} seconds, average {}, max {}.",
                         seconds, average, max_seconds);
                 logger.console("Sending move {}", engine.bestmove);
