@@ -6,6 +6,7 @@ import tango.text.convert.Format;
 interface LogConsumer
 {
     void log(char[]);
+    void error(char[]);
     void warn(char[]);
     void info(char[]);
 }
@@ -65,6 +66,18 @@ class Logger
             _console_print("log: {}", message);
     }
 
+    void error(char[] fmt, ...)
+    {
+        char[] message = Format.convert(_arguments, _argptr, fmt);
+        foreach(LogConsumer con; consumers)
+        {
+            con.error(message);
+        }
+
+        if (to_console)
+            _console_print("Error: {}", message);
+    }
+
     void warn(char[] fmt, ...)
     {
         char[] message = Format.convert(_arguments, _argptr, fmt);
@@ -74,7 +87,7 @@ class Logger
         }
 
         if (to_console)
-            _console_print("log: {}", message);
+            _console_print("Warning: {}", message);
     }
 
     void info(char[] fmt, ...)

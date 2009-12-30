@@ -483,6 +483,11 @@ class ServerInterface : LogConsumer
         con.send(Format("log Warning: {}\n", message));
     }
 
+    void error(char[] message)
+    {
+        con.send(Format("log Error: {}\n", message));
+    }
+
     ServerCmd current_cmd()
     {
         if (cmd_queue.length)

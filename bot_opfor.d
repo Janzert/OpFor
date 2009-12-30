@@ -18,6 +18,7 @@ import tango.io.Stdout;
 import tango.text.Ascii;
 import tango.text.convert.Float;
 import tango.text.convert.Integer;
+import tango.text.Util;
 import tango.time.Clock;
 import tango.time.StopWatch;
 import tango.time.Time;
@@ -373,7 +374,7 @@ class SearchThread : Thread
             }
         } catch (Exception err)
         {
-            control.logger.warn("Caught error in search thread");
+            control.logger.error("Caught error in search thread");
             char[] exception_msg = "".dup;
             void excwriter(char[] str)
             {
@@ -381,6 +382,11 @@ class SearchThread : Thread
             }
             err.writeOut(&excwriter);
             control.logger.console(exception_msg);
+            char[][] exc_lines = splitLines!(char)(exception_msg);
+            foreach (line; exc_lines)
+            {
+                control.logger.error(line);
+            }
         }
     }
 }
@@ -451,6 +457,16 @@ class ThreadEngine : Engine
             }
             threads.length = thread_num;
         }
+    }
+
+    bool check_threads()
+    {
+        foreach (thread; threads)
+        {
+            if (!thread.isRunning())
+                return false;
+        }
+        return true;
     }
 
     bool set_option(char[] name, char[] value)
@@ -703,6 +719,9 @@ class ThreadEngine : Engine
     {
         in_step = true;
         search_timer.start();
+        if (!check_threads())
+            throw new Exception("Not all search threads running");
+
         uint check_usecs = cast(uint)(check_time * 1000000);
         while (search_timer.microsec() < check_usecs && !should_abort()
                 && in_step && update_score < WIN_SCORE)
