@@ -878,6 +878,7 @@ class ThreadEngine : Engine
     {
         StepList bestline = pos_list.move.dup;
         Position pos = pos_list.pos.dup;
+        StepList pos_steps = StepList.allocate();
         TTNode* n = ttable.get(pos);
         for (int pvdepth = 0; pvdepth < depth * 2; pvdepth++)
         {
@@ -886,12 +887,20 @@ class ThreadEngine : Engine
             {
                 break;
             }
+            pos_steps.clear();
+            pos.get_steps(pos_steps);
+            int bix = 0;
+            while (pos_steps.numsteps < bix && pos_steps.steps[bix] != n.beststep)
+                bix++;
+            if (bix >= pos_steps.numsteps)
+                break;
             Step* next_step = bestline.newstep();
             *next_step = n.beststep;
             pos.do_step(n.beststep);
             n = ttable.get(pos);
         }
 
+        StepList.free(pos_steps);
         Position.free(pos);
         return bestline;
     }
