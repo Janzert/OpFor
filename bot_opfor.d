@@ -366,9 +366,15 @@ class SearchThread : Thread
                     }
                     searching.store(false);
                 } else {
-                    synchronized (control.search_wait_lock)
+                    try
                     {
-                        control.search_wait.wait(0.1);
+                        synchronized (control.search_wait_lock)
+                        {
+                            control.search_wait.wait(0.1);
+                        }
+                    } catch (SyncException err)
+                    {
+                        control.logger.warn("Caught sync exception while waiting in search thread.");
                     }
                 }
             }
