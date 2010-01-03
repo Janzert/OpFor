@@ -421,6 +421,7 @@ class ThreadEngine : Engine
     int to_check;
     int num_losing;
     int losing_score;
+    bool provisional_result;
     ulong nodes_searched;
 
     StopWatch search_timer;
@@ -565,6 +566,7 @@ class ThreadEngine : Engine
         }
         pos_list = null;
         last_best = null;
+        provisional_result = false;
         num_moves = 0;
         nodes_searched = 0;
         last_score = MIN_SCORE;
@@ -788,7 +790,10 @@ class ThreadEngine : Engine
 
     void set_bestmove()
     {
-        bestmove = pos_list.move.to_move_str(position);
+        if (provisional_result)
+            bestmove = last_best.move.to_move_str(position);
+        else
+            bestmove = pos_list.move.to_move_str(position);
         stop_search();
         state = EngineState.MOVESET;
     }
@@ -805,8 +810,14 @@ class ThreadEngine : Engine
     private void update_pos(PositionNode result)
     {
         auto score = result.last_score;
+        if (provisional_result && result is last_best)
+            provisional_result = false;
         if (score > update_score)
         {
+            if (update_score == MIN_SCORE && last_best !is null
+                    && result !is pos_list)
+                provisional_result = true;
+
             update_score = score;
             if (result !is pos_list)
             {
