@@ -760,6 +760,7 @@ class ThreadEngine : Engine
 
             if (depth_finished)
             {
+                assert (!provisional_result, "provisional result after search");
                 assert (best_score.load() == update_score,
                         "update_score != best_score at depth end");
                 run_search.store(false);
