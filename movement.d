@@ -1,6 +1,8 @@
 
 import position;
 
+import tango.util.log.Trace;
+
 void piece_mobility(Position pos, ulong pbit, ulong freezers,
         ulong[] reachable, out ulong frozen)
 in
@@ -89,7 +91,9 @@ body
                             & ~pbit & ~fbit));
         } else {
             bitix fix = bitindex(fbit);
-            if ((f_neighbors & pos.placement[side] & ~pbit)
+            ulong emptied = (f_neighbors & TRAPS & pos.placement[side])
+                & ~(neighbors_of(pos.placement[side] & ~fbit));
+            if ((f_neighbors & pos.placement[side] & ~pbit & ~emptied)
                     || ((fbit & ~TRAPS)
                         && piece >= pos.strongest[side^1][fix] + enemyoffset))
             {
@@ -102,7 +106,8 @@ body
             reachable[4] |= f_neighbors & (pos.placement[side] | filled)
                 & ~((pos.bitBoards[Piece.WRABBIT + pieceoffset]
                             | (is_r ? filled : 0))
-                        & ~rabbit_steps(cast(Side)(side^1), safe_empties & ~filled))
+                        & ~rabbit_steps(cast(Side)(side^1),
+                            safe_empties & ~filled))
                 & neighbors_of(safe_empties & ~filled);
             frozen |= reachable[4] & fr_neighbors
                 & ~neighbors_of(pos.placement[side] & ~(pbit | fbit));
@@ -146,33 +151,15 @@ body
 
 debug (test_movement)
 {
-    import std.file;
-    import std.path;
-    import std.stdio;
+    import tango.io.FilePath;
+    import tango.io.Stdout;
+    import tango.io.UnicodeFile;
+    import tango.math.random.Random;
+    import tango.text.Ascii;
 
-    int main(char[][] args)
+    void test_pos(Position pos, out uint true_moves,
+            out uint reported_moves)
     {
-        if (args.length < 2)
-        {
-            writefln("usage: %s boardfile [run_playouts]", getBaseName(args[0]));
-            return 1;
-        }
-        char[] boardstr;
-        try
-        {
-            boardstr = cast(char[])read(args[1]);
-        } catch (FileException fx)
-        {
-            writefln("A file exception occured: " ~ fx.toString());
-            return 2;
-        }
-
-        Position pos = position.parse_long_str(boardstr);
-        writefln("wb"[pos.side]);
-        writefln(pos.to_long_str(true));
-        writefln(pos.to_placing_move());
-        writefln();
-
         pos.set_side(Side.WHITE);
         ulong[Piece.max+1] true_movement;
         PosStore moves = pos.get_moves();
@@ -194,6 +181,8 @@ debug (test_movement)
                 true_movement[p] |= result.bitBoards[p];
             }
         }
+        for (int p = Piece.WRABBIT; p <= Piece.BELEPHANT; p++)
+            true_movement[p] |= pos.bitBoards[p];
 
         ulong enemyoffset = 6;
         ulong freezers;
@@ -219,29 +208,131 @@ debug (test_movement)
             freezers |= pos.bitBoards[p - enemyoffset];
         }
 
-        int total_true;
-        int total_reported;
+        true_moves = 0;
+        reported_moves = 0;
         for (int p = Piece.WCAT; p <= Piece.max; p++)
         {
             if (p == Piece.BRABBIT)
                 continue;
             if (reported_movement[p] & ~true_movement[p])
             {
-                writefln("Reported moves for %s that could not be made.", ".RCDHMErcdhme"[p]);
-                writefln("%s", bits_to_str(reported_movement[p] & ~true_movement[p]));
-                return 1;
+                Stdout.format("Incorrect moves for {}",
+                    ".RCDHMErcdhme"[p]).newline;
+                Stdout(bits_to_str(reported_movement[p]
+                            & ~true_movement[p])).newline;
+                throw new Exception("Moves reported that could not be made.");
             }
             int true_count = popcount(true_movement[p]);
             int reported_count = popcount(reported_movement[p]);
-            real found_per = (cast(real)reported_count / true_count) * 100.0;
-            writefln("For %s found %d of %d (%.2f) move squares.", ".RCDHMErcdhme"[p],
-                    reported_count, true_count, found_per);
-            total_true += true_count;
-            total_reported += reported_count;
+            real found_per = true_count > 0
+                ? (cast(real)reported_count / true_count) * 100.0
+                : 100.0;
+            Stdout.format("For {} found {} of {} ({:.2}) move squares.",
+                    ".RCDHMErcdhme"[p],
+                    reported_count, true_count, found_per).newline;
+            true_moves += true_count;
+            reported_moves += reported_count;
         }
-        real total_per = (cast(real)total_reported / total_true) * 100.0;
-        writefln("Overall found %d of %d (%.2f) move squares.", total_reported, total_true,
-                total_per);
+        real total_per = (cast(real)reported_moves / true_moves) * 100.0;
+        Stdout.format("Overall for pos found {} of {} ({:.2}) move squares.",
+                reported_moves, true_moves, total_per).newline;
+    }
+
+    ulong random_bit(ulong bits)
+    {
+        int num = popcount(bits);
+        int bix = rand.uniformR!(int)(num);
+        ulong b;
+        for (int i=0; i <= bix; i++)
+        {
+            b = bits & -bits;
+            bits ^= b;
+        }
+        return b;
+    }
+    void random_pos(inout Position pos)
+    {
+        Piece[] white_pieces;
+        white_pieces = [Piece.WELEPHANT, Piece.WCAMEL, Piece.WHORSE,
+            Piece.WHORSE, Piece.WDOG, Piece.WDOG, Piece.WCAT, Piece.WCAT].dup;
+        Piece[] black_pieces;
+        black_pieces = [Piece.BELEPHANT, Piece.BCAMEL, Piece.BHORSE,
+            Piece.BHORSE, Piece.BDOG, Piece.BDOG, Piece.BCAT, Piece.BCAT].dup;
+
+        ulong[] restricted_sqr = [0UL, RANK_8, 0, 0, 0, 0, 0,
+            RANK_1, 0, 0, 0, 0, 0];
+        int[] num_piece = [0, 8, 2, 2, 2, 1, 1, 8, 2, 2, 2, 1, 1];
+
+        ulong empty = ALL_BITS_SET;
+        ulong sqb;
+        for (Piece pt=Piece.WRABBIT; pt <= Piece.BELEPHANT; pt++)
+        {
+            int pt_side = pt < Piece.BRABBIT ? Side.WHITE : Side.BLACK;
+            auto place_num = rand.uniformR!(int)(num_piece[pt]);
+            if ((pt_side == Side.WHITE && pt >= Piece.WHORSE)
+                    || (pt_side == Side.BLACK && pt >= Piece.BHORSE))
+                place_num = num_piece[pt];
+            for (int n=0; n < place_num; n++)
+            {
+                sqb = random_bit(empty & ~(TRAPS
+                            & ~neighbors_of(pos.placement[pt_side]))
+                            & ~restricted_sqr[pt]);
+                empty ^= sqb;
+                pos.place_piece(pt, sqb);
+            }
+        }
+        pos.set_steps_left(4);
+    }
+
+    int main(char[][] args)
+    {
+        if (args.length < 2)
+        {
+            FilePath exec = new FilePath(args[0]);
+            Stdout.format("usage: {} <boardfile> | -r",
+                    exec.name).newline;
+            return 1;
+        }
+
+        if (compare("-r", args[1]))
+        {
+            char[] boardstr;
+            boardstr = UnicodeFile!(char)(args[1], Encoding.Unknown).read();
+
+            Position pos = position.parse_long_str(boardstr);
+            Stdout("wb"[pos.side]).newline;
+            Stdout(pos.to_long_str(true)).newline;
+            Stdout(pos.to_placing_move()).newline;
+            Stdout().newline;
+
+            uint pos_moves, pos_reported;
+            test_pos(pos, pos_moves, pos_reported);
+
+            return 0;
+        }
+
+        // Check randomly generated positions
+        ulong total_moves, total_reported;
+        Position pos = new Position();
+        uint pos_num;
+        while (true)
+        {
+            pos_num++;
+            random_pos(pos);
+            Stdout(pos_num);
+            Stdout("wb"[pos.side]).newline;
+            Stdout(pos.to_long_str(true)).newline;
+            Stdout(pos.to_placing_move()).newline;
+            uint pos_moves, pos_reported;
+            test_pos(pos, pos_moves, pos_reported);
+            total_moves += pos_moves;
+            total_reported += pos_reported;
+            Stdout.format("All positions found {} moves of {} total ({:.2}).",
+                    total_reported, total_moves,
+                    (cast(real)total_reported/total_moves) * 100.0).newline;
+            Stdout.newline;
+            pos.clear();
+        }
 
         return 0;
     }
