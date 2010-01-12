@@ -208,17 +208,12 @@ class StaticEval
         return score;
     }
 
-    // penalty for piece on trap, pinned or framed
+    // penalty for piece on trap
     int on_trap()
     {
-        const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
-        const int FRAMED[13] = [0, -50, -75, -100, -175, -225, -400,
-              50, 75, 100, 175, 225, 400];
-        const int PINNED[13] = [0, 0, -2, -3, -5, -8, -22, 0, 2, 3, 5, 8, 22];
-        const int FRAMER[13] = [0, 0, -1, -2, -3, -4, -11, 0, 1, 2, 3, 4, 11];
+        const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88,
+              6, 9, 12, 18, 33, 88];
 
-        frames = 0;
-        weakframers = 0;
         int score = 0;
         ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
         while (occupied_traps)
@@ -236,51 +231,6 @@ class StaticEval
                 score += ON_TRAP[tpiece] / 2;
             } else {
                 score += ON_TRAP[tpiece];
-            }
-
-            ulong fneighbors = tneighbors & pos.placement[tside];
-            if (popcount(fneighbors) == 1)
-            {
-                bitix fix = bitindex(fneighbors);
-                score += PINNED[pos.pieces[fix]];
-
-                tneighbors ^= fneighbors;
-                if (tpiece == Piece.WRABBIT)
-                    tneighbors &= ~(tbit >> 8);
-                else if (tpiece == Piece.BRABBIT)
-                    tneighbors &= ~(tbit << 8);
-
-                if (!(tneighbors & pos.bitBoards[Piece.EMPTY]))
-                {
-                    bool framed = true;
-                    ulong wframers;
-                    real framing_score = 0;
-                    while (tneighbors)
-                    {
-                        ulong ebit = tneighbors & -tneighbors;
-                        tneighbors ^= ebit;
-                        bitix eix = bitindex(ebit);
-                        if (tpiece + pieceoffset > pos.pieces[eix])
-                        {
-                            wframers |= ebit;
-                            if (neighbors_of(ebit) & pos.bitBoards[Piece.EMPTY])
-                            {
-                                framed = false;
-                                break;
-                            }
-                        }
-                        Piece epiece;
-                        epiece = pos.pieces[eix];
-                        framing_score += FRAMER[epiece];
-                    }
-                    if (framed)
-                    {
-                        weakframers |= wframers;
-                        frames |= tbit;
-                        score += FRAMED[tpiece];
-                        score += framing_score;
-                    }
-                }
             }
         }
         return score;
@@ -686,7 +636,16 @@ class StaticEval
                                     10, 25, 39, 61, 150, 264];
         static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
                                     0, 4, 5, 10, 18, 44];
-        static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
+        static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88,
+                                    6, 9, 12, 18, 33, 88];
+        static const int[13] FRAMED_VAL = [0,
+                                    -100, -150, -200, -250, -325, -800,
+                                    100, 150, 200, 250, 325, 800];
+        static const int[13] PINNED_VAL = [0, 0, -8, -12, -20, -32, -88,
+                                    0, 8, 12, 20, 32, 88];
+        static const int[13] FRAMER_VAL = [0, 0, -2, -4, -6, -8, -22,
+                     0, 2, 4, 6, 8, 22];
+
         static const int[] TRAP_DIST_MUL =
             [1, 1, 2, 1, 1, 2, 1, 1,
              1, 2, 2, 2, 2, 2, 2, 1,
@@ -697,6 +656,8 @@ class StaticEval
              1, 2, 2, 2, 2, 2, 2, 1,
              1, 1, 2, 1, 1, 2, 1, 1];
 
+        weakframers = 0;
+        frames = 0;
         hostages = 0;
         real bscore = 0;
         real hscore = 0;
@@ -722,17 +683,49 @@ class StaticEval
                     unsafe |= tbit;
                 }
             }
-
+            // FIXME: coverage does not include any rabbit movement
+            ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
+                & pos.bitBoards[Piece.EMPTY] & ~unsafe;
+            for (int steps = 0; steps < 3; steps++)
+            {
+                coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY]
+                    & ~unsafe;
+            }
             ulong empty_neighbors = neighbors_of(pos.bitBoards[Piece.EMPTY]);
 
-            ulong bcheck = (pos.bitBoards[Piece.WELEPHANT+pieceoffset] | pos.bitBoards[Piece.WCAMEL+pieceoffset]
-                | pos.bitBoards[Piece.WHORSE+pieceoffset]) & ~pos.frozen;
+            ulong bcheck = pos.placement[side];
             while (bcheck)
             {
                 ulong pbit = bcheck & -bcheck;
                 bcheck ^= pbit;
                 bitix pix = bitindex(pbit);
                 ulong pneighbors = neighbors_of(pbit);
+
+                if (pbit & pos.frozen)
+                {
+                    if (popcount(pneighbors & coverage) < 2)
+                    {
+                        real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.2 to .2
+                        if (side)
+                            power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
+                        else
+                            power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
+                        // power_mul should now be .8 to 1
+                        hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
+                        debug (mobility)
+                        {
+                            logger.log("hostage piece {}{}, pp {}, sc {}",
+                                    ".RCDHMErcdhme"[pos.pieces[pix]],
+                                    ix_to_alg(pix), power_mul,
+                                    HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul);
+                        }
+
+                        Piece strong_holder = pos.strongest[side^1][pix];
+                        hscore += HOLDER_PENALTY[strong_holder];
+                        hostages |= pbit;
+                    }
+                    continue;
+                }
 
                 if (popcount(pneighbors & pos.bitBoards[Piece.EMPTY]) > 1)
                     continue;
@@ -769,7 +762,8 @@ class StaticEval
                 if (can_push)
                     continue;
 
-
+                // pbit is blockaded figure out if just blockaded
+                // or really hostage
                 Piece strong_holder = pos.strongest[side^1][pix];
                 hscore += HOLDER_PENALTY[strong_holder];
                 if (pos.pieces[pix] >= (strong_holder + enemyoffset))
@@ -795,49 +789,30 @@ class StaticEval
                                 ix_to_alg(pix), power_mul);
                     }
                     hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
-                    // it's not actually frozen but should carry the same penalty as if it were
-                    hscore += FROZEN_PENALTY[pos.pieces[pix]] * 3; // magic number is frozen_w
+                    // it's not actually frozen but should carry the same
+                    // penalty as if it were
+                    hscore += FROZEN_PENALTY[pos.pieces[pix]] * frozen_w;
                     hostages |= pbit;
                 }
-            }
-
-            ulong hcheck = (pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset]) & pos.frozen;
-            if (hcheck)
-            {
-                ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
-                    & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-                for (int steps = 0; steps < 3; steps++)
+                if (pbit & unsafe)
                 {
-                    coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-                }
-                while (hcheck)
-                {
-                    ulong pbit = hcheck & -hcheck;
-                    hcheck ^= pbit;
-
-                    ulong pneighbors = neighbors_of(pbit);
-                    if (popcount(pneighbors & coverage) < 2)
+                    // piece is framed
+                    frames |= pbit;
+                    ulong framers = pneighbors & pos.placement[side^1];
+                    while (framers)
                     {
-                        bitix pix = bitindex(pbit);
-                        real power_mul = pstrengths[pix] / (8800.0 * 5); // Should restrict the range -.2 to .2
-                        if (side)
-                            power_mul = (power_mul < 0) ? 1+power_mul : 0.8;
-                        else
-                            power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
-                        // power_mul should now be .8 to 1
-                        hscore += HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul;
-                        debug (mobility)
+                        ulong frbit = framers & -framers;
+                        framers ^= frbit;
+                        bitix frix = bitindex(frbit);
+                        if (pos.pieces[pix]
+                                < pos.pieces[frix] + enemyoffset)
                         {
-                            logger.log("hostage piece {}{}, pp {}, sc {}",
-                                    ".RCDHMErcdhme"[pos.pieces[pix]],
-                                    ix_to_alg(pix), power_mul,
-                                    HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix] * power_mul);
+                            weakframers |= frbit;
                         }
-
-                        Piece strong_holder = pos.strongest[side^1][pix];
-                        hscore += HOLDER_PENALTY[strong_holder];
-                        hostages |= pbit;
+                        hscore += FRAMER_VAL[pos.pieces[frix]];
                     }
+                    hscore += PINNED_VAL[pos.strongest[side][pix]];
+                    hscore += FRAMED_VAL[pos.pieces[pix]];
                 }
             }
         }
@@ -847,8 +822,8 @@ class StaticEval
 
     int mobility()
     {
-        static const int[] BLOCKADE_VAL = [0, -1, -10, -15, -120, -200, -375,
-                     1, 10, 15, 120, 200, 375];
+        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -275,
+                     1, 5, 10, 50, 150, 275];
         static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
         static const real[] BLOCK_STRONGER_CL = [1.0, 0.4, 0.2, 0.1, 0.1];
         static const real[] BLOCK_STRONGER_FAR = [1.0, 0.6, 0.4, 0.3, 0.1];
@@ -892,7 +867,8 @@ class StaticEval
             }
 
             ulong freezers;
-            for (int p = Piece.WELEPHANT + pieceoffset; p > Piece.WCAT + pieceoffset; p--)
+            for (int p = Piece.WELEPHANT + pieceoffset;
+                    p > Piece.WCAT + pieceoffset; p--)
             {
                 int epiece = p + mcorr;
                 int cutpiece = p + mcorr - 1;
@@ -925,7 +901,8 @@ class StaticEval
                             real sc = BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
                             ulong[2] blockaders;
                             blockaders[0] = neighbors_of(tosquares[4]);
-                            blockaders[1] = neighbors_of(blockaders[0]);
+                            blockaders[1] = neighbors_of(blockaders[0])
+                                & ~blockaders[0];
                             int blk_num = popcount(blockaders[0] & freezers);
                             blk_num = blk_num > 4 ? 4 : blk_num;
                             sc *= BLOCK_STRONGER_CL[blk_num];
@@ -974,7 +951,8 @@ class StaticEval
                         if (kept_piece < hpiece + pcorr)
                             kept_piece = hpiece + pcorr;
                     }
-                    held = neighbors_of(p_neighbors & weakframers) & frames & pos.placement[side^1];
+                    held = neighbors_of(p_neighbors & weakframers)
+                        & frames & pos.placement[side^1];
                     while (held && kept_piece < cutpiece)
                     {
                         ulong hbit = held & -held;
@@ -1026,27 +1004,6 @@ class StaticEval
         debug (mobility)
         {
             logger.log("Mobility and blockade only: {}", score);
-        }
-
-        for (Side side = Side.WHITE; side <= Side.BLACK; side++)
-        {
-            for (int rank=2; rank < 4; rank++)
-            {
-                int strength = strongest_left[side][rank];
-                if (!strength)
-                    continue;
-                int threat_ix = strength - Piece.WCAT;
-                ulong threat_area = neighbors_of(threat_map[side][threat_ix][0]
-                        | threat_map[side][threat_ix][1]
-                        | threat_map[side][threat_ix][2]
-                        | threat_map[side][threat_ix][3]);
-                score += popcount(threat_area) * AREA_VAL[rank] * AREA_MUL[side];
-            }
-        }
-
-        debug (mobility)
-        {
-            logger.log("Mobility, blockade and threat area: {}", score);
         }
 
         real threat_score = 0;
