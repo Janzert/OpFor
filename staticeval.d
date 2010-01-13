@@ -68,6 +68,7 @@ class StaticEval
     real blockade_w = 1;
     real hostage_w = 1;
     real mobility_w = 1;
+    real threat_w = 1;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
@@ -130,6 +131,9 @@ class StaticEval
                 break;
             case "eval_mobility":
                 mobility_w = to!(real)(value);
+                break;
+            case "eval_threat":
+                threat_w = to!(real)(value);
                 break;
             case "eval_cache_size":
                 sc_cache.set_size(to!(int)(value));
@@ -684,7 +688,8 @@ class StaticEval
                 }
             }
             // FIXME: coverage does not include any rabbit movement
-            ulong coverage = neighbors_of(pos.placement[side] & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
+            ulong coverage = neighbors_of(pos.placement[side]
+                    & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
                 & pos.bitBoards[Piece.EMPTY] & ~unsafe;
             for (int steps = 0; steps < 3; steps++)
             {
@@ -835,9 +840,6 @@ class StaticEval
         static const int[] MOBILE_VAL = [0, 10, 4, 1];
         static const real[] SIDE_MUL = [0.1, -0.1];
 
-        static const int[] AREA_VAL = [0, 0, 2, 1];
-        static const real[] AREA_MUL = [-0.2, 0.2];
-
         static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -80, -200,
                      7, 22, 30, 45, 80, 200];
         static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
@@ -846,7 +848,7 @@ class StaticEval
                      2, 7, 10, 15, 28, 50];
         static const int[] KP_THREAT = [0, -1, -4, -5, -7, -14, -25,
                      1, 4, 5, 7, 14, 25];
-        static const real threat_mul = 0.6;
+        static const real THREAT_MUL = 0.6;
 
         real score = 0;
         int[4][2] strongest_left;
@@ -1001,6 +1003,7 @@ class StaticEval
                 freezers |= pos.bitBoards[p - enemyoffset];
             }
         }
+        score *= mobility_w;
         debug (mobility)
         {
             logger.log("Mobility and blockade only: {}", score);
@@ -1021,62 +1024,78 @@ class StaticEval
                     | threat_map[side^1][threat_ix][3];
                 ulong pieces = pos.bitBoards[p + pcorr];
                 ulong handled;
-                ulong threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
-                threat_score += NK_TOUCH_THREAT[p + pcorr] * popcount(threatened);
-                threat_score -= (NK_TOUCH_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
-                handled = threatened;
-                threatened = neighbors_of(threat_map[side][threat_ix][3]) & pieces & ~handled;
-                threat_score += KP_THREAT[p + pcorr] * popcount(threatened);
-                threat_score -= (KP_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
-                handled |= threatened;
-                threatened = neighbors_of(threat_map[side][threat_ix][1]) & pieces & ~handled;
-                threat_score += NK_CLOSE_THREAT[p + pcorr] * popcount(threatened);
-                threat_score -= (NK_CLOSE_THREAT[p + pcorr]  * popcount(threatened & cover)) / 2;
-                handled |= threatened;
-                cover |= threat_map[side^1][threat_ix][2];
-                threatened = neighbors_of(threat_map[side][threat_ix][2]) & pieces & ~handled;
-                threat_score += KP_THREAT[p + pcorr] * popcount(threatened & neighbors_of(pos.placement[side]));
-                threat_score += NK_FAR_THREAT[p + pcorr] * popcount(threatened & ~neighbors_of(pos.placement[side]));
-                threat_score -= (NK_FAR_THREAT[p + pcorr]  * popcount(threatened & cover)) / 4;
-
+                ulong threatened = neighbors_of(threat_map[side][threat_ix][0])
+                    & pieces;
+                threat_score += NK_TOUCH_THREAT[p + pcorr]
+                    * popcount(threatened);
+                threat_score -= (NK_TOUCH_THREAT[p + pcorr]
+                        * popcount(threatened & cover)) / 2;
                 debug (mobility)
                 {
-                    handled = 0;
-                    threatened = neighbors_of(threat_map[side][threat_ix][0]) & pieces;
-                    int threatened_pop = popcount(threatened);
-                    if (threatened_pop)
+                    if (threatened)
+                    {
+                        auto tpop = popcount(threatened);
                         logger.log("NK_TOUCH_THREAT to {} {} for {}",
-                                threatened_pop,
+                                tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                NK_TOUCH_THREAT[p + pcorr] * threatened_pop);
-                    handled = threatened;
-                    threatened = neighbors_of(threat_map[side][threat_ix][1])
-                        & pieces & ~handled;
-                    threatened_pop = popcount(threatened);
-                    if (threatened_pop)
+                                NK_TOUCH_THREAT[p + pcorr] * tpop);
+                    }
+                }
+                handled = threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][3])
+                    & pieces & ~handled;
+                threat_score += KP_THREAT[p + pcorr] * popcount(threatened);
+                threat_score -= (KP_THREAT[p + pcorr]
+                        * popcount(threatened & cover)) / 2;
+                debug (mobility)
+                {
+                    if (threatened)
+                    {
+                        auto tpop = popcount(threatened);
+                        logger.log("KP_THREAT to {} {} for {}", tpop,
+                                ".RCDHMErcdhme"[p + pcorr],
+                                KP_THREAT[p + pcorr] * tpop);
+                    }
+                }
+                handled |= threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][1])
+                    & pieces & ~handled;
+                threat_score += NK_CLOSE_THREAT[p + pcorr]
+                    * popcount(threatened);
+                threat_score -= (NK_CLOSE_THREAT[p + pcorr]
+                        * popcount(threatened & cover)) / 2;
+                debug (mobility)
+                {
+                    if (threatened)
+                    {
+                        auto tpop = popcount(threatened);
                         logger.log("NK_CLOSE_THREAT to {} {} for {}",
-                                threatened_pop,
+                                tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                NK_CLOSE_THREAT[p + pcorr] * threatened_pop);
-                    handled |= threatened;
-                    threatened = neighbors_of(threat_map[side][threat_ix][2])
-                        & pieces & ~handled;
-                    threatened_pop = popcount(threatened);
-                    if (threatened_pop)
-                        logger.log("NK_FAR_THREAT to {} {}", threatened_pop,
-                                ".RCDHMErcdhme"[p + pcorr]);
-                    handled |= threatened;
-                    threatened = neighbors_of(threat_map[side][threat_ix][3])
-                        & pieces & ~handled;
-                    threatened_pop = popcount(threatened);
-                    if (threatened_pop)
-                        logger.log("KP_THREAT to {} {} for {}", threatened_pop,
+                                NK_CLOSE_THREAT[p + pcorr] * tpop);
+                    }
+                }
+                handled |= threatened;
+                cover |= threat_map[side^1][threat_ix][2];
+                threatened = neighbors_of(threat_map[side][threat_ix][2])
+                    & pieces & ~handled & ~neighbors_of(pos.placement[side]);
+                threat_score += NK_FAR_THREAT[p + pcorr] * popcount(threatened);
+                threat_score -= (NK_FAR_THREAT[p + pcorr]
+                        * popcount(threatened & cover)) / 4;
+                debug (mobility)
+                {
+                    if (threatened)
+                    {
+                        auto tpop = popcount(threatened);
+                        logger.log("NK_FAR_THREAT to {} {} for {}",
+                                tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                KP_THREAT[p + pcorr] * threatened_pop);
+                                NK_FAR_THREAT[p+pcorr] * tpop);
+                    }
                 }
             }
         }
-        score += threat_score * threat_mul;
+        score += threat_score * threat_w;
 
         debug (mobility)
         {
@@ -1388,7 +1407,7 @@ class StaticEval
         score += piece_strength() * pstrength_w;
         score += on_trap() * ontrap_w;
         score += block_and_hostage();
-        score += mobility() * mobility_w;
+        score += mobility();
         score += rabbit_strength();
         score += rabbit_wall() * rwall_w;
         score += rabbit_open() * ropen_w;
@@ -1450,7 +1469,7 @@ class StaticEval
         score += block_and_hostage();
         logger.log("blockade and hostage {}", score-pscore);
         pscore = score;
-        score += mobility() * mobility_w;
+        score += mobility();
         logger.log("mobility {}", score-pscore);
         pscore = score;
         score += rabbit_strength();
