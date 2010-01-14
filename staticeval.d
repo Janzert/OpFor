@@ -592,8 +592,9 @@ class StaticEval
 
     int frozen_pieces()
     {
-        static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88];
-        static const real ALMOST_FROZEN = 0.1;
+        static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88,
+                     6, 9, 12, 18, 33, 88];
+        //static const real ALMOST_FROZEN = 0.1;
         static const real[33] POPULATION_MUL =
                [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
                      0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
@@ -606,29 +607,10 @@ class StaticEval
             score += popcount(pos.bitBoards[p] & pos.frozen) * FROZEN_PENALTY[p];
         }
 
-        for (Side s=Side.WHITE; s <= Side.BLACK; s++)
-        {
-            int enemyoffset = 6;
-            int pieceoffset = 0;
-            if (s == Side.BLACK)
-            {
-                enemyoffset = 0;
-                pieceoffset = 6;
-            }
-            ulong stronger = pos.placement[s^1] & ~pos.frozen;
-            for (int p=Piece.WRABBIT; p <= Piece.WELEPHANT; p++)
-            {
-                stronger &= ~pos.bitBoards[p+enemyoffset];
-                ulong nstronger = neighbors_of(stronger);
-                score += (popcount(pos.bitBoards[p+pieceoffset] & ~pos.frozen & nstronger) * FROZEN_PENALTY[p]) * ALMOST_FROZEN;
-            }
-        }
-
         uint total_pop = popcount(~pos.bitBoards[Piece.EMPTY]);
-        total_pop = (total_pop < 32) ? total_pop : 32;
-        real pop_mul = POPULATION_MUL[total_pop];
+        assert (total_pop <= 32, "Less than 32 empty spaces on the board");
 
-        return cast(int)(score * pop_mul);
+        return cast(int)(score * POPULATION_MUL[total_pop]);
     }
 
     int block_and_hostage()
