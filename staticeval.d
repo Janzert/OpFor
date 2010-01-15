@@ -67,8 +67,8 @@ class StaticEval
     real static_strap_w = 0.6;
     real blockade_w = 1;
     real hostage_w = 1;
-    real mobility_w = 1;
-    real threat_w = 1;
+    real mobility_w = 0.5;
+    real threat_w = 1.2;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
@@ -809,8 +809,8 @@ class StaticEval
 
     int mobility()
     {
-        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -275,
-                     1, 5, 10, 50, 150, 275];
+        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -300,
+                     1, 5, 10, 50, 150, 300];
         static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
         static const real[] BLOCK_STRONGER_CL = [1.0, 0.4, 0.2, 0.1, 0.1];
         static const real[] BLOCK_STRONGER_FAR = [1.0, 0.6, 0.4, 0.3, 0.1];
@@ -830,7 +830,6 @@ class StaticEval
                      2, 7, 10, 15, 28, 50];
         static const int[] KP_THREAT = [0, -1, -4, -5, -7, -14, -25,
                      1, 4, 5, 7, 14, 25];
-        static const real THREAT_MUL = 0.6;
 
         real score = 0;
         int[4][2] strongest_left;
@@ -878,7 +877,8 @@ class StaticEval
                     {
                         if (mobility > 4)
                         {
-                            score += (MOBILE_VAL[pieces_checked] * mobility) * SIDE_MUL[side];
+                            score += (MOBILE_VAL[pieces_checked] * mobility)
+                                * SIDE_MUL[side];
                         }
                         else if (pbit & ~pos.frozen)
                         {
