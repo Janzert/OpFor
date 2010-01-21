@@ -67,8 +67,8 @@ class StaticEval
     real static_strap_w = 0.6;
     real blockade_w = 1;
     real hostage_w = 1;
-    real mobility_w = 0.5;
-    real threat_w = 1.2;
+    real mobility_w = 1;
+    real threat_w = 0.5;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
@@ -594,7 +594,6 @@ class StaticEval
     {
         static const int[13] FROZEN_PENALTY = [0, -6, -9, -12, -18, -33, -88,
                      6, 9, 12, 18, 33, 88];
-        //static const real ALMOST_FROZEN = 0.1;
         static const real[33] POPULATION_MUL =
                [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
                      0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
@@ -809,27 +808,28 @@ class StaticEval
 
     int mobility()
     {
-        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -300,
-                     1, 5, 10, 50, 150, 300];
-        static const real[] MOBILITY_MUL = [1.0, 1.0, 0.8, 0.4, 0.1];
-        static const real[] BLOCK_STRONGER_CL = [1.0, 0.4, 0.2, 0.1, 0.1];
-        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.6, 0.4, 0.3, 0.1];
+        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -700,
+                     1, 5, 10, 50, 150, 700];
+        static const real[] MOBILITY_MUL = [1.0, 0.8, 0.4, 0.1];
+        // stronger close blockaders are like hostage holders
+        static const real[] BLOCK_STRONGER_CL = [1.0, 1.0, 0.5, 0.2, 0.1];
+        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.6, 0.3, 0.2];
         static const real[] BLOCK_EVEN_CL = [1.0, 0.6, 0.4];
         static const real[] BLOCK_EVEN_FAR = [1.0, 0.8, 0.6];
-        static const real[] BLOCK_WEAK_CL = [1.0, 0.8, 0.6];
-        static const real[] BLOCK_WEAK_FAR = [1.0, 0.9, 0.8];
+        static const real[] BLOCK_WEAK_CL = [1.0, 0.85, 0.7];
+        static const real[] BLOCK_WEAK_FAR = [1.0, 0.95, 0.9];
 
         static const int[] MOBILE_VAL = [0, 10, 4, 1];
         static const real[] SIDE_MUL = [0.1, -0.1];
 
-        static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -80, -200,
-                     7, 22, 30, 45, 80, 200];
+        static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -96, -150,
+                     7, 22, 30, 45, 96, 150];
         static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
                      5, 15, 20, 30, 64, 100];
-        static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -28, -50,
-                     2, 7, 10, 15, 28, 50];
-        static const int[] KP_THREAT = [0, -1, -4, -5, -7, -14, -25,
-                     1, 4, 5, 7, 14, 25];
+        static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -32, -50,
+                     2, 7, 10, 15, 32, 50];
+        static const int[] KP_THREAT = [0, -1, -4, -5, -7, -15, -25,
+                     1, 4, 5, 7, 15, 25];
 
         real score = 0;
         int[4][2] strongest_left;
@@ -862,7 +862,6 @@ class StaticEval
                     if (pieces_checked < 4)
                         strongest_left[side][pieces_checked] = epiece;
                 }
-                pieces &= ~pos.frozen;
                 while (pieces)
                 {
                     ulong pbit = pieces & -pieces;
@@ -873,47 +872,46 @@ class StaticEval
                     ulong pfrozen;
                     piece_mobility(pos, pbit, freezers, tosquares, pfrozen);
                     int mobility = popcount(tosquares[4] & ~pfrozen);
+                    // don't count the square the piece is on
+                    mobility = mobility > 0 ? mobility - 1 : 0;
                     if (pieces_checked < 4)
                     {
-                        if (mobility > 4)
+                        score += (MOBILE_VAL[pieces_checked] * mobility)
+                            * SIDE_MUL[side];
+                    }
+                    if (mobility <= 3)
+                    {
+                        real sc = BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
+                        ulong[2] blockaders;
+                        blockaders[0] = neighbors_of(tosquares[4]);
+                        blockaders[1] = neighbors_of(blockaders[0])
+                            & ~blockaders[0];
+                        int blk_num = popcount(blockaders[0] & freezers);
+                        blk_num = blk_num > 4 ? 4 : blk_num;
+                        sc *= BLOCK_STRONGER_CL[blk_num];
+                        blk_num = popcount(blockaders[1] & freezers);
+                        blk_num = blk_num > 4 ? 4 : blk_num;
+                        sc *= BLOCK_STRONGER_FAR[blk_num];
+                        blk_num = popcount(blockaders[0] & pos.bitBoards[epiece]);
+                        assert (blk_num < 3);
+                        sc *= BLOCK_EVEN_CL[blk_num];
+                        blk_num = popcount(blockaders[1] & pos.bitBoards[epiece]);
+                        assert (blk_num < 3);
+                        sc *= BLOCK_EVEN_FAR[blk_num];
+                        blk_num = popcount(blockaders[0] & pos.bitBoards[epiece-1]);
+                        blk_num = blk_num > 2 ? 2 : blk_num;
+                        sc *= BLOCK_WEAK_CL[blk_num];
+                        blk_num = popcount(blockaders[1] & pos.bitBoards[epiece-1]);
+                        blk_num = blk_num > 2 ? 2 : blk_num;
+                        sc *= BLOCK_WEAK_FAR[blk_num];
+                        score += sc;
+                        debug (mobility)
                         {
-                            score += (MOBILE_VAL[pieces_checked] * mobility)
-                                * SIDE_MUL[side];
-                        }
-                        else if (pbit & ~pos.frozen)
-                        {
-                            real sc = BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
-                            ulong[2] blockaders;
-                            blockaders[0] = neighbors_of(tosquares[4]);
-                            blockaders[1] = neighbors_of(blockaders[0])
-                                & ~blockaders[0];
-                            int blk_num = popcount(blockaders[0] & freezers);
-                            blk_num = blk_num > 4 ? 4 : blk_num;
-                            sc *= BLOCK_STRONGER_CL[blk_num];
-                            blk_num = popcount(blockaders[1] & freezers);
-                            blk_num = blk_num > 4 ? 4 : blk_num;
-                            sc *= BLOCK_STRONGER_FAR[blk_num];
-                            blk_num = popcount(blockaders[0] & pos.bitBoards[epiece]);
-                            assert (blk_num < 3);
-                            sc *= BLOCK_EVEN_CL[blk_num];
-                            blk_num = popcount(blockaders[1] & pos.bitBoards[epiece]);
-                            assert (blk_num < 3);
-                            sc *= BLOCK_EVEN_FAR[blk_num];
-                            blk_num = popcount(blockaders[0] & pos.bitBoards[epiece-1]);
-                            blk_num = blk_num > 2 ? 2 : blk_num;
-                            sc *= BLOCK_WEAK_CL[blk_num];
-                            blk_num = popcount(blockaders[1] & pos.bitBoards[epiece-1]);
-                            blk_num = blk_num > 2 ? 2 : blk_num;
-                            sc *= BLOCK_WEAK_FAR[blk_num];
-                            score += sc;
-                            debug (mobility)
-                            {
-                                bitix pix = bitindex(pbit);
-                                Piece ppiece = pos.pieces[pix];
-                                logger.log("Found blockade of {}{} to be worth {}",
-                                        ".RCDHMErcdhme"[ppiece],
-                                        ix_to_alg(pix), sc);
-                            }
+                            bitix pix = bitindex(pbit);
+                            Piece ppiece = pos.pieces[pix];
+                            logger.log("Found blockade of {}{} to be worth {}",
+                                    ".RCDHMErcdhme"[ppiece],
+                                    ix_to_alg(pix), sc);
                         }
                     }
 
@@ -1081,6 +1079,7 @@ class StaticEval
 
         debug (mobility)
         {
+            logger.log("Threat only: {}", threat_score * threat_w);
             logger.log("Final mobility and threat: {}", score);
         }
 
