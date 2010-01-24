@@ -46,6 +46,7 @@ class StaticEval
     ulong[2] safe_traps;
     ulong[2] active_traps;
     int[64] pstrengths;
+    int[13] piece_value;
     ulong hostages;
     ulong frames;
     ulong weakframers;
@@ -808,10 +809,11 @@ class StaticEval
 
     int mobility()
     {
-        static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -700,
-                     1, 5, 10, 50, 150, 700];
+        //static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -700,
+        //             1, 5, 10, 50, 150, 700];
+        static const real BLOCKADE_DIV = 4.0;
         static const real[] MOBILITY_MUL = [1.0, 0.8, 0.4, 0.1];
-        // stronger close blockaders are like hostage holders
+        // stronger close blockaders are possible hostage holders
         static const real[] BLOCK_STRONGER_CL = [1.0, 1.0, 0.5, 0.2, 0.1];
         static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.6, 0.3, 0.2];
         static const real[] BLOCK_EVEN_CL = [1.0, 0.6, 0.4];
@@ -822,6 +824,11 @@ class StaticEval
         static const int[] MOBILE_VAL = [0, 10, 4, 1];
         static const real[] SIDE_MUL = [0.1, -0.1];
 
+        static const real NK_TOUCH_DIV = 11.5;
+        static const real NK_CLOSE_DIV = 17.0;
+        static const real NK_FAR_DIV = 34.5;
+        static const real KEPT_DIV = 73.4;
+        /*
         static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -96, -150,
                      7, 22, 30, 45, 96, 150];
         static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
@@ -830,12 +837,14 @@ class StaticEval
                      2, 7, 10, 15, 32, 50];
         static const int[] KP_THREAT = [0, -1, -4, -5, -7, -15, -25,
                      1, 4, 5, 7, 15, 25];
+                     */
 
         real check_hostage(ulong pbit, Side side, int pieceoffset,
                 ulong unsafe, ulong holders, int mobility)
         {
-            static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
-                                    10, 25, 39, 61, 150, 264];
+            //static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
+            //                        10, 25, 39, 61, 150, 264];
+            static const real HOSTAGE_DIV = 4.0;
             static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
                                     0, 4, 5, 10, 18, 44];
             static const int[] TRAP_DIST_MUL =
@@ -870,8 +879,8 @@ class StaticEval
                 else
                     power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
                 // power_mul should now be .8 to 1
-                score = HOSTAGE_VAL[pos.pieces[pix]] * TRAP_DIST_MUL[pix]
-                        * MOBILE_MUL[mobility] * power_mul;
+                score = (-piece_value[pos.pieces[pix]] / HOSTAGE_DIV)
+                    * TRAP_DIST_MUL[pix] * MOBILE_MUL[mobility] * power_mul;
                 debug (mobility)
                 {
                     logger.log("hostage piece {}{}, pp {}, sc {}",
@@ -914,6 +923,12 @@ class StaticEval
             }
             score += PINNED_VAL[pos.strongest[side][pix]]
                 + FRAMED_VAL[pos.pieces[pix]];
+            debug (mobility)
+            {
+                logger.log("Found frame of {}{} worth {}",
+                        ".RCDHMErcdhme"[pos.pieces[pix]],
+                        ix_to_alg(pix), score);
+            }
             return score;
         }
 
@@ -985,9 +1000,17 @@ class StaticEval
                     {
                         score += frame_check(pbit, side, enemyoffset);
                     }
-                    if (mobility <= 3)
+                    else if (mobility <= 3 && (p_neighbors & stronger))
                     {
-                        real sc = BLOCKADE_VAL[p] * MOBILITY_MUL[mobility];
+                        score += check_hostage(pbit, side, pieceoffset,
+                                unsafe_traps, p_neighbors & stronger,
+                                mobility);
+                    }
+                    if (mobility <= 3 && ((pbit & ~pos.frozen) || popcount(
+                                    p_neighbors & pos.bitBoards[Piece.EMPTY]
+                                    & ~unsafe_traps) < 2))
+                    {
+                        real sc = (-piece_value[p] / BLOCKADE_DIV) * MOBILITY_MUL[mobility];
                         ulong[2] blockaders;
                         blockaders[0] = neighbors_of(reach_map[pnum][4]);
                         blockaders[1] = neighbors_of(blockaders[0])
@@ -995,12 +1018,6 @@ class StaticEval
                         int blk_num = popcount(blockaders[0] & stronger);
                         blk_num = blk_num > 4 ? 4 : blk_num;
                         sc *= BLOCK_STRONGER_CL[blk_num];
-                        if (blk_num && (p_neighbors & stronger))
-                        {
-                            score += check_hostage(pbit, side, pieceoffset,
-                                    unsafe_traps, p_neighbors & stronger,
-                                    mobility);
-                        }
                         blk_num = popcount(blockaders[1] & stronger);
                         blk_num = blk_num > 4 ? 4 : blk_num;
                         sc *= BLOCK_STRONGER_FAR[blk_num];
@@ -1160,9 +1177,9 @@ class StaticEval
                 ulong handled;
                 ulong threatened = neighbors_of(threat_map[side][threat_ix][0])
                     & pieces;
-                threat_score += NK_TOUCH_THREAT[p + pcorr]
+                threat_score += (-piece_value[p + pcorr] / NK_TOUCH_DIV)
                     * popcount(threatened);
-                threat_score -= (NK_TOUCH_THREAT[p + pcorr]
+                threat_score -= ((-piece_value[p + pcorr] / NK_TOUCH_DIV)
                         * popcount(threatened & cover)) / 2;
                 debug (mobility)
                 {
@@ -1172,31 +1189,34 @@ class StaticEval
                         logger.log("NK_TOUCH_THREAT to {} {} for {}",
                                 tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                NK_TOUCH_THREAT[p + pcorr] * tpop);
+                                (-piece_value[p + pcorr] / NK_TOUCH_DIV)
+                                * tpop);
                     }
                 }
                 handled = threatened;
                 threatened = neighbors_of(threat_map[side][threat_ix][3])
                     & pieces & ~handled;
-                threat_score += KP_THREAT[p + pcorr] * popcount(threatened);
-                threat_score -= (KP_THREAT[p + pcorr]
+                threat_score += (-piece_value[p + pcorr] / KEPT_DIV)
+                    * popcount(threatened);
+                threat_score -= ((-piece_value[p + pcorr] / KEPT_DIV)
                         * popcount(threatened & cover)) / 2;
                 debug (mobility)
                 {
                     if (threatened)
                     {
                         auto tpop = popcount(threatened);
-                        logger.log("KP_THREAT to {} {} for {}", tpop,
+                        logger.log("KEPT_THREAT to {} {} for {}", tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                KP_THREAT[p + pcorr] * tpop);
+                                (-piece_value[p + pcorr] / KEPT_DIV)
+                                * tpop);
                     }
                 }
                 handled |= threatened;
                 threatened = neighbors_of(threat_map[side][threat_ix][1])
                     & pieces & ~handled;
-                threat_score += NK_CLOSE_THREAT[p + pcorr]
+                threat_score += (-piece_value[p + pcorr] / NK_CLOSE_DIV)
                     * popcount(threatened);
-                threat_score -= (NK_CLOSE_THREAT[p + pcorr]
+                threat_score -= ((-piece_value[p + pcorr] / NK_CLOSE_DIV)
                         * popcount(threatened & cover)) / 2;
                 debug (mobility)
                 {
@@ -1204,17 +1224,19 @@ class StaticEval
                     {
                         auto tpop = popcount(threatened);
                         logger.log("NK_CLOSE_THREAT to {} {} for {}",
-                                tpop,
+                                 tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                NK_CLOSE_THREAT[p + pcorr] * tpop);
+                                (-piece_value[p + pcorr] / NK_CLOSE_DIV)
+                                * tpop);
                     }
                 }
                 handled |= threatened;
                 cover |= threat_map[side^1][threat_ix][2];
                 threatened = neighbors_of(threat_map[side][threat_ix][2])
                     & pieces & ~handled & ~neighbors_of(pos.placement[side]);
-                threat_score += NK_FAR_THREAT[p + pcorr] * popcount(threatened);
-                threat_score -= (NK_FAR_THREAT[p + pcorr]
+                threat_score += (-piece_value[p + pcorr] / NK_FAR_DIV)
+                    * popcount(threatened);
+                threat_score -= ((-piece_value[p + pcorr] / NK_FAR_DIV)
                         * popcount(threatened & cover)) / 4;
                 debug (mobility)
                 {
@@ -1224,7 +1246,8 @@ class StaticEval
                         logger.log("NK_FAR_THREAT to {} {} for {}",
                                 tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
-                                NK_FAR_THREAT[p+pcorr] * tpop);
+                                (-piece_value[p + pcorr] / NK_FAR_DIV)
+                                * tpop);
                     }
                 }
             }
@@ -1501,6 +1524,31 @@ class StaticEval
         return score;
     }
 
+    int material_values(int pop)
+    {
+        int score = fame.score(pop);
+        for (Piece piece=Piece.WRABBIT; piece <= Piece.BELEPHANT; piece++)
+        {
+            int cur_num = pop2count(pop, piece);
+            if (cur_num)
+            {
+                int mpop = count2pop(pop, piece, cur_num-1);
+                int mscore = fame.score(mpop);
+                piece_value[piece] = score - mscore;
+            } else {
+                int mpop = count2pop(pop, piece, 1);
+                int mscore = fame.score(mpop);
+                piece_value[piece] = mscore - score;
+            }
+            debug (material_value)
+            {
+                logger.log("Piece {} has value {}",
+                        ".RCDHMErcdhme"[piece], piece_value[piece]);
+            }
+        }
+        return score;
+    }
+
     int static_eval(Position pos)
     {
         // check if the score is cached for this position
@@ -1532,7 +1580,7 @@ class StaticEval
         }
 
         int pop = population(pos);
-        int fscore = fame.score(pop); // first pawn worth ~196
+        int fscore = material_values(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
         score = fscore;
         score += static_trap_eval(cast(Side)(pos.side^1), pop, fscore) * static_otrap_w;
@@ -1580,7 +1628,7 @@ class StaticEval
         }
 
         int pop = population(pos);
-        int fscore = fame.score(pop); // first pawn worth ~196
+        int fscore = material_values(pop); // first pawn worth ~196
                                      // only a pawn left ~31883
         logger.log("Fame {}", fscore);
         int score = fscore;

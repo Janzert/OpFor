@@ -2120,6 +2120,13 @@ int population(Position pos)
     return count;
 }
 
+int count2pop(int population, Piece piece, int count)
+{
+    population = population & ~(pop_mask[piece] << pop_offset[piece]);
+    population |= (count & pop_mask[piece]) << pop_offset[piece];
+    return population;
+}
+
 int pop2count(int population, Piece piece)
 {
     return (population >> pop_offset[piece]) & pop_mask[piece];
