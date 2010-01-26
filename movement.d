@@ -44,8 +44,9 @@ body
     ulong trapped = neighbors_of(pbit) & pos.placement[side] & bad_traps;
     ulong fr_neighbors = neighbors_of(freezers);
     ulong freeze_sq = fr_neighbors & ~neighbors_of(pos.placement[side] & ~pbit & ~trapped);
+    ulong p_neighbors = neighbors_of(pbit);
 
-    reachable[1] = neighbors_of(pbit) & safe_empties;
+    reachable[1] = p_neighbors & safe_empties;
     frozen |= reachable[1] & freeze_sq;
     reachable[2] = neighbors_of(reachable[1] & ~frozen) & safe_empties & ~pbit;
     frozen |= reachable[2] & freeze_sq;
@@ -55,7 +56,7 @@ body
     reachable[4] = neighbors_of(reachable[3] & ~frozen) & safe_empties
         & ~(pbit | reachable[1] | reachable[2]);
     frozen |= reachable[4] & freeze_sq;
-    ulong fmove = neighbors_of(pbit) & pos.placement[side];
+    ulong fmove = p_neighbors & pos.placement[side];
     if (popcount(fmove) > 1
             || (pbit & ~fr_neighbors & ~TRAPS))
     {
@@ -113,6 +114,46 @@ body
                 & ~neighbors_of(pos.placement[side] & ~(pbit | fbit));
         }
     }
+
+    fmove = neighbors_of(reachable[1]) & pos.placement[side];
+    fmove &= ~(pos.bitBoards[Piece.WRABBIT + pieceoffset]
+            & ~rabbit_steps(cast(Side)(side^1), safe_empties))
+        & neighbors_of(safe_empties);
+    while (fmove)
+    {
+        ulong fbit = fmove & -fmove;
+        fmove ^= fbit;
+        ulong f_neighbors = neighbors_of(fbit);
+        ulong filled = 0;
+        ulong safe_fempties = f_neighbors & empties
+            & ~(TRAPS & ~neighbors_of(pos.placement[side] & ~pbit & ~fbit));
+        ulong f_steps = safe_fempties;
+        if (fbit & pos.bitBoards[Piece.WRABBIT + pieceoffset])
+        {
+            f_steps &= rabbit_steps(side, fbit);
+        }
+        if (!f_steps)
+            continue;
+        ulong first_steps = safe_fempties & p_neighbors;
+        while (first_steps)
+        {
+            ulong first_step = first_steps & -first_steps;
+            first_steps ^= first_step;
+            if (!(neighbors_of(first_step) & ~fbit & ~pbit
+                        & pos.placement[side])
+                    && (neighbors_of(first_step) & freezers))
+                continue;
+            if (!(f_steps & ~first_step))
+                continue;
+            reachable[3] |= fbit;
+            if (popcount(f_steps & ~first_step) > 1)
+            {
+                reachable[4] |= safe_fempties;
+                break;
+            }
+        }
+    }
+
     ulong weaker = pos.placement[side^1] & ~freezers & ~pos.bitBoards[piece - enemyoffset];
     ulong pmove = neighbors_of(pbit) & weaker & neighbors_of(empties) & ~bad_traps;
     reachable[2] |= pmove;
