@@ -146,16 +146,20 @@ body
             if (!(f_steps & ~first_step))
                 continue;
             reachable[3] |= fbit;
+            frozen |= fbit & freeze_sq;
             if (popcount(f_steps & ~first_step) > 1)
             {
                 reachable[4] |= safe_fempties;
+                frozen |= safe_fempties & freeze_sq;
                 break;
             }
         }
     }
 
-    ulong weaker = pos.placement[side^1] & ~freezers & ~pos.bitBoards[piece - enemyoffset];
-    ulong pmove = neighbors_of(pbit) & weaker & neighbors_of(empties) & ~bad_traps;
+    ulong weaker = pos.placement[side^1] & ~freezers
+        & ~pos.bitBoards[piece - enemyoffset];
+    ulong pmove = neighbors_of(pbit) & weaker & neighbors_of(empties)
+        & ~bad_traps;
     reachable[2] |= pmove;
     frozen |= pmove & freeze_sq;
     while (pmove)
@@ -179,11 +183,33 @@ body
         }
         if (obit & ~frozen)
         {
-            reachable[4] |= neighbors_of(obit) & (weaker | filled) & neighbors_of(empties)
-                & ~bad_traps;
+            reachable[4] |= neighbors_of(obit) & (weaker | filled)
+                & neighbors_of(empties) & ~bad_traps;
                 frozen |= reachable[4] & freeze_sq;
         }
     }
+
+    pmove = neighbors_of(reachable[1] & ~frozen) & weaker
+        & neighbors_of(empties) & ~bad_traps;
+    while (pmove)
+    {
+        ulong obit = pmove & -pmove;
+        pmove ^= obit;
+
+        ulong on_empties = neighbors_of(obit) & empties;
+        ulong pfrom = on_empties & reachable[1] & ~frozen;
+        if (pfrom & safe_empties)
+        {
+            auto pop_one = popcount(on_empties);
+            if (pop_one <= 1)
+                continue;
+            reachable[3] |= obit;
+            if (pop_one > 2 && !(obit & freeze_sq))
+                reachable[4] |= on_empties & safe_empties;
+            frozen |= (reachable[3] | reachable[4]) & freeze_sq;
+        }
+    }
+
     reachable[1] |= pbit;
     reachable[2] |= reachable[1];
     reachable[3] |= reachable[2];
