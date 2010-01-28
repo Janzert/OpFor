@@ -67,6 +67,7 @@ class StaticEval
     real static_otrap_w = 0.8;
     real static_strap_w = 0.6;
     real hostage_w = 1;
+    real frame_w = 1;
     real mobility_w = 1;
     real threat_w = 0.5;
 
@@ -125,6 +126,9 @@ class StaticEval
                 break;
             case "eval_hostage":
                 hostage_w = to!(real)(value);
+                break;
+            case "eval_frame":
+                frame_w = to!(real)(value);
                 break;
             case "eval_mobility":
                 mobility_w = to!(real)(value);
@@ -212,29 +216,29 @@ class StaticEval
     // penalty for piece on trap
     int on_trap()
     {
-        const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88,
-              6, 9, 12, 18, 33, 88];
+        //const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88,
+        //      6, 9, 12, 18, 33, 88];
+        const static real ON_TRAP_MUL = 0.029783;
 
-        int score = 0;
+        real score = 0;
         ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
         while (occupied_traps)
         {
             ulong tbit = occupied_traps & -occupied_traps;
             occupied_traps ^= tbit;
-            ulong tneighbors = neighbors_of(tbit);
             bitix tix = bitindex(tbit);
             Piece tpiece = pos.pieces[tix];
             Side tside = (tpiece > Piece.WELEPHANT) ? Side.BLACK : Side.WHITE;
-            int pieceoffset = (tside == Side.WHITE) ? 6 : -6;
 
+            real penalty = -piece_value[tpiece] * ON_TRAP_MUL;
             if (safe_traps[tside] & tbit)
             {
-                score += ON_TRAP[tpiece] / 2;
+                score += penalty / 2.0;
             } else {
-                score += ON_TRAP[tpiece];
+                score += penalty;
             }
         }
-        return score;
+        return cast(int)score;
     }
 
     int map_elephant()
@@ -616,9 +620,9 @@ class StaticEval
         static const real BLOCKADE_DIV = 4.0;
         static const real[] MOBILITY_MUL = [1.0, 0.8, 0.4, 0.1];
         // stronger close blockaders are possible hostage holders
-        static const real[] BLOCK_STRONGER_CL = [1.0, 1.0, 0.5, 0.2, 0.1];
-        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.6, 0.3, 0.2];
-        static const real[] BLOCK_EVEN_CL = [1.0, 0.6, 0.4];
+        static const real[] BLOCK_STRONGER_CL = [1.0, 0.6, 0.4, 0.2, 0.1];
+        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.5, 0.3, 0.2];
+        static const real[] BLOCK_EVEN_CL = [1.0, 0.65, 0.45];
         static const real[] BLOCK_EVEN_FAR = [1.0, 0.8, 0.6];
         static const real[] BLOCK_WEAK_CL = [1.0, 0.85, 0.7];
         static const real[] BLOCK_WEAK_FAR = [1.0, 0.95, 0.9];
@@ -784,7 +788,7 @@ class StaticEval
                         ".RCDHMErcdhme"[pos.pieces[pix]],
                         ix_to_alg(pix), score);
             }
-            return score;
+            return score * frame_w;
         }
 
         hostages = 0;

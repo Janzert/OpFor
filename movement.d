@@ -225,7 +225,8 @@ debug (test_movement)
     import tango.text.Ascii;
 
     void test_pos(Position pos, out uint true_moves,
-            out uint reported_moves)
+            out uint reported_moves, out uint false_blockade,
+            out uint true_blockade, out uint no_blockade)
     {
         pos.set_side(Side.WHITE);
         ulong[Piece.max+1] true_movement;
@@ -297,8 +298,24 @@ debug (test_movement)
             Stdout.format("For {} found {} of {} ({:.2}) move squares.",
                     ".RCDHMErcdhme"[p],
                     reported_count, true_count, found_per).newline;
+            if (reported_count == 0 && true_count != 0)
+            {
+                Stdout.format("False complete blockade for {}",
+                        ".RCDHMErcdhme"[p]).newline;
+                throw new Exception("False full blockade found.");
+            }
             true_moves += true_count;
             reported_moves += reported_count;
+            if (reported_count < 4 && true_count >= 4)
+            {
+                false_blockade += 1;
+            }
+            else if (true_count < 4)
+            {
+                true_blockade += 1;
+            } else {
+                no_blockade += 1;
+            }
         }
         real total_per = (cast(real)reported_moves / true_moves) * 100.0;
         Stdout.format("Overall for pos found {} of {} ({:.2}) move squares.",
@@ -372,14 +389,14 @@ debug (test_movement)
             Stdout(pos.to_placing_move()).newline;
             Stdout().newline;
 
-            uint pos_moves, pos_reported;
-            test_pos(pos, pos_moves, pos_reported);
+            uint pos_moves, pos_reported, fb, tb, nb;
+            test_pos(pos, pos_moves, pos_reported, fb, tb, nb);
 
             return 0;
         }
 
         // Check randomly generated positions
-        ulong total_moves, total_reported;
+        ulong total_moves, total_reported, total_false, total_true, total_none;
         Position pos = new Position();
         uint pos_num;
         while (true)
@@ -390,13 +407,17 @@ debug (test_movement)
             Stdout("wb"[pos.side]).newline;
             Stdout(pos.to_long_str(true)).newline;
             Stdout(pos.to_placing_move()).newline;
-            uint pos_moves, pos_reported;
-            test_pos(pos, pos_moves, pos_reported);
+            uint pos_moves, pos_reported, false_blk, true_blk, no_blk;
+            test_pos(pos, pos_moves, pos_reported, false_blk, true_blk, no_blk);
             total_moves += pos_moves;
             total_reported += pos_reported;
-            Stdout.format("All positions found {} moves of {} total ({:.2}).",
+            total_false += false_blk;
+            total_true += true_blk;
+            total_none += no_blk;
+            Stdout.format("All positions found {} moves of {} total ({:.2}), blockades {} false {} true {} not a blockade.",
                     total_reported, total_moves,
-                    (cast(real)total_reported/total_moves) * 100.0).newline;
+                    (cast(real)total_reported/total_moves) * 100.0,
+                    total_false, total_true, total_none).newline;
             Stdout.newline;
             pos.clear();
         }
