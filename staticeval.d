@@ -618,7 +618,7 @@ class StaticEval
         //static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -700,
         //             1, 5, 10, 50, 150, 700];
         static const real BLOCKADE_DIV = 4.0;
-        static const real[] MOBILITY_MUL = [1.0, 0.8, 0.4, 0.1];
+        static const real[] MOBILITY_MUL = [1.0, 0.5, 0.2, 0.1];
         // stronger close blockaders are possible hostage holders
         static const real[] BLOCK_STRONGER_CL = [1.0, 0.6, 0.4, 0.2, 0.1];
         static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.5, 0.3, 0.2];

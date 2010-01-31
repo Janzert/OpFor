@@ -196,6 +196,7 @@ class SearchThread : Thread
     ABQSearch searcher;
     ThreadEngine control;
     int depth;
+    int cur_score;
 
     Mutex search_check_lock;
     Atomic!(bool) searching;
@@ -213,16 +214,24 @@ class SearchThread : Thread
         searcher = new ABQSearch(ctl.logger, ctl.ttable);
         class ACheck
         {
-            SearchThread ctl;
+            SearchThread sthread;
 
             this(SearchThread t)
             {
-                ctl = t;
+                sthread = t;
             }
 
             bool sa()
             {
-                return ctl.abort_search;
+                if (sthread.abort_search)
+                    return true;
+                int new_score = sthread.control.best_score.load();
+                if (new_score != sthread.cur_score)
+                {
+                    sthread.cur_score = new_score;
+                    return true;
+                }
+                return false;
             }
         }
         auto chk = new ACheck(this);
@@ -274,14 +283,13 @@ class SearchThread : Thread
         int search_depth;
         synchronized (search_lock)
         {
-            // FIXME: check_nodes should be based on 1 second
-            ulong check_nodes = 100000;
+            // should check_nodes be time based?
+            int check_nodes = 50000;
             searcher.check_interval = check_nodes;
-            ulong next_check = searcher.nodes_searched + check_nodes;
-            searcher.check_nodes = next_check;
+            searcher.check_nodes = searcher.nodes_searched + check_nodes;
 
             ulong start_nodes = searcher.nodes_searched;
-            int cur_score = control.best_score.load();
+            cur_score = control.best_score.load();
             Position pos = search.pos;
             searcher.nullmove = pos.dup;
             searcher.nullmove.do_step(NULL_STEP);
@@ -307,23 +315,45 @@ class SearchThread : Thread
                 if (search_depth > search.last_depth)
                 {
                     ulong sd = search.last_depth;
-                    while (sd < search_depth && score != -ABORT_SCORE)
-                        score = -searcher.alphabeta(pos, ++sd,
-                                -(cur_score+1), -cur_score, 0);
+                    while (sd < search_depth)
+                    {
+                        score = -searcher.alphabeta(pos, sd+1, -(cur_score+1),
+                                -(cur_score), 0);
+                        if (score == -ABORT_SCORE)
+                        {
+                            if (abort_search)
+                                break;
+                        } else {
+                            ++sd;
+                        }
+                    }
                 } else {
                     score = search.last_score;
                     search_depth = search.last_depth;
                 }
             } else {
-                score = -searcher.alphabeta(pos, depth, MIN_SCORE,
-                        -cur_score, 0);
+                while (true)
+                {
+                    score = -searcher.alphabeta(pos, depth, MIN_SCORE,
+                            -cur_score, 0);
+                    if (score != -ABORT_SCORE || abort_search)
+                        break;
+                }
                 search_depth = depth;
             }
 
-            while (search_depth < depth && score > cur_score)
+            while (search_depth < depth && (score > cur_score
+                        || score == -ABORT_SCORE))
             {
-                score = -searcher.alphabeta(pos, ++search_depth, MIN_SCORE,
+                score = -searcher.alphabeta(pos, search_depth+1, MIN_SCORE,
                         -cur_score, 0);
+                if (score == -ABORT_SCORE)
+                {
+                    if (abort_search)
+                        break;
+                } else {
+                    ++search_depth;
+                }
             }
             Position.free(searcher.nullmove);
             searcher.nodes_searched++;
@@ -346,6 +376,9 @@ class SearchThread : Thread
                 search.last_nodes = pos_nodes;
             }
             control.msg_q.set(ResultSMessage.allocate(this, search));
+        } else {
+            if (!abort_search)
+                control.logger.error("Aborting search without request.");
         }
     }
 
@@ -810,6 +843,7 @@ class ThreadEngine : Engine
 
     private void update_pos(PositionNode result)
     {
+        ++checked_moves;
         auto score = result.last_score;
         if (provisional_result && result is last_best)
             provisional_result = false;
@@ -883,7 +917,6 @@ class ThreadEngine : Engine
             }
         }
         nodes_searched += result.last_nodes;
-        checked_moves += 1;
     }
 
     StepList get_bestline()
