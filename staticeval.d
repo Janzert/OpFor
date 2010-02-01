@@ -793,6 +793,7 @@ class StaticEval
 
         hostages = 0;
         frames = 0;
+        weakframers = 0;
         real score = 0;
         int[4][2] strongest_left;
         ulong[5][16] reach_map;
@@ -948,7 +949,9 @@ class StaticEval
                     ulong p_neighbors = neighbors_of(pbit);
 
                     int kept_piece;
-                    ulong held = p_neighbors & hostages & pos.placement[side^1];
+                    // hostages piece is holding
+                    ulong held = p_neighbors & hostages
+                        & pos.placement[side^1];
                     while (held && kept_piece < cutpiece)
                     {
                         ulong hbit = held & -held;
@@ -957,6 +960,7 @@ class StaticEval
                         if (kept_piece < hpiece + pcorr)
                             kept_piece = hpiece + pcorr;
                     }
+                    // frames piece is directly framing
                     held = p_neighbors & frames & pos.placement[side^1];
                     if (held && kept_piece < cutpiece)
                     {
@@ -965,6 +969,7 @@ class StaticEval
                         if (kept_piece < hpiece + pcorr)
                             kept_piece = hpiece + pcorr;
                     }
+                    // frames piece is framing by keeping a weakframer in
                     held = neighbors_of(p_neighbors & weakframers)
                         & frames & pos.placement[side^1];
                     while (held && kept_piece < cutpiece)
@@ -975,8 +980,10 @@ class StaticEval
                         if (kept_piece < hpiece + pcorr)
                             kept_piece = hpiece + pcorr;
                     }
+                    // hostages piece is protecting
                     held = TRAPS & p_neighbors;
-                    held = (neighbors_of(held) | neighbors_of(neighbors_of(held)))
+                    held = (neighbors_of(held)
+                            | neighbors_of(neighbors_of(held)))
                         & hostages & pos.placement[side];
                     while (held && kept_piece < cutpiece)
                     {
@@ -986,6 +993,7 @@ class StaticEval
                         if (kept_piece < hpiece + mcorr)
                             kept_piece = hpiece + mcorr;
                     }
+                    // frames piece is pinned to
                     held = p_neighbors & frames & pos.placement[side];
                     if (held && kept_piece < cutpiece)
                     {
@@ -1000,14 +1008,18 @@ class StaticEval
                     {
                         if (tp < spiece)
                         {
-                            if (!(p_neighbors & frames & pos.placement[side]))
-                                threat_map[side^1][tp-2][3] |= reach_map[pnum][1]
-                                    & ~freezes[pnum];
+                            if (!(p_neighbors & frames &
+                                        pos.placement[side]))
+                                threat_map[side^1][tp-2][3] |=
+                                    reach_map[pnum][1] & ~freezes[pnum];
                         } else {
-                            threat_map[side^1][tp-Piece.WCAT][0] |= reach_map[pnum][0];
-                            threat_map[side^1][tp-Piece.WCAT][1] |= reach_map[pnum][2]
+                            threat_map[side^1][tp-Piece.WCAT][0] |=
+                                reach_map[pnum][0];
+                            threat_map[side^1][tp-Piece.WCAT][1] |=
+                                reach_map[pnum][2]
                                 & ~freezes[pnum] & ~reach_map[pnum][0];
-                            threat_map[side^1][tp-Piece.WCAT][2] |= reach_map[pnum][4]
+                            threat_map[side^1][tp-Piece.WCAT][2] |=
+                                reach_map[pnum][4]
                                 & ~freezes[pnum] & ~reach_map[pnum][2];
                         }
                     }
@@ -1065,8 +1077,8 @@ class StaticEval
                     | threat_map[side^1][threat_ix][3];
                 ulong pieces = pos.bitBoards[p + pcorr];
                 ulong handled;
-                ulong threatened = neighbors_of(threat_map[side][threat_ix][0])
-                    & pieces;
+                ulong threatened =
+                    neighbors_of(threat_map[side][threat_ix][0]) & pieces;
                 threat_score += (-piece_value[p + pcorr] / NK_TOUCH_DIV)
                     * popcount(threatened);
                 threat_score -= ((-piece_value[p + pcorr] / NK_TOUCH_DIV)
