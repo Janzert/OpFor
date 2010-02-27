@@ -36,8 +36,7 @@ if build_static:
     cmd = ["gcc"]
     cmd += [f.replace(".d", ".o") for f in sourcefiles]
     cmd += ["-o", "bot_opfor", "-m32", "-static", "-Xlinker",
-            "-L"+library_path, "-ltangobos", "-ltango-user-dmd",
-            "-ltango-base-dmd", "-lpthread", "-lm"]
+            "-L"+library_path, "-ltango-dmd", "-lpthread", "-lm"]
     print " ".join(cmd)
     Popen(cmd).wait()
 
