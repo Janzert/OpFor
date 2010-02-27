@@ -1461,8 +1461,9 @@ class StaticEval
         int score;
         if (pos.is_endstate() && pos.is_goal(cast(Side)(pos.side^1)))
         {
-            // the only time static eval should end up called with a endstate is when there is an opposing rabbit
-            // on the goal line that might still get pulled back off before the end of the turn
+            // the only time static eval should end up called with a endstate
+            // is when there is an opposing rabbit on the goal line that might
+            // still get pulled back off before the end of the turn
             score = -(WIN_SCORE - pos.stepsLeft);
             sc_entry.zobrist = pos.zobrist;
             sc_entry.score = score;
@@ -1476,6 +1477,13 @@ class StaticEval
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
             score = WIN_SCORE - goals.shortest[pos.side];
+            sc_entry.zobrist = pos.zobrist;
+            sc_entry.score = score;
+            return score;
+        }
+        else if (goals.shortest[pos.side^1] != goals.NOT_FOUND)
+        {
+            score = -(WIN_SCORE - goals.shortest[pos.side^1] - pos.stepsLeft);
             sc_entry.zobrist = pos.zobrist;
             sc_entry.score = score;
             return score;
@@ -1572,14 +1580,11 @@ class StaticEval
         score += map_elephant() * map_e_w;
         logger.log("map elephant {}", score-pscore);
         pscore = score;
+        score += goal_threat();
+        logger.log("goal threat {}", score-pscore);
 
         if (pos.side == Side.BLACK)
             score = -score;
-
-        pscore = score;
-        score += goal_threat();
-        logger.log("goal threat (side to move) {}", score-pscore);
-        pscore = score;
 
         // clamp the evaluation to be less than a win
         score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;

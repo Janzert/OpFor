@@ -1119,7 +1119,8 @@ class ABQSearch : ABSearch
         nodes_quiesced++;
 
         int score = MIN_SCORE;
-        if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1)) || pos.stepsLeft < 2))
+        if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1))
+                    || pos.stepsLeft < 2))
         {
             score = pos.endscore() * WIN_SCORE;
             if (pos.side == Side.BLACK)
@@ -1158,9 +1159,11 @@ class ABQSearch : ABSearch
                 int rscore = evaluator.static_eval(reversed);
                 if ((score < rscore-2) || (score > rscore+2))
                 {
-                    fwritefln(stderr, "%s\n%s", "wb"[pos.side], pos.to_long_str());
-                    fwritefln(stderr, "reversed:\n%s\n%s", "wb"[reversed.side], reversed.to_long_str());
-                    throw new Exception(Format("Biased eval, {} != {}", score, rscore));
+                    Stderr("{}\n{}", "wb"[pos.side], pos.to_long_str());
+                    Stderr("reversed:\n{}\n{}", "wb"[reversed.side],
+                            reversed.to_long_str());
+                    throw new Exception(Format("Biased eval, {} != {}",
+                                score, rscore));
                 }
                 Position.free(reversed);
             }
@@ -1178,7 +1181,8 @@ class ABQSearch : ABSearch
         }
 
         StepList steps = StepList.allocate();
-        if (!pos.inpush)
+        if (!pos.inpush &&
+                !(evaluator.goals.shortest[pos.side^1] < 5))
         {
             trap_search.find_captures(pos, pos.side);
             for (int six=0; six < trap_search.num_captures; six++)
