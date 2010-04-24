@@ -1947,7 +1947,7 @@ int main(char[][] args)
                         } else {
                             logger.info("depth {}", engine.depth+3);
                         }
-                        logger.info("time {:f0}", (now-search_start).interval);
+                        logger.info("time {:f1}", (now-search_start).interval);
                         engine.report();
                         check_num = 0;
                         nextreport = now + report_interval;
