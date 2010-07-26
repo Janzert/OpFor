@@ -1505,6 +1505,7 @@ int main(char[][] args)
     }
     AbortChecker abort_checker = new AbortChecker(server);
 
+    bool use_tc = false; // is there a timecontrol in effect and should it be followed
     TimeSpan tc_permove = TimeSpan.zero; // time given per move
     TimeSpan tc_maxreserve = TimeSpan.zero; // maximum reserve size
     TimeSpan tc_maxmove = TimeSpan.zero; // maximum time for a move
@@ -1600,7 +1601,7 @@ int main(char[][] args)
                     } else {
                         pondering = false;
                     }
-                    if (tc_permove.interval && max_depth == -1)
+                    if (use_tc)
                     {
                         Side myside = engine.position.side;
                         TimeSpan myreserve = (myside == Side.WHITE) ? tc_wreserve : tc_breserve;
@@ -1682,10 +1683,15 @@ int main(char[][] args)
                             if (scmd.value == "infinite")
                             {
                                 max_depth = -1;
+                                if (tc_permove.interval)
+                                {
+                                    use_tc = true;
+                                }
                                 logger.log("Search depth set to infinite");
                             } else {
                                 int depth = toInt(scmd.value);
                                 max_depth = (depth > 3) ? depth - 4 : 0;
+                                use_tc = false;
                                 logger.log("Search depth set to {}",
                                         max_depth+4);
                             }
@@ -1693,6 +1699,10 @@ int main(char[][] args)
                         case "tcmove":
                             tc_permove = TimeSpan.fromInterval(
                                     toFloat(scmd.value));
+                            if (max_depth == -1)
+                            {
+                                use_tc = true;
+                            }
                             if (tc_permove.minutes < 10)
                             {
                                 GC.disable();
@@ -1860,7 +1870,7 @@ int main(char[][] args)
                     if (((max_depth != -1) && (engine.depth > max_depth))
                         || (engine.cur_score >= WIN_SCORE)
                         || (engine.pos_list.next is null)
-                        || (tc_permove != TimeSpan.zero
+                        || (use_tc
                             && (now >= (move_start + tc_max_search)))
                         || (tc_max_length != TimeSpan.zero
                             && (now >= (search_start + tc_max_length))))
@@ -1903,8 +1913,7 @@ int main(char[][] args)
                         } else {
                             engine.set_bestmove();
                         }
-                    } else if (tc_permove != TimeSpan.zero
-                            && (now > (move_start + tc_min_search)))
+                    } else if (use_tc && (now > (move_start + tc_min_search)))
                     {
                         logger.log("Min search time reached");
                         auto decision_length = (now - last_decision_change).interval;
