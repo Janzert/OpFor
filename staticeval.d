@@ -627,7 +627,7 @@ class StaticEval
         static const real[] BLOCK_WEAK_CL = [1.0, 0.85, 0.7];
         static const real[] BLOCK_WEAK_FAR = [1.0, 0.95, 0.9];
 
-        static const int[] MOBILE_VAL = [0, 10, 4, 1];
+        static const int[] MOBILE_VAL = [0, 50, 20, 5];
         static const real[] SIDE_MUL = [0.1, -0.1];
 
         static const real NK_TOUCH_DIV = 11.5;
@@ -857,19 +857,19 @@ class StaticEval
                         score += (MOBILE_VAL[pieces_checked] * mobility)
                             * SIDE_MUL[side];
                     }
+                    real fhscore = 0.;
                     if (mobility == 0 && (pbit & unsafe_traps))
                     {
-                        score += frame_check(pbit, side, enemyoffset);
+                        fhscore = frame_check(pbit, side, enemyoffset);
                     }
                     else if (mobility <= 3 && (p_neighbors & stronger))
                     {
-                        score += check_hostage(pbit, side, pieceoffset,
+                        fhscore = check_hostage(pbit, side, pieceoffset,
                                 unsafe_traps, p_neighbors & stronger,
                                 mobility);
                     }
-                    if (mobility <= 3 && ((pbit & ~pos.frozen) || popcount(
-                                    p_neighbors & pos.bitBoards[Piece.EMPTY]
-                                    & ~unsafe_traps) < 2))
+                    score += fhscore;
+                    if (fhscore == 0 && mobility <= 3 && (pbit & ~pos.frozen))
                     {
                         real sc = (-piece_value[p] / BLOCKADE_DIV)
                             * MOBILITY_MUL[mobility];
@@ -1477,13 +1477,6 @@ class StaticEval
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
             score = WIN_SCORE - goals.shortest[pos.side];
-            sc_entry.zobrist = pos.zobrist;
-            sc_entry.score = score;
-            return score;
-        }
-        else if (goals.shortest[pos.side^1] != goals.NOT_FOUND)
-        {
-            score = -(WIN_SCORE - goals.shortest[pos.side^1] - pos.stepsLeft);
             sc_entry.zobrist = pos.zobrist;
             sc_entry.score = score;
             return score;

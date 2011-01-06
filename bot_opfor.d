@@ -5,6 +5,7 @@
 version (trace_exceptions)
 {
 import tango.core.tools.TraceExceptions;
+pragma(msg, "Compiling with stack trace support.");
 }
 
 import tango.util.log.Trace;

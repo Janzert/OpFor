@@ -38,6 +38,7 @@ int main(char[][] args)
     Stdout(pos.to_long_str(true)).newline;
     Stdout(pos.to_placing_move()).newline;
     Stdout.newline;
+    Stdout.format("Zobrist hash: {:X}", pos.zobrist).newline;
     StepList steps = new StepList();
     pos.get_steps(steps);
     Stdout.format("There are {} initial steps.",
