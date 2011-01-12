@@ -1181,8 +1181,7 @@ class ABQSearch : ABSearch
         }
 
         StepList steps = StepList.allocate();
-        if (!pos.inpush &&
-                !(evaluator.goals.shortest[pos.side^1] < 5))
+        if (!pos.inpush)
         {
             trap_search.find_captures(pos, pos.side);
             for (int six=0; six < trap_search.num_captures; six++)
