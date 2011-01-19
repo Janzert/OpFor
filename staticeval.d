@@ -423,15 +423,26 @@ class StaticEval
         const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.2, 0],
               [0.0, -1.2, -1.0, -0.4, -0.2, 0, 0, 0]];
         const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0],
-             [0, 30, 40, 35, 30, 15, 0, 0]];
+              [0, 30, 40, 35, 30, 15, 0, 0]];
+        /* Try to encourage weak rabbits to the edges.
+           600 game test showed no improvement
+        const static real[] weaksq = [0.0, 0, 0, 0, 0, 0, 0, 0,
+              0.0 , 0.0 , 0.0 , 0.05, 0.05, 0.0 , 0.0 , 0.0 ,
+              0.05, 0.07, 0.12, 0.15, 0.15, 0.12, 0.07, 0.05,
+              0.08, 0.1 , 0.15, 0.17, 0.17, 0.15, 0.1 , 0.08,
+              0.1 , 0.15, 0.2 , 0.2 , 0.2 , 0.2 , 0.15, 0.1 ,
+              0.15, 0.20, 0.22, 0.21, 0.21, 0.22, 0.20, 0.15,
+              0.13, 0.16, 0.2 , 0.18, 0.18, 0.2 , 0.16, 0.13,
+              0   , 0   , 0   , 0   , 0   , 0   , 0   , 0   ];
+              */
         const static int power_balance = 1000;
         const static real full_weak = 6000;
         const static int full_strong = 8000;
         const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
         const static int[] rforward = [8, -8];
-        const static int[] side_mul = [1, -1];
+        const static real[] side_mul = [1, -1];
 
-        int wscore = 0;
+        real wscore = 0;
         real sscore = 0;
         ulong allpieces = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
             & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
@@ -477,6 +488,13 @@ class StaticEval
                 {
                     real sfactor = -power / full_weak;
                     sfactor = (sfactor < 1) ? sfactor : 1;
+                    /* encourage weak rabbits to the edges
+                    int wsi = rix;
+                    if (s == Side.BLACK)
+                        wsi = 63 - wsi;
+                    real rval = -200. * side_mul[s] * weaksq[wsi] * sfactor;
+                    wscore += rval;
+                    */
                     debug (rabbit_strength)
                     {
                         logger.log("weak r at {}, pf {}",
@@ -503,9 +521,9 @@ class StaticEval
                         rval *= 0.4;
                     debug (rabbit_strength)
                     {
-                        logger.log("strong r at {}, val {} final {} sector {:X} st {:X}",
+                        logger.log("strong r at {}, val {} final {} sector {:X} mst {:X} ost {:X}",
                                 ix_to_alg(rix), rval, cast(int)(rval*rstrong_w),
-                                sector, safe_traps[s^1]);
+                                sector, safe_traps[s], safe_traps[s^1]);
                     }
                     sscore += rval;
                 }

@@ -5,8 +5,11 @@ import tango.io.device.File;
 import tango.io.FilePath;
 import tango.io.Stdout;
 import tango.time.StopWatch;
+import tango.util.Convert;
 
+import logging;
 import goalsearch;
+import staticeval;
 import trap_check;
 import trapmoves;
 import position;
@@ -20,22 +23,36 @@ int main(char[][] args)
                 FilePath(args[0]).name);
         return 1;
     }
+    int file_arg = 2;
+    int steps_left = 4;
+    try {
+        steps_left = to!(int)(args[1]);
+    } catch (ConversionException) {
+        file_arg = 1;
+    }
     char[] boardstr;
     try
     {
-        boardstr = cast(char[])File.get(args[1]);
+        boardstr = cast(char[])File.get(args[file_arg]);
     } catch (IOException fx)
     {
         Stdout.format("A file exception occured: " ~ fx.toString());
         return 2;
     }
-    bool run_playouts = false;
-    if (args.length > 2)
-        run_playouts = true;
+    int run_playouts = 0;
+    if (args.length > file_arg + 1)
+        run_playouts = to!(int)(args[file_arg + 1]);
+
+    Logger log = new Logger();
+    log.to_console = true;
 
     Position pos = position.parse_long_str(boardstr);
+    pos.set_steps_left(steps_left);
     Stdout("wb"[pos.side]).newline;
     Stdout(pos.to_long_str(true)).newline;
+    if (pos.stepsLeft != 4) {
+        Stdout.format("{} steps left", pos.stepsLeft).newline;
+    }
     Stdout(pos.to_placing_move()).newline;
     Stdout.newline;
     Stdout.format("Zobrist hash: {:X}", pos.zobrist).newline;
@@ -85,10 +102,14 @@ int main(char[][] args)
     if (fast_score != cast(int)(slow_score))
         Stdout.format("Fast FAME score {} != slow fame score {}",
                 fast_score, cast(int)(slow_score)).newline;
+    TrapGenerator tgen = new TrapGenerator();
+    StaticEval eval = new StaticEval(log, gsdt, tgen);
+    int eval_score = eval.logged_eval(pos);
+    Stdout.format("Eval score: {}", eval_score).newline;
 
+    GoalSearch gsearch = new GoalSearch();
     if (shortest_goal != gsdt.NOT_FOUND)
         Stdout.format("Side to move goals in {} steps", shortest_goal).newline;
-    GoalSearch gsearch = new GoalSearch();
     gsearch.set_start(pos);
     gsearch.find_goals(30);
     if (gsearch.goals_found[Side.WHITE] > 0)
@@ -148,7 +169,6 @@ int main(char[][] args)
         StepList.free(shortest_move);
     }
 
-    TrapGenerator tgen = new TrapGenerator();
     for (Side s = Side.WHITE; s <= Side.BLACK; s++)
     {
         if (tgen.find_captures(pos, s))
@@ -198,7 +218,7 @@ int main(char[][] args)
         timer.start();
         Position gamepos = Position.allocate();
         PlayoutResult result;
-        const int tests = 10000;
+        int tests = run_playouts;
         int wins = 0;
         int totalsteps = 0;
         for (int plays = 0; plays < tests; plays++)

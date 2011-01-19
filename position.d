@@ -1364,6 +1364,22 @@ class Position
         update_derived();
     }
 
+    void remove_piece(bitix square_ix)
+    {
+        Piece pt = pieces[square_ix];
+        if (pt == Piece.EMPTY) {
+            throw new ValueException("Tried to remove piece from empty square");
+        }
+        Side pside = pt < Piece.BRABBIT ? Side.WHITE : Side.BLACK;
+        ulong pbit = 1UL << square_ix;
+        placement[pside] ^= pbit;
+        pieces[square_ix] = Piece.EMPTY;
+        bitBoards[pt] ^= pbit;
+        bitBoards[Piece.EMPTY] ^= pbit;
+        zobrist ^= ZOBRIST_PIECE[pt][square_ix];
+        update_remove(pside, pt, 1UL << square_ix);
+    }
+
     void set_steps_left(int num)
     {
         if (num < 0 || num > 4)
