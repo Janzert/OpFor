@@ -683,14 +683,14 @@ class StaticEval
                                      1, 2, 2, 2, 2, 2, 2, 1,
                                      1, 1, 2, 1, 1, 2, 1, 1];
             static const int[] NEAREST_TRAP =
-                                    [45, 45, 45, 45, 42, 42, 42, 42,
-                                     45, 45, 45, 45, 42, 42, 42, 42,
-                                     45, 45, 45, 45, 42, 42, 42, 42,
-                                     45, 45, 45, 45, 42, 42, 42, 42,
-                                     21, 21, 21, 21, 18, 18, 18, 18,
-                                     21, 21, 21, 21, 18, 18, 18, 18,
-                                     21, 21, 21, 21, 18, 18, 18, 18,
-                                     21, 21, 21, 21, 18, 18, 18, 18];
+                [18, 18, 18, 18, 21, 21, 21, 21,
+                 18, 18, 18, 18, 21, 21, 21, 21,
+                 18, 18, 18, 18, 21, 21, 21, 21,
+                 18, 18, 18, 18, 21, 21, 21, 21,
+                 42, 42, 42, 42, 45, 45, 45, 45,
+                 42, 42, 42, 42, 45, 45, 45, 45,
+                 42, 42, 42, 42, 45, 45, 45, 45,
+                 42, 42, 42, 42, 45, 45, 45, 45];
             static const real[] MOBILE_MUL = [1.0, 0.3, 0.1, 0.05];
             static const real EON_TRAP = 0.92;
             static const real EN_OF_TRAP = 0.95;
@@ -745,13 +745,13 @@ class StaticEval
                 ulong nearest_trap = 1UL << NEAREST_TRAP[pix];
                 if (nearest_trap & pos.placement[side])
                     score *= EON_TRAP;
-                ulong near_neighbors = neighbors_of(
-                        nearest_trap & pos.placement[side] & ~pbit);
+                ulong near_neighbors = neighbors_of(nearest_trap)
+                    & pos.placement[side] & ~pbit;
                 int neighbor_count = popcount(near_neighbors);
                 for (int i=0; i < neighbor_count; i++)
                     score *= EN_OF_TRAP;
-                int far_neighbors = neighbors_of(near_neighbors
-                        & pos.placement[side] & ~nearest_trap);
+                ulong far_neighbors = neighbors_of(near_neighbors)
+                        & pos.placement[side] & ~nearest_trap;
                 neighbor_count = popcount(far_neighbors);
                 for (int i=0; i < neighbor_count; i++)
                     score *= ENN_OF_TRAP;
