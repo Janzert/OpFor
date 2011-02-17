@@ -451,7 +451,6 @@ class ThreadEngine : Engine
     PositionNode last_best;
     PositionNode loss_list;
     int num_moves;
-    int checked_moves;
     int to_check;
     int num_losing;
     int losing_score;
@@ -956,7 +955,7 @@ class ThreadEngine : Engine
         logger.info("nodes {}", nodes_searched);
         if (num_losing)
             logger.info("losing_moves {}", num_losing);
-        if (in_step)
+        if (in_step && checked_moves > 0)
         {
             logger.info("depth_searched {}", checked_moves);
             logger.info("to_search {}", to_check - checked_moves);
@@ -986,7 +985,6 @@ class SeqEngine : Engine
     PositionNode loss_list;
     PositionNode next_pos;
     int num_moves;
-    int checked_moves;
     int num_losing;
     int losing_score;
 
@@ -1923,10 +1921,14 @@ int main(char[][] args)
                                 - now).interval;
                         logger.log("move_length {}, decision_length {}, time_left {}",
                                     move_length, decision_length, time_left);
-                        if (decision_length < move_length
-                                * (1.0/tc_confidence_denom)
-                                && decision_length < time_left
-                                * (1.0/tc_time_left_denom))
+                        auto score = engine.cur_score;
+                        if (engine.checked_moves == 0 && engine.depth > 1)
+                            score = engine.last_score;
+                        if ((decision_length < move_length
+                                    * (1.0/tc_confidence_denom)
+                                    && decision_length < time_left
+                                    * (1.0/tc_time_left_denom))
+                                || (score <= -MIN_WIN_SCORE))
                         {
                             real tc_cd = 1.0 / (tc_confidence_denom-1);
                             real tc_tld = 1.0 / (tc_time_left_denom-1);

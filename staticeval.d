@@ -645,7 +645,7 @@ class StaticEval
         static const real[] BLOCK_WEAK_CL = [1.0, 0.85, 0.7];
         static const real[] BLOCK_WEAK_FAR = [1.0, 0.95, 0.9];
 
-        static const int[] MOBILE_VAL = [0, 50, 20, 5];
+        static const int[] MOBILE_VAL = [0, 20, 8, 2];
         static const real[] SIDE_MUL = [0.1, -0.1];
 
         static const real NK_TOUCH_DIV = 11.5;
@@ -668,7 +668,7 @@ class StaticEval
         {
             //static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
             //                        10, 25, 39, 61, 150, 264];
-            static const real HOSTAGE_DIV = 6.0;
+            static const real HOSTAGE_DIV = 5.5;
             //static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
             //                        0, 4, 5, 10, 18, 44];
             static const real HOLDER_DIV = 65.0;

@@ -552,6 +552,7 @@ class AEIEngine
     int ply;
     Position[] past;
     char[][] moves;
+    int checked_moves;
 
     this(Logger l)
     {
