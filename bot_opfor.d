@@ -1889,10 +1889,14 @@ int main(char[][] args)
                             search_left = time_left;
                         logger.log("search_length {}, decision_length {}, search_left {}",
                                    think_time, decision_length, search_left);
-                        if (decision_length < (think_time
-                                    * (1.0/tc_confidence_denom))
-                                && decision_length < (search_left
-                                    * (1.0/tc_time_left_denom)))
+                        auto score = engine.cur_score;
+                        if (engine.checked_moves == 0 && engine.depth > 1)
+                            score = engine.last_score;
+                        if ((decision_length < (think_time
+                                        * (1.0/tc_confidence_denom))
+                                    && decision_length < (search_left
+                                        * (1.0/tc_time_left_denom)))
+                                || (score <= -MIN_WIN_SCORE))
                         {
                             auto tc_cd = 1.0 / (tc_confidence_denom-1);
                             auto tc_tld = 1.0 / (tc_time_left_denom-1);
@@ -1907,6 +1911,12 @@ int main(char[][] args)
                             auto end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
                             end_search += TimeSpan.fromInterval(0.1);
                             tc_target_length = (end_search - search_start);
+                            auto min_ext = (time_left < 20.0)
+                                ? time_left / 4.0 : 5.0;
+                            auto ext_time = TimeSpan.fromInterval(
+                                    min_ext + think_time);
+                            if (tc_target_length < ext_time)
+                                tc_target_length = ext_time;
                             logger.log("next target time set to {}",
                                     tc_target_length.interval);
                         } else {
@@ -1940,9 +1950,16 @@ int main(char[][] args)
                                                 + tc_max_search)
                                         - last_decision_change).interval
                                         * tc_tld);
-                            auto end_search = (length_cutoff < reserve_cutoff) ? length_cutoff : reserve_cutoff;
+                            auto end_search = (length_cutoff < reserve_cutoff)
+                                ? length_cutoff : reserve_cutoff;
                             end_search += TimeSpan.fromInterval(0.1);
                             tc_min_search = end_search - move_start;
+                            auto min_ext = (time_left < 20.0)
+                                ? time_left / 4.0 : 5.0;
+                            auto ext_time = TimeSpan.fromInterval(
+                                    min_ext + move_length);
+                            if (tc_min_search < ext_time)
+                                tc_min_search = ext_time;
                             logger.log("next min_search set to {}",
                                     tc_min_search.interval);
                         } else {
