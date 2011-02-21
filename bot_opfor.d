@@ -563,6 +563,12 @@ class ThreadEngine : Engine
             case "prune_unrelated":
                 StepSorter.prune_unrelated = to!(bool)(value);
                 break;
+            case "set_steps":
+                if (position !is null) {
+                    auto steps = to!(int)(value);
+                    position.set_steps_left(steps);
+                }
+                break;
             default:
                 if (state != EngineState.SEARCHING)
                 {
@@ -1059,6 +1065,12 @@ class SeqEngine : Engine
                 break;
             case "setup_random_minor":
                 board_setup.random_minor = cast(bool)toInt(value);
+                break;
+            case "set_steps":
+                if (position !is null) {
+                    auto steps = to!(int)(value);
+                    position.set_steps_left(steps);
+                }
                 break;
             default:
                 handled = searcher.set_option(option, value);

@@ -3858,7 +3858,7 @@ class GoalSearchDT
                 length = empty_goal(gbit, Side.WHITE);
             else if (gbit & start.placement[Side.WHITE])
                 length = friendly_goal(gbit, Side.WHITE);
-            if (length)
+            if (length != NOT_FOUND)
             {
                 goal_squares |= gbit;
                 if (length < goal)
@@ -3880,7 +3880,7 @@ class GoalSearchDT
                 length = empty_goal(gbit, Side.BLACK);
             else if (gbit & start.placement[Side.BLACK])
                 length = friendly_goal(gbit, Side.BLACK);
-            if (length)
+            if (length != NOT_FOUND)
             {
                 goal_squares |= gbit;
                 if (length < goal)

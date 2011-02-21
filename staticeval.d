@@ -54,22 +54,22 @@ class StaticEval
     ScoreCache sc_cache;
 
     real map_e_w = 2;
-    real tsafety_w = 4;
-    real ontrap_w = 2;
-    real frozen_w = 1.5;
+    real tsafety_w = 1;
+    real ontrap_w = 1;
+    real frozen_w = 1;
     real rwall_w = 1;
     real ropen_w = 2;
-    real rhome_w = 5;
+    real rhome_w = 3;
     real rweak_w = 1;
-    real rstrong_w = 0.04;
-    real pstrength_w = 0.0001;
+    real rstrong_w = 1;
+    real pstrength_w = 0.00005;
     real goal_w = 1;
-    real static_otrap_w = 0.8;
-    real static_strap_w = 0.6;
+    real static_otrap_w = 0.6;
+    real static_strap_w = 0.5;
     real hostage_w = 1;
     real frame_w = 1;
     real mobility_w = 1;
-    real threat_w = 0.5;
+    real threat_w = 1;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
@@ -147,9 +147,9 @@ class StaticEval
 
     int trap_safety()
     {
-        static const int[] BOTH_SAFE = [-1, 1];
-        static const int[] WHITE_SAFE = [2, 10];
-        static const int[] BLACK_SAFE = [-10, -2];
+        static const int[] BOTH_SAFE = [-5, 5];
+        static const int[] WHITE_SAFE = [20, 80];
+        static const int[] BLACK_SAFE = [-80, -20];
 
         int score = 0;
 
@@ -218,7 +218,7 @@ class StaticEval
     {
         //const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88,
         //      6, 9, 12, 18, 33, 88];
-        const static real ON_TRAP_MUL = 0.029783;
+        const static real ON_TRAP_MUL = 0.02;
 
         real score = 0;
         ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
@@ -230,13 +230,13 @@ class StaticEval
             Piece tpiece = pos.pieces[tix];
             Side tside = (tpiece > Piece.WELEPHANT) ? Side.BLACK : Side.WHITE;
 
-            real penalty = -piece_value[tpiece] * ON_TRAP_MUL;
             if (safe_traps[tside] & tbit)
             {
-                score += penalty / 2.0;
+                score = -piece_value[tpiece] * ON_TRAP_MUL / 2.0;
             } else {
-                score += penalty;
+                score = -piece_value[tpiece] * ON_TRAP_MUL;
             }
+
         }
         return cast(int)score;
     }
@@ -416,28 +416,28 @@ class StaticEval
     real rabbit_strength()
     {
         // Depends on goal search and trap safety being done first
-        const static int[] pieceval = [0, 0, 45, 60, 150, 200, 300,
-              0, -45, -60, -150, -200, -300];
-        const static int[] distval = [100, 100, 90, 75, 60,
-              10, 9, 6, 5, 2, 2, 1, 1, 0, 0, 0];
-        const static real[][] rankval = [[0, 0, 0, 0.2, 0.4, 1.0, 1.2, 0],
-              [0.0, -1.2, -1.0, -0.4, -0.2, 0, 0, 0]];
-        const static int[][] weakval = [[0, 0, -15, -30, -35, -40, -30, 0],
-              [0, 30, 40, 35, 30, 15, 0, 0]];
-        /* Try to encourage weak rabbits to the edges.
-           600 game test showed no improvement
-        const static real[] weaksq = [0.0, 0, 0, 0, 0, 0, 0, 0,
-              0.0 , 0.0 , 0.0 , 0.05, 0.05, 0.0 , 0.0 , 0.0 ,
-              0.05, 0.07, 0.12, 0.15, 0.15, 0.12, 0.07, 0.05,
-              0.08, 0.1 , 0.15, 0.17, 0.17, 0.15, 0.1 , 0.08,
-              0.1 , 0.15, 0.2 , 0.2 , 0.2 , 0.2 , 0.15, 0.1 ,
-              0.15, 0.20, 0.22, 0.21, 0.21, 0.22, 0.20, 0.15,
-              0.13, 0.16, 0.2 , 0.18, 0.18, 0.2 , 0.16, 0.13,
+        const static int[] pieceval = [0, 0, 45, 80, 150, 200, 300,
+              0, -45, -80, -150, -200, -300];
+        const static int[] distval = [100, 100, 90, 75, 50,
+              10, 6, 3, 2, 1, 0, 0, 0, 0, 0, 0];
+        const static real[][] rankval = [[0, 0, 0.1, 0.2, 0.4, 1.0, 1.2, 0],
+              [0.0, -1.2, -1.0, -0.4, -0.2, -0.1, 0, 0]];
+        const static real[][] WEAK_MUL = [
+            [0.0, 0.00, 0.02, 0.05, 0.10, 0.20, 0.08, 0],
+            [0.0, 0.08, 0.20, 0.10, 0.05, 0.02, 0.00, 0]];
+        // Try to encourage rabbits to the edges.
+        const static real[] rsq = [0.0, 0, 0, 0, 0, 0, 0, 0,
+              0.05, 0.07, 0.09, 0.10, 0.10, 0.09, 0.07, 0.05,
+              0.11, 0.12, 0.14, 0.15, 0.15, 0.13, 0.12, 0.11,
+              0.10, 0.11, 0.13, 0.14, 0.14, 0.13, 0.11, 0.10,
+              0.09, 0.10, 0.11, 0.12, 0.12, 0.11, 0.10, 0.09,
+              0.09, 0.10, 0.10, 0.11, 0.11, 0.10, 0.10, 0.09,
+              0.07, 0.08, 0.08, 0.09, 0.09, 0.08, 0.08, 0.07,
               0   , 0   , 0   , 0   , 0   , 0   , 0   , 0   ];
-              */
-        const static int power_balance = 1000;
-        const static real full_weak = 6000;
-        const static int full_strong = 8000;
+        const static int INIT_BALANCE = -2000;
+        const static int WEAK_SPAN = 8000;
+        const static int STRONG_SPAN = 9000;
+        const static real STRONG_VAL = 450;
         const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
         const static int[] rforward = [8, -8];
         const static real[] side_mul = [1, -1];
@@ -463,11 +463,14 @@ class StaticEval
         for (Side s = Side.WHITE; s <= Side.BLACK; s++)
         {
             ulong rabbits;
+            Piece rabbit_piece;
             if (s == Side.WHITE)
             {
-                rabbits = pos.bitBoards[Piece.WRABBIT] & ~(RANK_1 & RANK_2);
+                rabbit_piece = Piece.WRABBIT;
+                rabbits = pos.bitBoards[Piece.WRABBIT] & ~RANK_1;
             } else {
-                rabbits = pos.bitBoards[Piece.BRABBIT] & ~(RANK_8 & RANK_7);
+                rabbit_piece = Piece.BRABBIT;
+                rabbits = pos.bitBoards[Piece.BRABBIT] & ~RANK_8;
             }
             while (rabbits)
             {
@@ -482,43 +485,49 @@ class StaticEval
                     power += pval[i] * distval[taxicab_dist[forward][pixs[i]]];
                 }
                 power *= side_mul[s];
+
+                uint rfile = rix % 8;
+                ulong sector;
+                if (rfile < 5)
+                    sector = DEFENSE_SECTORS[1];
+                if (rfile > 2)
+                    sector |= DEFENSE_SECTORS[0];
+                if (s == Side.WHITE)
+                    sector <<= 40;
+                int power_balance = INIT_BALANCE + (popcount(
+                        pos.placement[s^1] & sector) * 400);
                 power -= power_balance;
 
-                if (power <= 0)
+                // encourage rabbits to the edges
+                int rsi = rix;
+                if (s == Side.BLACK)
+                    rsi = 63 - rsi;
+                wscore += -piece_value[rabbit_piece] * rsq[rsi];
+                if (power < 0)
                 {
+                    real full_weak = WEAK_SPAN + power_balance;
                     real sfactor = -power / full_weak;
                     sfactor = (sfactor < 1) ? sfactor : 1;
-                    /* encourage weak rabbits to the edges
-                    int wsi = rix;
-                    if (s == Side.BLACK)
-                        wsi = 63 - wsi;
-                    real rval = -200. * side_mul[s] * weaksq[wsi] * sfactor;
+                    real rval = -piece_value[rabbit_piece] * WEAK_MUL[s][rix/8]
+                        * sfactor;
                     wscore += rval;
-                    */
                     debug (rabbit_strength)
                     {
-                        logger.log("weak r at {}, pf {}",
-                                ix_to_alg(rix), sfactor);
+                        logger.log("weak r at {}, pf {}, rval {}",
+                                ix_to_alg(rix), sfactor, rval);
                     }
-                    wscore += weakval[s][rix/8] * sfactor;
-                } else {
+                }
+                else if (power > 0)
+                {
+                    int full_strong = STRONG_SPAN + power_balance;
                     power = (power < full_strong) ? power : full_strong;
+                    real sfactor = power / full_strong;
                     real rv = rankval[s][rix/8];
-                    real rval = power * rv;
+                    real rval = STRONG_VAL * rv * sfactor;
                     if (rbit & TRAPS)
-                        rval /= 2;
-                    uint rfile = rix % 8;
-                    ulong sector;
-                    if (rfile < 6)
-                        sector = DEFENSE_SECTORS[1];
-                    if (rfile > 1)
-                        sector |= DEFENSE_SECTORS[0];
-                    if (s == Side.WHITE)
-                    {
-                        sector <<= 40;
-                    }
+                        rval *= 0.6;
                     if (!((safe_traps[s] & ~safe_traps[s^1]) & sector))
-                        rval *= 0.4;
+                        rval *= 0.5;
                     debug (rabbit_strength)
                     {
                         logger.log("strong r at {}, val {} final {} sector {:X} mst {:X} ost {:X}",
@@ -633,55 +642,26 @@ class StaticEval
 
     int mobility()
     {
-        //static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -700,
-        //             1, 5, 10, 50, 150, 700];
-        static const real BLOCKADE_DIV = 4.0;
-        static const real[] MOBILITY_MUL = [1.0, 0.5, 0.2, 0.1];
-        // stronger close blockaders are possible hostage holders
-        static const real[] BLOCK_STRONGER_CL = [1.0, 0.6, 0.4, 0.2, 0.1];
-        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.5, 0.3, 0.2];
-        static const real[] BLOCK_EVEN_CL = [1.0, 0.65, 0.45];
-        static const real[] BLOCK_EVEN_FAR = [1.0, 0.8, 0.6];
-        static const real[] BLOCK_WEAK_CL = [1.0, 0.85, 0.7];
-        static const real[] BLOCK_WEAK_FAR = [1.0, 0.95, 0.9];
-
-        static const int[] MOBILE_VAL = [0, 20, 8, 2];
-        static const real[] SIDE_MUL = [0.1, -0.1];
-
-        static const real NK_TOUCH_DIV = 11.5;
-        static const real NK_CLOSE_DIV = 17.0;
-        static const real NK_FAR_DIV = 34.5;
-        static const real KEPT_DIV = 73.4;
-        /*
-        static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -96, -150,
-                     7, 22, 30, 45, 96, 150];
-        static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
-                     5, 15, 20, 30, 64, 100];
-        static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -32, -50,
-                     2, 7, 10, 15, 32, 50];
-        static const int[] KP_THREAT = [0, -1, -4, -5, -7, -15, -25,
-                     1, 4, 5, 7, 15, 25];
-                     */
 
         real check_hostage(ulong pbit, Side side, int pieceoffset,
                 ulong unsafe, ulong holders, int mobility)
         {
             //static const int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
             //                        10, 25, 39, 61, 150, 264];
-            static const real HOSTAGE_DIV = 5.5;
+            static const real HOSTAGE_DIV = 2.0;
             //static const int[] HOLDER_PENALTY = [0, 0, -4, -5, -10, -18, -44,
             //                        0, 4, 5, 10, 18, 44];
-            static const real HOLDER_DIV = 65.0;
+            static const real HOLDER_DIV = 9.4;
             static const real FROZEN_HOLDER_DIV = 4;
-            static const int[] TRAP_DIST_MUL =
-                                    [1, 1, 2, 1, 1, 2, 1, 1,
-                                     1, 2, 2, 2, 2, 2, 2, 1,
-                                     2, 2, 2, 2, 2, 2, 2, 2,
-                                     1, 2, 2, 2, 2, 2, 2, 1,
-                                     1, 2, 2, 2, 2, 2, 2, 1,
-                                     2, 2, 2, 2, 2, 2, 2, 2,
-                                     1, 2, 2, 2, 2, 2, 2, 1,
-                                     1, 1, 2, 1, 1, 2, 1, 1];
+            static const real[] TRAP_DIST_MUL =
+                                    [0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5];
             static const int[] NEAREST_TRAP =
                 [18, 18, 18, 18, 21, 21, 21, 21,
                  18, 18, 18, 18, 21, 21, 21, 21,
@@ -700,7 +680,7 @@ class StaticEval
             ulong coverage = neighbors_of(pos.placement[side] & ~pbit
                     & ~pos.bitBoards[Piece.WRABBIT+pieceoffset] & ~pos.frozen)
                 & pos.bitBoards[Piece.EMPTY] & ~unsafe;
-            for (int steps = 0; steps < 3; steps++)
+            for (int steps = 0; steps < 2; steps++)
             {
                 coverage |= neighbors_of(coverage) & pos.bitBoards[Piece.EMPTY]
                     & ~unsafe;
@@ -717,12 +697,12 @@ class StaticEval
                 else
                     power_mul = (power_mul > 0) ? 1-power_mul : 0.8;
                 // power_mul should now be .8 to 1
-                score = (-piece_value[pos.pieces[pix]] / HOSTAGE_DIV)
+                auto hpiece_value = piece_value[pos.pieces[pix]];
+                score = (-hpiece_value / HOSTAGE_DIV)
                     * TRAP_DIST_MUL[pix] * MOBILE_MUL[mobility] * power_mul;
 
                 Piece strong_holder = pos.strongest[side^1][pix];
-                score += -piece_value[strong_holder]
-                    / HOLDER_DIV;
+                score += -piece_value[strong_holder] / HOLDER_DIV;
                 bool hfrozen = false;
                 while (holders)
                 {
@@ -757,6 +737,9 @@ class StaticEval
                     score *= ENN_OF_TRAP;
 
                 hostages |= pbit;
+                if ((hpiece_value > 0 && score > 0)
+                        || (hpiece_value < 0 && score < 0))
+                    score = 0;
                 debug (mobility)
                 {
                     logger.log("hostage piece {}{}, sc {}",
@@ -809,6 +792,25 @@ class StaticEval
             return score * frame_w;
         }
 
+        //static const int[] BLOCKADE_VAL = [0, -1, -5, -10, -50, -150, -700,
+        //             1, 5, 10, 50, 150, 700];
+        static const real BLOCKADE_DIV = 3;
+        static const real[] MOBILITY_MUL = [1.0, 0.75, 0.5, 0.25];
+        static const real CLOSE_BLOCKADER_DIV = 80.0;
+        static const real FAR_BLOCKADER_DIV = 100.0;
+        // stronger close blockaders are possible hostage holders
+        static const real[] BLOCK_STRONGER_CL = [1.0, 0.6, 0.4, 0.2, 0.1];
+        static const real[] BLOCK_STRONGER_FAR = [1.0, 0.7, 0.5, 0.3, 0.2];
+        static const real[] BLOCK_EVEN_CL = [1.0, 0.75, 0.55];
+        static const real[] BLOCK_EVEN_FAR = [1.0, 0.9, 0.8];
+        static const real[] BLOCK_WEAK_CL = [1.0, 1.0, 1.0, 0.95, 0.9,
+                                             0.85, 0.8];
+        static const real[] BLOCK_WEAK_FAR = [1.0, 1.0, 1.0, 1.0, 0.98,
+                                              0.95, 0.92, 0.9, 0.88];
+
+        static const int[] MOBILE_VAL = [0, 20, 8, 2];
+        static const real[] SIDE_MUL = [0.1, -0.1];
+
         hostages = 0;
         frames = 0;
         weakframers = 0;
@@ -847,6 +849,7 @@ class StaticEval
             }
 
             ulong stronger;
+            ulong blockader_penalized = 0UL;
             for (int p = Piece.WELEPHANT + pieceoffset;
                     p >= Piece.WCAT + pieceoffset; p--)
             {
@@ -892,9 +895,10 @@ class StaticEval
                         real sc = (-piece_value[p] / BLOCKADE_DIV)
                             * MOBILITY_MUL[mobility];
                         ulong[2] blockaders;
-                        blockaders[0] = neighbors_of(reach_map[pnum][4]);
+                        blockaders[0] = neighbors_of(reach_map[pnum][4])
+                            & pos.placement[side^1];
                         blockaders[1] = neighbors_of(blockaders[0])
-                            & ~blockaders[0];
+                            & ~blockaders[0] & pos.placement[side^1];
                         int blk_num = popcount(blockaders[0] & stronger);
                         blk_num = blk_num > 4 ? 4 : blk_num;
                         sc *= BLOCK_STRONGER_CL[blk_num];
@@ -907,20 +911,53 @@ class StaticEval
                         blk_num = popcount(blockaders[1] & pos.bitBoards[epiece]);
                         assert (blk_num < 3);
                         sc *= BLOCK_EVEN_FAR[blk_num];
-                        blk_num = popcount(blockaders[0] & pos.bitBoards[epiece-1]);
-                        blk_num = blk_num > 2 ? 2 : blk_num;
+                        blk_num = popcount(blockaders[0] &
+                                ~(stronger | pos.bitBoards[epiece]));
+                        blk_num = (blk_num < 6) ? blk_num : 6;
                         sc *= BLOCK_WEAK_CL[blk_num];
-                        blk_num = popcount(blockaders[1] & pos.bitBoards[epiece-1]);
-                        blk_num = blk_num > 2 ? 2 : blk_num;
+                        blk_num = popcount(blockaders[1] &
+                                ~(stronger | pos.bitBoards[epiece]));
+                        blk_num = (blk_num < 8) ? blk_num : 8;
                         sc *= BLOCK_WEAK_FAR[blk_num];
-                        score += sc;
+                        real bpiece_penalty = 0;
+                        while (blockaders[0]) {
+                            ulong bbit = blockaders[0] & -blockaders[0];
+                            blockaders[0] ^= bbit;
+                            if (bbit & blockader_penalized)
+                                continue;
+                            blockader_penalized |= bbit;
+                            bitix bix = bitindex(bbit);
+                            bpiece_penalty += -piece_value[pos.pieces[bix]]
+                                / CLOSE_BLOCKADER_DIV;
+                            if (bbit & TRAPS
+                                    & ~neighbors_of(pos.placement[side]
+                                        & ~pbit))
+                                bpiece_penalty /= 10.0;
+                        }
+                        while (blockaders[1]) {
+                            ulong bbit = blockaders[1] & -blockaders[1];
+                            blockaders[1] ^= bbit;
+                            if (bbit & blockader_penalized)
+                                continue;
+                            blockader_penalized |= bbit;
+                            bitix bix = bitindex(bbit);
+                            bpiece_penalty += -piece_value[pos.pieces[bix]]
+                                / FAR_BLOCKADER_DIV;
+                            if (bbit & TRAPS
+                                    & ~neighbors_of(pos.placement[side]
+                                        & ~pbit))
+                                bpiece_penalty /= 10.0;
+                        }
+                        if ((sc < 0 && sc + bpiece_penalty < 0)
+                                || (sc > 0 && sc + bpiece_penalty > 0))
+                            score += sc + bpiece_penalty;
                         debug (mobility)
                         {
                             bitix pix = bitindex(pbit);
                             Piece ppiece = pos.pieces[pix];
-                            logger.log("Found blockade of {}{} to be worth {}",
+                            logger.log("Found blockade of {}{} to be worth {} + {}",
                                     ".RCDHMErcdhme"[ppiece],
-                                    ix_to_alg(pix), sc);
+                                    ix_to_alg(pix), sc, bpiece_penalty);
                         }
                     }
                     ++pnum;
@@ -1080,6 +1117,21 @@ class StaticEval
             logger.log("Mobility and blockade only: {}", score);
         }
 
+        static const real NK_TOUCH_DIV = 10;
+        static const real NK_CLOSE_DIV = 20;
+        static const real NK_FAR_DIV = 40;
+        static const real KEPT_DIV = 60;
+        /*
+        static const int[] NK_TOUCH_THREAT = [0, -7, -22, -30, -45, -96, -150,
+                     7, 22, 30, 45, 96, 150];
+        static const int[] NK_CLOSE_THREAT = [0, -5, -15, -20, -30, -64, -100,
+                     5, 15, 20, 30, 64, 100];
+        static const int[] NK_FAR_THREAT = [0, -2, -7, -10, -15, -32, -50,
+                     2, 7, 10, 15, 32, 50];
+        static const int[] KP_THREAT = [0, -1, -4, -5, -7, -15, -25,
+                     1, 4, 5, 7, 15, 25];
+                     */
+
         real threat_score = 0;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
@@ -1114,24 +1166,6 @@ class StaticEval
                     }
                 }
                 handled = threatened;
-                threatened = neighbors_of(threat_map[side][threat_ix][3])
-                    & pieces & ~handled;
-                threat_score += (-piece_value[p + pcorr] / KEPT_DIV)
-                    * popcount(threatened);
-                threat_score -= ((-piece_value[p + pcorr] / KEPT_DIV)
-                        * popcount(threatened & cover)) / 2;
-                debug (mobility)
-                {
-                    if (threatened)
-                    {
-                        auto tpop = popcount(threatened);
-                        logger.log("KEPT_THREAT to {} {} for {}", tpop,
-                                ".RCDHMErcdhme"[p + pcorr],
-                                (-piece_value[p + pcorr] / KEPT_DIV)
-                                * tpop);
-                    }
-                }
-                handled |= threatened;
                 threatened = neighbors_of(threat_map[side][threat_ix][1])
                     & pieces & ~handled;
                 threat_score += (-piece_value[p + pcorr] / NK_CLOSE_DIV)
@@ -1167,6 +1201,24 @@ class StaticEval
                                 tpop,
                                 ".RCDHMErcdhme"[p + pcorr],
                                 (-piece_value[p + pcorr] / NK_FAR_DIV)
+                                * tpop);
+                    }
+                }
+                handled |= threatened;
+                threatened = neighbors_of(threat_map[side][threat_ix][3])
+                    & pieces & ~handled;
+                threat_score += (-piece_value[p + pcorr] / KEPT_DIV)
+                    * popcount(threatened);
+                threat_score -= ((-piece_value[p + pcorr] / KEPT_DIV)
+                        * popcount(threatened & cover)) / 2;
+                debug (mobility)
+                {
+                    if (threatened)
+                    {
+                        auto tpop = popcount(threatened);
+                        logger.log("KEPT_THREAT to {} {} for {}", tpop,
+                                ".RCDHMErcdhme"[p + pcorr],
+                                (-piece_value[p + pcorr] / KEPT_DIV)
                                 * tpop);
                     }
                 }
@@ -1394,6 +1446,7 @@ class StaticEval
                 int defender_num;
                 if (goals.goal_squares & ~(MIDDLE_SECTOR << sector_shift) & GOAL_RANK[s])
                 {
+                    ulong counted_threats = 0UL;
                     ulong sector = DEFENSE_SECTORS[0] << sector_shift;;
                     int[2] sector_defenders;
                     if (goals.goal_squares & sector & GOAL_RANK[s])
@@ -1402,6 +1455,7 @@ class StaticEval
                         if (sector & (safe_traps[s^1] & ~safe_traps[s]))
                             sector_defenders[0] >>= 1;
                         num_threats++;
+                        counted_threats = goals.goal_squares & sector;
                     } else {
                         sector_defenders[0] = 8;
                     }
@@ -1411,7 +1465,8 @@ class StaticEval
                         sector_defenders[1] = popcount(sector & defenders);
                         if (sector & (safe_traps[s^1] & ~safe_traps[s]))
                             sector_defenders[1] >>= 1;
-                        num_threats++;
+                        if (goals.goal_squares & sector & ~counted_threats)
+                            num_threats++;
                     } else {
                         sector_defenders[1] = 8;
                     }
@@ -1439,6 +1494,14 @@ class StaticEval
                     default:
                 }
                 score += GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s];
+                debug (goal_threat) {
+                    logger.log("gthreat: sq {:X}", goals.goal_squares);
+                    logger.log("gthreat: num {} extra steps {} dsteps {} dnum {}",
+                            num_threats, extrasteps, dsteps, defender_num);
+                    logger.log("gthreat vals: esteps {} dsteps {} dnum {}",
+                            GOAL_THREAT[extrasteps], DEFENSE_STEPS[dsteps],
+                            DEFENSE_NUM[defender_num]);
+                }
             }
         }
         return score;
