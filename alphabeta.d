@@ -2,6 +2,8 @@
 import core.memory;
 import core.sync.mutex;
 import std.conv : to;
+import std.format : format;
+import std.stdio : stderr, writef, writefln, writeln;
 
 import tango_compat;
 
@@ -1173,9 +1175,9 @@ class ABQSearch : ABSearch
                 int rscore = evaluator.static_eval(reversed);
                 if ((score < rscore-2) || (score > rscore+2))
                 {
-                    Stderr("{}\n{}", "wb"[pos.side], pos.to_long_str());
-                    Stderr("reversed:\n{}\n{}", "wb"[reversed.side],
-                            reversed.to_long_str());
+                    stderr.writeln(Format("{}\n{}", "wb"[pos.side], pos.to_long_str()));
+                    stderr.writeln(Format("reversed:\n{}\n{}", "wb"[reversed.side],
+                            reversed.to_long_str()));
                     throw new Exception(Format("Biased eval, {} != {}",
                                 score, rscore));
                 }
@@ -1271,7 +1273,7 @@ class ABQSearch : ABSearch
                         writefln("%s\n%s", "wb"[pos.side], pos.to_long_str());
                         for (int rix=0; rix < rsteps.numsteps; rix++)
                             writef("%s ", rsteps.steps[rix].toString(true));
-                        writefln();
+                        writeln();
                         throw new Exception(format("Bad step found in qsearch %s",
                                     steps.steps[six].toString(true)));
                     }

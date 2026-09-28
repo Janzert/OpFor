@@ -501,7 +501,7 @@ class Position
                         places = placement[1];
                     if (board != (board & places))
                     {
-                        assert (0, "placement doesn't have some of the pieces, " ~ std.string.toString(piece));
+                        assert (0, "placement doesn't have some of the pieces, " ~ to!string(piece));
                     }
                 }
 

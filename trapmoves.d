@@ -1,5 +1,8 @@
 
+import std.stdio : writeln;
+
 import position;
+import tango_compat;
 
 struct CaptureInfo
 {
@@ -39,10 +42,10 @@ class TrapGenerator
     {
         debug (static_captures)
         {
-            Stdout.format("cap {} at {} in {} steps {} trap step from {} to {} is push {}",
+            writeln(Format("cap {} at {} in {} steps {} trap step from {} to {} is push {}",
                     ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)), steps,
                     ix_to_alg(bitindex(tbit)), ix_to_alg(bitindex(frombit)),
-                    ix_to_alg(bitindex(tobit)), ispush).newline;
+                    ix_to_alg(bitindex(tobit)), ispush));
         }
         captures[num_captures].victim = piece;
         captures[num_captures].victim_bit = vbit;
@@ -62,11 +65,11 @@ class TrapGenerator
     {
         debug (static_captures)
         {
-            Stdout.format("cap {} at {} in {} steps {} trap using step {} to {} is push {}",
+            writeln(Format("cap {} at {} in {} steps {} trap using step {} to {} is push {}",
                     ".RCDHMErcdhme"[piece], ix_to_alg(bitindex(vbit)),
                     steps, ix_to_alg(bitindex(tbit)),
                     ix_to_alg(bitindex(step.frombit)),
-                    ix_to_alg(bitindex(step.tobit)), step.push).newline;
+                    ix_to_alg(bitindex(step.tobit)), step.push));
         }
         captures[num_captures].victim = piece;
         captures[num_captures].victim_bit = vbit;
