@@ -11,7 +11,6 @@ import std.string : indexOf, splitLines, strip;
 
 import tango_compat;
 
-import d1_literals;
 import zobristkeys;
 
 private int find(const(char)[] src, char pattern)
@@ -1993,7 +1992,7 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
     return result;
 }
 
-real FAME(Position pos, real scale = D1_33_695652173913032)
+real FAME(Position pos, real scale = 33.695652173913032L)
 {
     static immutable int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
 
@@ -2073,7 +2072,7 @@ real FAME(Position pos, real scale = D1_33_695652173913032)
             & ~pos.bitBoards[Piece.BRABBIT]);
         famescore += wr_left * (600.0L/(brabbits+(2*bpieces)));
     } else {
-        famescore = D1_3369_562173913032;
+        famescore = 3369.562173913032L;
     }
 
     if (pos.placement[Side.WHITE])
@@ -2082,7 +2081,7 @@ real FAME(Position pos, real scale = D1_33_695652173913032)
             & ~pos.bitBoards[Piece.WRABBIT]);
         famescore -= br_left * (600.0L/(wrabbits+(2*wpieces)));
     } else {
-        famescore = -D1_3369_562173913032;
+        famescore = -3369.562173913032L;
     }
 
     return famescore / scale;
@@ -2154,7 +2153,7 @@ class FastFAME
     int[int] cache;
     real scale;
 
-    this(real s = D1_33_695652173913032)
+    this(real s = 33.695652173913032L)
     {
         scale = s;
     }
@@ -2259,7 +2258,7 @@ class FastFAME
         {
             famescore += wr_left * (600.0L/(brabbits+(2*bpieces)));
         } else {
-            return D1_3369_562173913032 / scale;
+            return 3369.562173913032L / scale;
         }
 
         int wpieces = 0;
@@ -2271,7 +2270,7 @@ class FastFAME
         {
             famescore -= br_left * (600.0L/(wrabbits+(2*wpieces)));
         } else {
-            return -D1_3369_562173913032 / scale;
+            return -3369.562173913032L / scale;
         }
 
         return famescore / scale;

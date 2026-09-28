@@ -11,10 +11,10 @@ import os
 import subprocess
 import sys
 
-SOURCES = ["bot_opfor.d", "aeibot.d", "alphabeta.d", "d1_literals.d",
-           "logging.d", "movement.d", "goalsearch.d", "position.d",
-           "setupboard.d", "staticeval.d", "tango_compat.d", "trapmoves.d",
-           "utility.d", "zobristkeys.d"]
+SOURCES = ["bot_opfor.d", "aeibot.d", "alphabeta.d", "logging.d",
+           "movement.d", "goalsearch.d", "position.d", "setupboard.d",
+           "staticeval.d", "tango_compat.d", "trapmoves.d", "utility.d",
+           "zobristkeys.d"]
 
 OPTIMIZE = ["-O3", "-release", "-boundscheck=off"]
 
