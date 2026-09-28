@@ -927,7 +927,7 @@ class ThreadEngine : Engine
             pos_steps.clear();
             pos.get_steps(pos_steps);
             int bix = 0;
-            while (pos_steps.numsteps < bix && pos_steps.steps[bix] != n.beststep)
+            while (bix < pos_steps.numsteps && pos_steps.steps[bix] != n.beststep)
                 bix++;
             if (bix >= pos_steps.numsteps)
                 break;
