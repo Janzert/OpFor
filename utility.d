@@ -1,6 +1,8 @@
 
-import tango.core.sync.Condition;
-import tango.core.sync.Mutex;
+import core.sync.condition;
+import core.sync.mutex;
+
+import tango_compat : fromSeconds;
 
 class Queue(T)
 {
@@ -57,7 +59,7 @@ class Queue(T)
             {
                 if (timeout > 0)
                 {
-                    cnd.wait(timeout);
+                    cnd.wait(fromSeconds(timeout));
                 } else { // timeout must be negative
                     cnd.wait();
                 }

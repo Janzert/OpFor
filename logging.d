@@ -1,14 +1,15 @@
 
-import tango.core.sync.Mutex;
-import tango.io.Stdout;
-import tango.text.convert.Format;
+import core.sync.mutex;
+import std.stdio : stderr;
+
+import tango_compat;
 
 interface LogConsumer
 {
-    void log(char[]);
-    void error(char[]);
-    void warn(char[]);
-    void info(char[]);
+    void log(string);
+    void error(string);
+    void warn(string);
+    void info(string);
 }
 
 class Logger
@@ -25,38 +26,28 @@ class Logger
 
     void register(LogConsumer c)
     {
-        consumers.length = consumers.length + 1;
-        consumers[length-1] = c;
+        consumers ~= c;
     }
 
-    private
-    {
-    void _console_print(char[] fmt, ...)
-    {
-        _console_print(_arguments, _argptr, fmt);
-    }
-
-    void _console_print(TypeInfo[] _arguments, void* _argptr, char[] fmt)
+    private void _console_print(Args...)(const(char)[] fmt, Args args)
     {
         synchronized (console_lock)
         {
-            Stderr(Stderr.layout.convert(_arguments, _argptr, fmt)).newline;
+            stderr.writeln(Format(fmt, args));
         }
     }
-    }
 
-
-    void console(char[] fmt, ...)
+    void console(Args...)(const(char)[] fmt, Args args)
     {
         if (to_console)
         {
-            _console_print(_arguments, _argptr, fmt);
+            _console_print(fmt, args);
         }
     }
 
-    void log(char[] fmt, ...)
+    void log(Args...)(const(char)[] fmt, Args args)
     {
-        char[] message = Format.convert(_arguments, _argptr, fmt);
+        string message = Format(fmt, args);
         foreach(LogConsumer con; consumers)
         {
             con.log(message);
@@ -66,9 +57,9 @@ class Logger
             _console_print("log: {}", message);
     }
 
-    void error(char[] fmt, ...)
+    void error(Args...)(const(char)[] fmt, Args args)
     {
-        char[] message = Format.convert(_arguments, _argptr, fmt);
+        string message = Format(fmt, args);
         foreach(LogConsumer con; consumers)
         {
             con.error(message);
@@ -78,9 +69,9 @@ class Logger
             _console_print("Error: {}", message);
     }
 
-    void warn(char[] fmt, ...)
+    void warn(Args...)(const(char)[] fmt, Args args)
     {
-        char[] message = Format.convert(_arguments, _argptr, fmt);
+        string message = Format(fmt, args);
         foreach(LogConsumer con; consumers)
         {
             con.warn(message);
@@ -90,9 +81,9 @@ class Logger
             _console_print("Warning: {}", message);
     }
 
-    void info(char[] fmt, ...)
+    void info(Args...)(const(char)[] fmt, Args args)
     {
-        char[] message = Format.convert(_arguments, _argptr, fmt);
+        string message = Format(fmt, args);
         foreach(LogConsumer con; consumers)
         {
             con.info(message);

@@ -1,5 +1,4 @@
 
-import tango.util.log.Trace;
 import position;
 
 class GoalSearch
@@ -138,7 +137,7 @@ class GoalSearch
 
 class GoalSearchDT
 {
-    const static int NOT_FOUND = 5;
+    static immutable int NOT_FOUND = 5;
     Position start;
 
     int[2] shortest;
@@ -377,7 +376,7 @@ class GoalSearchDT
 
     private int friendly_goal(ulong gbit, Side side)
     {
-        const static ulong dist2 = 0x0010387C38100000UL;
+        static immutable ulong dist2 = 0x0010387C38100000UL;
 
         bitix gix = bitindex(gbit);
         ulong gneighbors = neighbors_of(gbit);
@@ -3450,7 +3449,7 @@ class GoalSearchDT
 
     private int empty_goal(ulong gbit, Side side)
     {
-        const static ulong dist3 = 0x10387CFE7C381000UL;
+        static immutable ulong dist3 = 0x10387CFE7C381000UL;
 
         bitix gix = bitindex(gbit);
         int enemyoffset;

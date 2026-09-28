@@ -3,17 +3,17 @@
  * Base for implementing an Arimaa Engine Interface bot.
  */
 
-import tango.core.Exception;
-import tango.core.Thread;
-import tango.core.sync.Mutex;
-import tango.core.sync.Condition;
-import tango.io.Console;
-import tango.io.Stdout;
-import tango.net.device.Socket;
-import tango.text.convert.Format;
-import tango.text.Text;
-import tango.text.Util;
-import tango.time.Time;
+import core.stdc.errno : EINTR, errno;
+import core.sync.mutex;
+import core.sys.posix.unistd : read;
+import core.thread;
+import std.algorithm : canFind, splitter;
+import std.array : array;
+import std.socket;
+import std.stdio : stderr, stdout;
+import std.string : indexOf, indexOfAny, strip, stripLeft;
+
+import tango_compat;
 
 import logging;
 import position;
@@ -24,17 +24,14 @@ version(windows)
     pragma(lib, "ws2_32.lib");
 }
 
-private int find(char[] src, char[] pattern)
+private int find(const(char)[] src, const(char)[] pattern)
 {
-    int index = locatePattern!(char)(src, pattern);
-    if (index == src.length)
-        index = -1;
-    return index;
+    return cast(int)indexOf(src, pattern);
 }
 
 class NotImplementedException : Exception
 {
-    this(char[] msg)
+    this(string msg)
     {
         super(msg);
     }
@@ -42,7 +39,7 @@ class NotImplementedException : Exception
 
 class ConnectException : Exception
 {
-    this(char[] msg)
+    this(string msg)
     {
         super(msg);
     }
@@ -50,7 +47,7 @@ class ConnectException : Exception
 
 class TimeoutException : Exception
 {
-    this(char[] msg)
+    this(string msg)
     {
         super(msg);
     }
@@ -58,9 +55,9 @@ class TimeoutException : Exception
 
 class UnknownCommand : Exception
 {
-    char[] command;
+    string command;
 
-    this(char[] msg, char[] cmd)
+    this(string msg, string cmd)
     {
         super(msg);
         this.command = cmd;
@@ -70,43 +67,53 @@ class UnknownCommand : Exception
 interface ServerConnection
 {
     void shutdown();
-    char[] receive(float timeout=-1);
-    void send(char[]);
+    string receive(float timeout=-1);
+    void send(const(char)[]);
 }
 
 class _StdioCom : Thread
 {
-    Queue!(char[]) inq;
+    Queue!(string) inq;
     bool stop = false;
 
     this()
     {
         super(&run);
-        inq = new Queue!(char[])();
-        isDaemon(true);
+        inq = new Queue!(string)();
+        isDaemon = true;
     }
 
     void run()
     {
         try
         {
-            char[] buf;
-            while (!stop && Cin.readln(buf, true))
+            // Read the descriptor directly. std.stdio's readln holds the
+            // stdin FILE lock while it blocks, which deadlocks the C runtime
+            // flushing streams at exit.
+            char[4096] buf;
+            string pending;
+            while (!stop)
             {
-                inq.set(buf.dup);
+                auto got = read(0, buf.ptr, buf.length);
+                if (got < 0 && errno == EINTR)
+                    continue;
+                if (got <= 0) // end of input or error
+                    break;
+                pending ~= buf[0..got];
+                ptrdiff_t eol;
+                while ((eol = indexOf(pending, '\n')) >= 0)
+                {
+                    inq.set(pending[0..eol+1]);
+                    pending = pending[eol+1..$];
+                }
             }
         }
         catch (Exception err)
         {
             if (!stop)
             {
-                void writer(char[] str)
-                {
-                    Stderr(str);
-                }
-                Stderr("Caught error in stdin thread:").newline;
-                err.writeOut(&writer);
-                Stderr.newline;
+                stderr.writeln("Caught error in stdin thread:");
+                stderr.writeln(err);
             }
         }
     }
@@ -134,43 +141,41 @@ class StdioServer : ServerConnection
         comt.stop = true;
     }
 
-    char[] receive(float timeout=-1)
+    string receive(float timeout=-1)
     {
-        char[] msg = comt.inq.get(timeout);
+        string msg = comt.inq.get(timeout);
         if (msg is null)
             throw new TimeoutException("No data received");
         return msg;
     }
 
-    void send(char[] msg)
+    void send(const(char)[] msg)
     {
         synchronized (out_lock)
         {
-            Stdout(msg);
-            Stdout.flush();
+            stdout.write(msg);
+            stdout.flush();
         }
     }
 }
 
 class SocketServer : ServerConnection
 {
-    Berkeley sock;
+    Socket sock;
 
-    this(char[] ip, ushort port)
+    this(string ip, ushort port)
     {
         try
         {
-            sock.open(AddressFamily.INET, SocketType.STREAM,
-                    ProtocolType.TCP);
-            sock.connect(new IPv4Address(ip, port));
-            int[1] send_buffer_size = 24 * 1024;
+            sock = new TcpSocket();
+            sock.connect(new InternetAddress(ip, port));
             sock.setOption(SocketOptionLevel.SOCKET, SocketOption.SNDBUF,
-                    cast(void[])send_buffer_size);
+                    24 * 1024);
         } catch (SocketException e)
         {
             throw new ConnectException(e.msg);
         }
-        sock.blocking(false);
+        sock.blocking = false;
     }
 
     ~this()
@@ -183,25 +188,21 @@ class SocketServer : ServerConnection
         if (sock.isAlive())
         {
             sock.shutdown(SocketShutdown.BOTH);
-            sock.detach();
-            //delete sock;
-            //sock = null;
+            sock.close();
         }
     }
 
-    char[] receive(float timeout=-1)
+    string receive(float timeout=-1)
     {
         SocketSet sset = new SocketSet(1);
-        SocketSet null_set = cast(SocketSet)null;
-        sset.add(&sock);
+        sset.add(sock);
         int ready_sockets;
         if (timeout < 0)
         {
-            ready_sockets = SocketSet.select(sset, null_set, null_set);
+            ready_sockets = Socket.select(sset, null, null);
         } else {
-            long utimeout = cast(long)(timeout * 1000000);
-            ready_sockets = SocketSet.select(sset, null_set, null_set,
-                    utimeout);
+            ready_sockets = Socket.select(sset, null, null,
+                    fromSeconds(timeout));
         }
         if (!ready_sockets)
         {
@@ -211,14 +212,14 @@ class SocketServer : ServerConnection
                 throw new Exception("Socket Error, not alive");
         }
 
-        const int bufsize = 5000;
+        enum int bufsize = 5000;
         char[bufsize] buf;
-        char[] resp;
+        string resp;
         bool gotresponse = false;
-        int val = 0;
+        ptrdiff_t val = 0;
         do {
-            val = sock.receive(buf);
-            if (val == SOCKET_ERROR)
+            val = sock.receive(buf[]);
+            if (val == Socket.ERROR)
             {
                 throw new Exception("Socket Error, receiving");
             } else if (val > 0)
@@ -226,7 +227,7 @@ class SocketServer : ServerConnection
                 gotresponse = true;
             }
             resp ~= buf[0..val];
-        } while (val == bufsize)
+        } while (val == bufsize);
         if (!gotresponse)
         {
             throw new Exception("Socket closed");
@@ -234,13 +235,13 @@ class SocketServer : ServerConnection
         return resp;
     }
 
-    void send(char[] buf)
+    void send(const(char)[] buf)
     {
-        int sent = 0;
+        size_t sent = 0;
         while (sent < buf.length)
         {
-            int val = sock.send(buf[sent..length]);
-            if (val == SOCKET_ERROR)
+            auto val = sock.send(buf[sent..$]);
+            if (val == Socket.ERROR)
                 throw new Exception(Format("Socket Error, sending. Sent {} bytes", sent));
             sent += val;
         }
@@ -288,7 +289,7 @@ class GoCmd : ServerCmd
 
 class MoveCmd : ServerCmd
 {
-    char[] move;
+    string move;
 
     this()
     {
@@ -298,7 +299,7 @@ class MoveCmd : ServerCmd
 
 class PositionCmd : ServerCmd
 {
-    char[] pos_str;
+    string pos_str;
     Side side;
 
     this()
@@ -309,8 +310,8 @@ class PositionCmd : ServerCmd
 
 class OptionCmd : ServerCmd
 {
-    char[] name;
-    char[] value;
+    string name;
+    string value;
 
     this()
     {
@@ -321,17 +322,15 @@ class OptionCmd : ServerCmd
 class ServerInterface : LogConsumer
 {
     ServerConnection con;
-    char[] partial;
+    string partial;
 
     ServerCmd[] cmd_queue;
     bool have_critical = false;
 
-    this(ServerConnection cn, char[] bot_name, char[] bot_author)
+    this(ServerConnection cn, string bot_name, string bot_author)
     {
         con = cn;
-        auto greet = new Text!(char)(con.receive());
-        greet.trim();
-        if (!greet.equals("aei"))
+        if (strip(con.receive()) != "aei")
             throw new Exception("Invalid greeting from server.");
         con.send("protocol-version 1\n");
         con.send(Format("id name {}\n", bot_name));
@@ -348,31 +347,26 @@ class ServerInterface : LogConsumer
     {
         try
         {
-            bool got_partial = false;
-            char[] packet = con.receive(timeout);
-            if (packet && packet[length-1] != '\n' && packet[length-1] != '\r')
+            string packet = partial ~ con.receive(timeout);
+            // Handle complete lines, keeping any unterminated rest for the
+            // next packet.
+            auto end = packet.length;
+            while (end > 0 && packet[end-1] != '\n')
+                end--;
+            partial = packet[end..$];
+            string[] cmds;
+            foreach (line; packet[0..end].splitter('\n'))
             {
-                got_partial = true;
+                if (line.length && line[$-1] == '\r')
+                    line = line[0..$-1];
+                cmds ~= line;
             }
-            if (partial)
+            if (cmds.length)
+                cmds = cmds[0..$-1]; // the empty rest after the last newline
+            foreach (string line; cmds)
             {
-                packet = partial ~ packet;
-                partial = "";
-            }
-            char[][] cmds = splitLines!(char)(packet)[0..length-1];
-            if (got_partial)
-            {
-                if (cmds.length)
-                {
-                    partial = cmds[length-1];
-                    cmds = cmds[0..length-1];
-                } else {
-                    partial = packet;
-                }
-            }
-            foreach (char[] line; cmds)
-            {
-                char[] cmd = trim!(char)(delimit!(char)(line, " \t\n")[0]);
+                auto cmd_end = indexOfAny(line, " \t\n");
+                string cmd = strip(cmd_end < 0 ? line : line[0..cmd_end]);
                 switch (cmd)
                 {
                     case "isready":
@@ -387,10 +381,10 @@ class ServerInterface : LogConsumer
                     case "go":
                         GoCmd go_cmd = new GoCmd();
                         cmd_queue ~= go_cmd;
-                        char[][] words = delimit!(char)(line, " \t");
+                        string[] words = line.splitter!(c => c == ' ' || c == '\t').array;
                         if (words.length > 1)
                         {
-                            switch (trim!(char)(words[1]))
+                            switch (strip(words[1]))
                             {
                                 case "ponder":
                                     go_cmd.option = GoCmd.Option.PONDER;
@@ -408,13 +402,13 @@ class ServerInterface : LogConsumer
                         cmd_queue ~= move_cmd;
                         // find end of makemove
                         int mix = find(line, "makemove") + 8;
-                        move_cmd.move = trim!(char)(line[mix..length]);
+                        move_cmd.move = strip(line[mix..$]);
                         break;
                     case "setposition":
                         PositionCmd p_cmd = new PositionCmd();
                         cmd_queue ~= p_cmd;
                         int six = find(line, "setposition") + 11;
-                        switch(triml!(char)(line[six..length])[0])
+                        switch(stripLeft(line[six..$])[0])
                         {
                             case 'g':
                                 p_cmd.side = Side.WHITE;
@@ -426,18 +420,18 @@ class ServerInterface : LogConsumer
                                 throw new Exception("Bad side sent in setposition from server.");
                         }
                         int pix = find(line, "[");
-                        p_cmd.pos_str = trim!(char)(line[pix..length]);
+                        p_cmd.pos_str = strip(line[pix..$]);
                         break;
                     case "setoption":
                         OptionCmd option_cmd = new OptionCmd();
                         cmd_queue ~= option_cmd;
                         int nameix = find(line, "name") + 4;
                         int valueix = find(line, "value");
-                        valueix = (valueix == -1) ? line.length : valueix;
-                        option_cmd.name = trim!(char)(line[nameix..valueix]);
+                        valueix = (valueix == -1) ? cast(int)line.length : valueix;
+                        option_cmd.name = strip(line[nameix..valueix]);
                         if (valueix != line.length)
                         {
-                            option_cmd.value = trim!(char)(line[valueix+5..length]);
+                            option_cmd.value = strip(line[valueix+5..$]);
                         } else {
                             option_cmd.value = "";
                         }
@@ -463,27 +457,27 @@ class ServerInterface : LogConsumer
         con.send("readyok\n");
     }
 
-    void bestmove(char[] move)
+    void bestmove(string move)
     {
         con.send(Format("bestmove {}\n", move));
     }
 
-    void info(char[] message)
+    void info(string message)
     {
         con.send(Format("info {}\n", message));
     }
 
-    void log(char[] message)
+    void log(string message)
     {
         con.send(Format("log {}\n", message));
     }
 
-    void warn(char[] message)
+    void warn(string message)
     {
         con.send(Format("log Warning: {}\n", message));
     }
 
-    void error(char[] message)
+    void error(string message)
     {
         con.send(Format("log Error: {}\n", message));
     }
@@ -515,27 +509,20 @@ class ServerInterface : LogConsumer
                     }
                 }
             }
-            cmd_queue = cmd_queue[1..length];
+            cmd_queue = cmd_queue[1..$];
             return cast(bool)cmd_queue.length;
         }
         return false;
     }
 
-    static bool is_standard_option(char[] n)
+    static bool is_standard_option(string n)
     {
-        static char[][] stdopts = ["tcmove", "tcreserve", "tcpercent", "tcmax",
-            "tctotal", "tcturns", "tcturntime", "greserve", "sreserve",
-            "gused", "sused", "lastmoveused", "moveused", "opponent",
-            "opponent_rating", "rated", "event", "hash", "depth"];
-        auto name = new Text!(char)(n);
-        for (int i=0; i < stdopts.length; i++)
-        {
-            if (name.equals(stdopts[i]) == 0)
-            {
-                return true;
-            }
-        }
-        return false;
+        static immutable string[] stdopts = ["tcmove", "tcreserve",
+            "tcpercent", "tcmax", "tctotal", "tcturns", "tcturntime",
+            "greserve", "sreserve", "gused", "sused", "lastmoveused",
+            "moveused", "opponent", "opponent_rating", "rated", "event",
+            "hash", "depth"];
+        return stdopts.canFind(n);
     }
 }
 
@@ -546,12 +533,12 @@ class AEIEngine
     Logger logger;
 
     EngineState state;
-    char[] bestmove;
+    string bestmove;
 
     Position position;
     int ply;
     Position[] past;
-    char[][] moves;
+    string[] moves;
     int checked_moves;
 
     this(Logger l)
@@ -598,7 +585,7 @@ class AEIEngine
         throw new NotImplementedException("AEIEngine.set_bestmove() has not been implemented.");
     }
 
-    void make_move(char[] move)
+    void make_move(string move)
     {
         past ~= position.dup;
         moves ~= move;
@@ -608,7 +595,7 @@ class AEIEngine
         state = EngineState.IDLE;
     }
 
-    void set_position(Side side, char[] pstr)
+    void set_position(Side side, string pstr)
     {
         if (position !is null)
         {

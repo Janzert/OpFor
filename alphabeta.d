@@ -1,7 +1,9 @@
 
-import tango.core.Memory;
-import tango.core.sync.Mutex;
-import tango.util.Convert;
+import core.memory;
+import core.sync.mutex;
+import std.conv : to;
+
+import tango_compat;
 
 import goalsearch;
 import logging;
@@ -9,14 +11,22 @@ import position;
 import staticeval;
 import trapmoves;
 
-static const int MAX_EVAL_SCORE = 63979;
-static const int MIN_WIN_SCORE = 63980;
-static const int WIN_SCORE = 64000;
-static const int MAX_SCORE = 65000;
-static const int MIN_SCORE = -MAX_SCORE;
-static const int ABORT_SCORE = MAX_SCORE+100;
+enum int MAX_EVAL_SCORE = 63979;
+enum int MIN_WIN_SCORE = 63980;
+enum int WIN_SCORE = 64000;
+enum int MAX_SCORE = 65000;
+enum int MIN_SCORE = -MAX_SCORE;
+enum int ABORT_SCORE = MAX_SCORE+100;
 
 enum SType { EXACT, ALPHA, BETA }
+
+/*
+ * Bytes per transposition table entry used to size the table. This is
+ * TTNode.sizeof in the original 32-bit build, where ulong was 4 byte
+ * aligned. Keeping the same entry count keeps search results identical to
+ * that build; the entries themselves are larger on 64-bit.
+ */
+enum size_t TT_ENTRY_SIZE = 44;
 
 struct TTNode
 {
@@ -60,20 +70,20 @@ class TransTable
     void set_size(int size)
     {
         store.length = 0;
-        store.length = (size*1024*1024) / TTNode.sizeof;
+        store.length = (size*1024*1024) / TT_ENTRY_SIZE;
         store.length = store.length < 1 ? 1 : store.length;
-        GC.setAttr(cast(void*)store, GC.BlkAttr.NO_SCAN);
+        GC.setAttr(store.ptr, GC.BlkAttr.NO_SCAN);
         age();
         log.log("Set transposition table size to {}MB ({} entries)", size, store.length);
     }
 
     TTNode* get(Position pos)
     {
-        int key = pos.zobrist % store.length;
+        int key = cast(int)(pos.zobrist % store.length);
         TTNode* node = &store[key];
         if (store[key].zobrist != pos.zobrist)
         {
-            key = (key + 1) % store.length;
+            key = cast(int)((key + 1) % store.length);
             if (store[key].zobrist == pos.zobrist)
             {
                 node = &store[key];
@@ -82,7 +92,7 @@ class TransTable
                 {
                     node = &store[key];
                 }
-                key = (key + 1) % store.length;
+                key = cast(int)((key + 1) % store.length);
                 if (store[key].zobrist == pos.zobrist)
                 {
                     node = &store[key];
@@ -91,7 +101,7 @@ class TransTable
                     {
                         node = &store[key];
                     }
-                    key = (key + 1) % store.length;
+                    key = cast(int)((key + 1) % store.length);
                     if (store[key].zobrist == pos.zobrist
                             || (!node.aged && node.depth > store[key].depth))
                     {
@@ -160,7 +170,7 @@ class HistoryHeuristic
 
 class KillerHeuristic
 {
-    const static int MAX_HEIGHT = 20;
+    enum int MAX_HEIGHT = 20;
     Step[2][2][MAX_HEIGHT] steps;
     uint[64][64][2][MAX_HEIGHT] history;
     uint[2][2][MAX_HEIGHT] max_history;
@@ -220,11 +230,11 @@ class KillerHeuristic
 
 class StepSorter
 {
-    private static Mutex cache_lock;
-    private static StepSorter[] reserve;
-    private static int reservesize;
+    private __gshared Mutex cache_lock;
+    private __gshared StepSorter[] reserve;
+    private __gshared int reservesize;
 
-    static this()
+    shared static this()
     {
         cache_lock = new Mutex();
     }
@@ -259,10 +269,10 @@ class StepSorter
         }
     }
 
-    static bool use_killers = true;
-    static bool use_history = true;
-    static bool capture_first = true;
-    static bool prune_unrelated = true;
+    __gshared bool use_killers = true;
+    __gshared bool use_history = true;
+    __gshared bool capture_first = true;
+    __gshared bool prune_unrelated = true;
 
     ABSearch parent;
     int height;
@@ -278,7 +288,7 @@ class StepSorter
     bool captures_generated;
     int capture_num;
 
-    private ulong considered[64];
+    private ulong[64] considered;
 
     int num;
     int stage;
@@ -420,6 +430,7 @@ class StepSorter
                     parent.logger.warn("Did not find hash step in step list");
                 }
                 stage++;
+                goto case;
             case 1:
                 if (capture_first && !pos.inpush)
                 {
@@ -537,6 +548,7 @@ class StepSorter
                     }
                 }
                 stage++;
+                goto case;
             case 2:
                 if (use_killers && !pos.inpush && height < parent.killers.MAX_HEIGHT)
                 {
@@ -578,6 +590,7 @@ class StepSorter
                         break;
                 }
                 stage++;
+                goto case;
             case 3:
                 if (remove_unrelated)
                 {
@@ -624,6 +637,7 @@ class StepSorter
                     break;
                 }
                 stage++;
+                goto default;
              default:
                 step = &steps.steps[num++];
         }
@@ -672,31 +686,31 @@ class ABSearch
         tthits = 0;
     }
 
-    bool set_option(char[] option, char[] value)
+    bool set_option(string option, string value)
     {
         bool handled = true;
         switch (option)
         {
             case "history":
-                StepSorter.use_history = to!(bool)(value);
+                StepSorter.use_history = to!bool(value);
                 break;
             case "capture_sort":
-                StepSorter.capture_first = to!(bool)(value);
+                StepSorter.capture_first = to!bool(value);
                 break;
             case "use_lmr":
-                use_lmr = to!(bool)(value);
+                use_lmr = to!bool(value);
                 break;
             case "use_nmh":
-                use_nmh = to!(bool)(value);
+                use_nmh = to!bool(value);
                 break;
             case "use_early_beta":
-                use_early_beta = to!(bool)(value);
+                use_early_beta = to!bool(value);
                 break;
             case "use_killers":
-                StepSorter.use_killers = to!(bool)(value);
+                StepSorter.use_killers = to!bool(value);
                 break;
             case "prune_unrelated":
-                StepSorter.prune_unrelated = to!(bool)(value);
+                StepSorter.prune_unrelated = to!bool(value);
                 break;
             default:
                 handled = false;
@@ -1065,22 +1079,22 @@ class ABQSearch : ABSearch
         evaluator = new StaticEval(l, goal_searcher, trap_search);
     }
 
-    void prepare()
+    override void prepare()
     {
         super.prepare();
         nodes_quiesced = 0;
     }
 
-    bool set_option(char[] option, char[] value)
+    override bool set_option(string option, string value)
     {
         bool handled = true;
         switch (option)
         {
             case "eval_quiesce":
-                do_qsearch = to!(int)(value);
+                do_qsearch = to!int(value);
                 break;
             case "eval_qdepth":
-                max_qdepth = 0 - to!(int)(value);
+                max_qdepth = 0 - to!int(value);
                 qdepth = max_qdepth;
                 break;
             default:
@@ -1091,12 +1105,12 @@ class ABQSearch : ABSearch
         return handled;
     }
 
-    void set_depth(int depth)
+    override void set_depth(int depth)
     {
         super.set_depth(depth);
     }
 
-    int eval(Position pos, int alpha, int beta)
+    override int eval(Position pos, int alpha, int beta)
     {
         switch (do_qsearch)
         {
@@ -1108,7 +1122,7 @@ class ABQSearch : ABSearch
         }
     }
 
-    int static_eval(Position pos)
+    override int static_eval(Position pos)
     {
         return evaluator.static_eval(pos);
     }
@@ -1348,12 +1362,12 @@ class ABQSearch : ABSearch
         return score;
     }
 
-    int logged_eval(Position pos)
+    override int logged_eval(Position pos)
     {
         return evaluator.logged_eval(pos);
     }
 
-    void report()
+    override void report()
     {
         super.report();
         if (do_qsearch)

@@ -1,42 +1,37 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
+"""Build bot_opfor with LDC.
+
+With no arguments this builds an optimized executable. "-static" builds a
+statically linked one. Any other arguments are passed to the compiler in
+place of the default optimization flags. Set LDC to use a compiler that
+isn't ldc2 on the path.
+"""
 
 import os
+import subprocess
 import sys
 
-from subprocess import Popen
+SOURCES = ["bot_opfor.d", "aeibot.d", "alphabeta.d", "d1_literals.d",
+           "logging.d", "movement.d", "goalsearch.d", "position.d",
+           "setupboard.d", "staticeval.d", "tango_compat.d", "trapmoves.d",
+           "utility.d", "zobristkeys.d"]
+
+OPTIMIZE = ["-O3", "-release", "-boundscheck=off"]
 
 
-library_path = os.path.expanduser("~/dmd/lib")
+def main():
+    args = sys.argv[1:]
+    static = "-static" in args
+    if static:
+        args.remove("-static")
+    if not args:
+        args = OPTIMIZE
+    cmd = [os.environ.get("LDC", "ldc2")] + args + SOURCES + ["-of=bot_opfor"]
+    if static:
+        cmd.append("-static")
+    print(" ".join(cmd))
+    return subprocess.call(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
 
-sourcefiles = ["bot_opfor.d", "aeibot.d", "alphabeta.d", "logging.d",
-        "movement.d", "goalsearch.d", "position.d", "setupboard.d",
-        "staticeval.d", "trapmoves.d", "utility.d", "zobristkeys.d",
-        "Arguments.d"]
 
-
-args = sys.argv[1:]
-build_static = False
-if len(args) and ("-static" in args):
-    for i, arg in enumerate(args):
-        if arg == "-static":
-            args[i] = "-c"
-            build_static = True
-            break
-
-if len(args) == 0 or (len(args) == 1
-        and args[0] == "-c"):
-    args += ["-release", "-O", "-inline"]
-
-cmd = ["dmd"] + args + sourcefiles
-
-print " ".join(cmd)
-Popen(cmd).wait()
-
-if build_static:
-    cmd = ["gcc"]
-    cmd += [f.replace(".d", ".o") for f in sourcefiles]
-    cmd += ["-o", "bot_opfor", "-m32", "-static", "-Xlinker",
-            "-L"+library_path, "-ltango-dmd", "-lpthread", "-lm"]
-    print " ".join(cmd)
-    Popen(cmd).wait()
-
+if __name__ == "__main__":
+    sys.exit(main())

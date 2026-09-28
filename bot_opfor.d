@@ -1,31 +1,16 @@
 
-// Give traceback when an exception is thrown
-// does not work in release mode
-// does not work if placed in a debug section
-version (trace_exceptions)
-{
-import tango.core.tools.TraceExceptions;
-pragma(msg, "Compiling with stack trace support.");
-}
+import core.memory;
+import core.sync.condition;
+import core.sync.exception;
+import core.sync.mutex;
+import core.thread;
+import core.time : dur;
+import std.conv : to;
+import std.getopt;
+import std.stdio : stderr;
+import std.string : splitLines, toUpper;
 
-import tango.util.log.Trace;
-import tango.core.Memory;
-import tango.core.Atomic;
-import tango.core.Thread;
-import tango.core.sync.Condition;
-import tango.core.sync.Mutex;
-import tango.core.sync.ReadWriteMutex;
-import tango.io.Stdout;
-import tango.text.Ascii;
-import tango.text.convert.Float;
-import tango.text.convert.Integer;
-import tango.text.Util;
-import tango.time.Clock;
-import tango.time.StopWatch;
-import tango.time.Time;
-import tango.util.Convert;
-// Lifted from tango trunk, should be included in some release after 0.99.7
-import Arguments;
+import tango_compat;
 
 import alphabeta;
 import aeibot;
@@ -34,10 +19,10 @@ import position;
 import setupboard;
 import utility;
 
-const char[] BOT_NAME = "OpFor";
-const char[] BOT_AUTHOR = "Janzert";
+enum BOT_NAME = "OpFor";
+enum BOT_AUTHOR = "Janzert";
 
-const int START_SEARCH_NODES = 30000;
+enum int START_SEARCH_NODES = 30000;
 
 struct PositionRecord
 {
@@ -48,9 +33,9 @@ struct PositionRecord
 
 class PositionNode
 {
-    private static PositionNode cache_head;
-    static int allocated;
-    static int reserved;
+    private __gshared PositionNode cache_head;
+    __gshared int allocated;
+    __gshared int reserved;
 
     PositionNode prev;
     PositionNode next;
@@ -122,7 +107,7 @@ class Engine : AEIEngine
 
     void report() { }
 
-    bool set_option(char[] name, char[] value) { return false; }
+    bool set_option(string name, string value) { return false; }
 
     void shutdown() { }
 }
@@ -141,12 +126,12 @@ class ResultSMessage : SearcherMsg
 {
     private
     {
-    static Mutex cache_lock;
-    static ResultSMessage[] msg_store;
-    static uint num_msgs;
+    __gshared Mutex cache_lock;
+    __gshared ResultSMessage[] msg_store;
+    __gshared uint num_msgs;
     }
 
-    static this()
+    shared static this()
     {
         cache_lock = new Mutex();
     }
@@ -203,7 +188,7 @@ class SearchThread : Thread
     Atomic!(bool) searching;
 
     bool root_lmr = true;
-    const static int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
+    static immutable int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
     }
 
     this(ThreadEngine ctl)
@@ -252,7 +237,7 @@ class SearchThread : Thread
         return searching.load();
     }
 
-    bool set_option(char[] name, char[] value)
+    bool set_option(string name, string value)
     {
         synchronized (search_lock)
         {
@@ -318,7 +303,7 @@ class SearchThread : Thread
                     ulong sd = search.last_depth;
                     while (sd < search_depth)
                     {
-                        score = -searcher.alphabeta(pos, sd+1, -(cur_score+1),
+                        score = -searcher.alphabeta(pos, cast(int)(sd+1), -(cur_score+1),
                                 -(cur_score), 0);
                         if (score == -ABORT_SCORE)
                         {
@@ -369,12 +354,12 @@ class SearchThread : Thread
                 best_score = control.best_score.load();
                 if (best_score >= score)
                     break;
-            } while (!control.best_score.storeIf(score, best_score))
+            } while (!control.best_score.storeIf(score, best_score));
             synchronized (control.pn_lock)
             {
                 search.last_score = score;
                 search.last_depth = search_depth;
-                search.last_nodes = pos_nodes;
+                search.last_nodes = cast(int)pos_nodes;
             }
             control.msg_q.set(ResultSMessage.allocate(this, search));
         } else {
@@ -404,9 +389,9 @@ class SearchThread : Thread
                     {
                         synchronized (control.search_wait_lock)
                         {
-                            control.search_wait.wait(0.1);
+                            control.search_wait.wait(dur!"msecs"(100));
                         }
-                    } catch (SyncException err)
+                    } catch (SyncError err)
                     {
                         control.logger.warn("Caught sync exception while waiting in search thread.");
                     }
@@ -415,15 +400,9 @@ class SearchThread : Thread
         } catch (Exception err)
         {
             control.logger.error("Caught error in search thread");
-            char[] exception_msg = "".dup;
-            void excwriter(char[] str)
-            {
-                exception_msg ~= str;
-            }
-            err.writeOut(&excwriter);
+            string exception_msg = err.toString();
             control.logger.console(exception_msg);
-            char[][] exc_lines = splitLines!(char)(exception_msg);
-            foreach (line; exc_lines)
+            foreach (line; splitLines(exception_msg))
             {
                 control.logger.error(line);
             }
@@ -483,7 +462,7 @@ class ThreadEngine : Engine
         {
             auto cur_num = threads.length;
             threads.length = thread_num;
-            for (int t=cur_num; t < thread_num; t++)
+            for (size_t t=cur_num; t < thread_num; t++)
             {
                 threads[t] = new SearchThread(this);
                 threads[t].start();
@@ -491,7 +470,7 @@ class ThreadEngine : Engine
         }
         else if (thread_num < threads.length)
         {
-            for (int t=threads.length-1; t >= thread_num; t--)
+            for (ptrdiff_t t=threads.length-1; t >= thread_num; t--)
             {
                 threads[t].shutdown = true;
             }
@@ -509,7 +488,7 @@ class ThreadEngine : Engine
         return true;
     }
 
-    bool set_option(char[] name, char[] value)
+    override bool set_option(string name, string value)
     {
         bool handled = true;
         switch(name)
@@ -549,7 +528,7 @@ class ThreadEngine : Engine
                 }
                 break;
             case "setup_random_minor":
-                board_setup.random_minor = cast(bool)toInt(value);
+                board_setup.random_minor = cast(bool)to!int(value);
                 break;
             case "history":
                 StepSorter.use_history = to!(bool)(value);
@@ -577,14 +556,14 @@ class ThreadEngine : Engine
                         handled = handled && thread.set_option(name, value);
                     }
                 } else {
-                    logger.warn("Currently searching did not try to set option {} on search threads.");
+                    logger.warn("Currently searching did not try to set option {} on search threads.", name);
                     handled = false;
                 }
         }
         return handled;
     }
 
-    void cleanup_search()
+    override void cleanup_search()
     {
         stop_search();
         foreach(thread; threads)
@@ -614,12 +593,12 @@ class ThreadEngine : Engine
         state = EngineState.IDLE;
     }
 
-    int cur_score()
+    override int cur_score()
     {
         return update_score;
     }
 
-    void logged_eval(Position pos)
+    override void logged_eval(Position pos)
     {
         if (run_search.load())
         {
@@ -629,7 +608,7 @@ class ThreadEngine : Engine
         threads[0].searcher.logged_eval(pos);
     }
 
-    void start_search()
+    override void start_search()
     {
         if (ply < 3)
         {
@@ -675,13 +654,20 @@ class ThreadEngine : Engine
                 }
                 last_pos = n;
             }
-            delete pstore;
 
             if (pos_list is null)
             {
                 // only repetition moves available
                 pos_list = repeated;
                 num_moves = 1;
+            }
+            if (pos_list is null)
+            {
+                // No legal moves, the game is already lost by immobilization.
+                logger.warn("No legal moves in this position.");
+                bestmove = "";
+                state = EngineState.MOVESET;
+                return;
             }
             best_score.store(MIN_SCORE);
             update_score = MIN_SCORE;
@@ -742,7 +728,7 @@ class ThreadEngine : Engine
                     if (thread.is_searching())
                     {
                         still_searching = true;
-                        Thread.sleep(0.2);
+                        Thread.sleep(dur!"msecs"(200));
                     }
                 }
             }
@@ -762,7 +748,7 @@ class ThreadEngine : Engine
         }
     }
 
-    void search(double check_time, bool delegate() should_abort)
+    override void search(double check_time, bool delegate() should_abort)
     {
         in_step = true;
         search_timer.start();
@@ -828,7 +814,7 @@ class ThreadEngine : Engine
         }
     }
 
-    void set_bestmove()
+    override void set_bestmove()
     {
         if (provisional_result)
             bestmove = last_best.move.to_move_str(position);
@@ -838,7 +824,7 @@ class ThreadEngine : Engine
         state = EngineState.MOVESET;
     }
 
-    void shutdown()
+    override void shutdown()
     {
         foreach (thread; threads)
         {
@@ -956,7 +942,7 @@ class ThreadEngine : Engine
         return bestline;
     }
 
-    void report()
+    override void report()
     {
         logger.info("nodes {}", nodes_searched);
         if (num_losing)
@@ -1000,15 +986,15 @@ class SeqEngine : Engine
 
     PositionNode last_best;
 
-    const static int BOOK_SIZE = 1000000;
+    enum int BOOK_SIZE = 1000000;
     PositionRecord[] opening_book;
     bool position_record = false;
 
-    const static uint MAX_ABORT_REPORTS = 4;
+    enum uint MAX_ABORT_REPORTS = 4;
     uint aborts_reported = 0;
 
     bool root_lmr = true;
-    const static int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
+    static immutable int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
 
     StopWatch search_length;
 
@@ -1021,7 +1007,7 @@ class SeqEngine : Engine
         in_step = false;
     }
 
-    bool set_option(char[] option, char[] value)
+    override bool set_option(string option, string value)
     {
         bool handled = true;
         switch (option)
@@ -1033,7 +1019,7 @@ class SeqEngine : Engine
                 log_tt_stats = to!(bool)(value);
                 break;
             case "opening_book":
-                position_record = cast(bool)toInt(value);
+                position_record = cast(bool)to!int(value);
                 if (position_record)
                 {
                     if (opening_book.length == 0)
@@ -1041,7 +1027,7 @@ class SeqEngine : Engine
                 }
                 break;
             case "root_lmr":
-                root_lmr = cast(bool)toInt(value);
+                root_lmr = cast(bool)to!int(value);
                 break;
             case "setup_rabbits":
                 switch (toUpper(value))
@@ -1064,7 +1050,7 @@ class SeqEngine : Engine
                 }
                 break;
             case "setup_random_minor":
-                board_setup.random_minor = cast(bool)toInt(value);
+                board_setup.random_minor = cast(bool)to!int(value);
                 break;
             case "set_steps":
                 if (position !is null) {
@@ -1078,24 +1064,24 @@ class SeqEngine : Engine
         return handled;
     }
 
-    int cur_score()
+    override int cur_score()
     {
         return best_score;
     }
 
-    void logged_eval(Position pos)
+    override void logged_eval(Position pos)
     {
         searcher.logged_eval(pos);
     }
 
-    void new_game()
+    override void new_game()
     {
         if (position_record && past.length > 3)
         {
-            int record_length = (past.length < 60) ? past.length : 60;
+            int record_length = cast(int)((past.length < 60) ? past.length : 60);
             for (int i=3; i < record_length; i++)
             {
-                int key = past[i].zobrist % opening_book.length;
+                int key = cast(int)(past[i].zobrist % opening_book.length);
                 if (opening_book[key].position_key != past[i].zobrist)
                 {
                     opening_book[key].position_key = past[i].zobrist;
@@ -1110,7 +1096,7 @@ class SeqEngine : Engine
         super.new_game();
     }
 
-    void start_search()
+    override void start_search()
     {
         if (ply < 3)
         {
@@ -1156,13 +1142,20 @@ class SeqEngine : Engine
                 }
                 last_pos = n;
             }
-            delete pstore;
 
             if (pos_list is null)
             {
                 // only repetition moves available
                 pos_list = repeated;
                 num_moves = 1;
+            }
+            if (pos_list is null)
+            {
+                // No legal moves, the game is already lost by immobilization.
+                logger.warn("No legal moves in this position.");
+                bestmove = "";
+                state = EngineState.MOVESET;
+                return;
             }
             next_pos = pos_list;
             best_score = MIN_SCORE;
@@ -1177,7 +1170,7 @@ class SeqEngine : Engine
         }
     }
 
-    void search(double check_time, bool delegate() should_abort)
+    override void search(double check_time, bool delegate() should_abort)
     {
         in_step = true;
         uint check_nodes;
@@ -1219,7 +1212,7 @@ class SeqEngine : Engine
                 {
                     ulong sd = next_pos.last_depth;
                     while (sd < search_depth && score != -ABORT_SCORE)
-                        score = -searcher.alphabeta(pos, ++sd, -(best_score+1), -best_score, 0);
+                        score = -searcher.alphabeta(pos, cast(int)++sd, -(best_score+1), -best_score, 0);
                 } else {
                     score = next_pos.last_score;
                     search_depth = next_pos.last_depth;
@@ -1252,7 +1245,7 @@ class SeqEngine : Engine
 
             if (position_record)
             {
-                int key = pos.zobrist % opening_book.length;
+                int key = cast(int)(pos.zobrist % opening_book.length);
                 if (opening_book[key].position_key == pos.zobrist
                         && opening_book[key].total_seen)
                 {
@@ -1340,7 +1333,7 @@ class SeqEngine : Engine
         }
     }
 
-    void set_bestmove()
+    override void set_bestmove()
     {
         bestmove = pos_list.move.to_move_str(position);
         search_length.stop();
@@ -1369,7 +1362,7 @@ class SeqEngine : Engine
         return bestline;
     }
 
-    void report()
+    override void report()
     {
         searcher.report();
         if (num_losing)
@@ -1394,7 +1387,7 @@ class SeqEngine : Engine
         }
     }
 
-    void cleanup_search()
+    override void cleanup_search()
     {
         while (pos_list !is null)
         {
@@ -1421,55 +1414,58 @@ class SeqEngine : Engine
 }
 
 
-int main(char[][] args)
+int main(string[] args)
 {
-    char[] ip = "127.0.0.1";
+    string ip = "127.0.0.1";
     ushort port = 40015;
     bool use_stdio = true;
 
     Logger logger = new Logger();
     Engine engine;
 
-    Arguments arguments = new Arguments();
-    arguments.define("server").aliases(["s"]).parameters(1);
-    arguments.define("port").aliases(["p"]).parameters(1);
-    arguments.define("stdio").conflicts(["socket"]);
-    arguments.define("socket").conflicts(["stdio"]);
-    arguments.define("seq").conflicts(["threads"]);
-    arguments.define("threads").conflicts(["seq"]);
-
-    if (args.length > 1)
+    string server_opt;
+    ushort port_opt;
+    bool stdio_opt, socket_opt, seq_opt, threads_opt;
+    try
     {
-        arguments.parse(args[1..$]);
-
-        if (arguments.contains("server"))
+        auto help = getopt(args,
+                "server|s", "Connect to a server at this IP address.", &server_opt,
+                "port|p", "Connect to a server on this port.", &port_opt,
+                "stdio", "Talk to the controller over stdin/stdout (default).", &stdio_opt,
+                "socket", "Talk to the controller over a socket.", &socket_opt,
+                "seq", "Use the single threaded search engine.", &seq_opt,
+                "threads", "Use the multithreaded search engine (default).", &threads_opt);
+        if (help.helpWanted)
         {
-            use_stdio = false;
-            ip = arguments["server"];
+            defaultGetoptPrinter("Usage: bot_opfor [options]", help.options);
+            return 0;
         }
-        if (arguments.contains("port"))
-        {
-            use_stdio = false;
-            port = toInt(arguments["port"]);
-        }
-        if (arguments.contains("socket"))
-        {
-            use_stdio = false;
-        }
-        if (arguments.contains("stdio"))
-        {
-            use_stdio = true;
-        }
-        if (arguments.contains("seq"))
-        {
-            engine = new SeqEngine(logger);
-        }
-        if (arguments.contains("threads"))
-        {
-            engine = new ThreadEngine(logger);
-        }
+        if (stdio_opt && socket_opt)
+            throw new GetOptException("--stdio and --socket conflict");
+        if (seq_opt && threads_opt)
+            throw new GetOptException("--seq and --threads conflict");
+    } catch (GetOptException e)
+    {
+        stderr.writeln(e.msg);
+        return 1;
     }
-    if (engine is null)
+    if (server_opt !is null)
+    {
+        use_stdio = false;
+        ip = server_opt;
+    }
+    if (port_opt)
+    {
+        use_stdio = false;
+        port = port_opt;
+    }
+    if (socket_opt)
+        use_stdio = false;
+    if (stdio_opt)
+        use_stdio = true;
+    if (seq_opt)
+        engine = new SeqEngine(logger);
+    else
         engine = new ThreadEngine(logger);
 
     int max_depth = -1;
@@ -1490,8 +1486,8 @@ int main(char[][] args)
                 BOT_NAME, BOT_AUTHOR);
         } catch (ConnectException e)
         {
-            Stderr.formatln("Error connecting to server: {}", e.msg);
-            Stderr.formatln("Tried to connect to {}:{}", ip, port);
+            stderr.writeln("Error connecting to server: ", e.msg);
+            stderr.writeln(Format("Tried to connect to {}:{}", ip, port));
             return 1;
         }
     }
@@ -1700,7 +1696,7 @@ int main(char[][] args)
                                 }
                                 logger.log("Search depth set to infinite");
                             } else {
-                                int depth = toInt(scmd.value);
+                                int depth = to!int(scmd.value);
                                 max_depth = (depth > 3) ? depth - 4 : 0;
                                 use_tc = false;
                                 logger.log("Search depth set to {}",
@@ -1709,7 +1705,7 @@ int main(char[][] args)
                             break;
                         case "tcmove":
                             tc_permove = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             if (max_depth == -1)
                             {
                                 use_tc = true;
@@ -1723,42 +1719,42 @@ int main(char[][] args)
                             break;
                         case "tcmax":
                             tc_maxreserve = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             break;
                         case "tcturntime":
                             tc_maxmove = TimeSpan.fromInterval(
-                                toFloat(scmd.value));
+                                to!double(scmd.value));
                             break;
                         case "greserve":
                             tc_wreserve = TimeSpan.fromInterval(
-                                toFloat(scmd.value));
+                                to!double(scmd.value));
                             break;
                         case "sreserve":
                             tc_breserve = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             break;
                         case "lastmoveused":
                             tc_lastmove = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             break;
                         case "moveused":
                             auto used = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             move_start = Clock.now() - used;
                             break;
                         case "target_min_time":
                             tc_target_length = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             break;
                         case "target_max_time":
                             tc_max_length = TimeSpan.fromInterval(
-                                    toFloat(scmd.value));
+                                    to!double(scmd.value));
                             break;
                         case "log_console":
                             logger.to_console = to!(bool)(scmd.value);
                             break;
                         case "run_gc":
-                            auto collect_timer = new StopWatch();
+                            StopWatch collect_timer;
                             collect_timer.start();
                             GC.collect();
                             auto collect_time = collect_timer.stop();
@@ -1800,7 +1796,8 @@ int main(char[][] args)
                     {
                         logger.log("Sending forced win move in {} seconds.",
                                 seconds);
-                    } else if (engine.pos_list.next is null)
+                    } else if (engine.pos_list !is null
+                            && engine.pos_list.next is null)
                     {
                         auto score = engine.cur_score;
                         if (!engine.in_step)

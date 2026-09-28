@@ -12,7 +12,7 @@ struct CaptureInfo
 
 class TrapGenerator
 {
-    static const int MAX_CAPTURES = 80;
+    static immutable int MAX_CAPTURES = 80;
 
     int num_captures;
     CaptureInfo[MAX_CAPTURES] captures;
@@ -35,7 +35,7 @@ class TrapGenerator
         assert (tbit & TRAPS, "trap_bit not a trap");
         assert (popcount(tbit) == 1, "more than one trap in trap_bit");
     }
-    body
+    do
     {
         debug (static_captures)
         {
@@ -58,7 +58,7 @@ class TrapGenerator
         assert (tbit & TRAPS, "trap_bit not a trap");
         assert (popcount(tbit) == 1, "more than one trap in trap_bit");
     }
-    body
+    do
     {
         debug (static_captures)
         {

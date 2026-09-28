@@ -1,17 +1,17 @@
 
-import tango.math.random.Random;
+import std.random : uniform;
 
 import position;
 
 class SetupGenerator
 {
-    const static ulong[] rabbit_setups = [0x00FF, // Standard
+    static immutable ulong[] rabbit_setups = [0x00FF, // Standard
                 0x81E7, // 99of9
                 0xA5A5]; // Fritz
-    const static ulong[] cat_setups = [0x2400,
+    static immutable ulong[] cat_setups = [0x2400,
                 0x2400,
                 0x42];
-    const static ulong[] dog_setups = [0x8100,
+    static immutable ulong[] dog_setups = [0x8100,
                 0x18,
                 0x18];
     enum RabbitSetup { ANY = -1,
@@ -27,10 +27,10 @@ class SetupGenerator
 
     private ulong gold_to_silver(ulong bitboard)
     {
-        const static ulong ROW_1_MASK = 0xFF;
-        const static ulong ROW_2_MASK = 0xFF00;
-        const static int ROW_1_TO_8 = 56;
-        const static int ROW_2_TO_7 = 40;
+        static immutable ulong ROW_1_MASK = 0xFF;
+        static immutable ulong ROW_2_MASK = 0xFF00;
+        static immutable int ROW_1_TO_8 = 56;
+        static immutable int ROW_2_TO_7 = 40;
 
         return ((bitboard & ROW_2_MASK) << ROW_2_TO_7)
                | ((bitboard & ROW_1_MASK) << ROW_1_TO_8);
@@ -43,7 +43,7 @@ class SetupGenerator
         return bitboard;
     }
 
-    private void randomize_minor(Side s, inout Position pos)
+    private void randomize_minor(Side s, ref Position pos)
     {
         int offset = (s == Side.WHITE) ? 0 : 6;
         ulong squares = pos.bitBoards[Piece.WCAT + offset] | pos.bitBoards[Piece.WDOG + offset];
@@ -56,16 +56,16 @@ class SetupGenerator
             ulong sbit = squares & -squares;
             squares ^= sbit;
 
-            int pix = rand.uniformR!(int)(pieces.length);
+            int pix = uniform(0, cast(int)(pieces.length));
             int piece = pieces[pix];
-            pieces[pix] = pieces[length-1];
+            pieces[pix] = pieces[$-1];
             pieces.length = pieces.length - 1;
 
             pos.place_piece(cast(Piece)piece, sbit);
         }
     }
 
-    private void randomize_all(Side s, inout Position pos)
+    private void randomize_all(Side s, ref Position pos)
     {
         int offset = (s == Side.WHITE) ? 0 : 6;
         ulong squares = 0xFFFF;
@@ -96,16 +96,16 @@ class SetupGenerator
             ulong sbit = squares & -squares;
             squares ^= sbit;
 
-            int pix = rand.uniformR!(int)(pieces.length);
+            int pix = uniform(0, cast(int)(pieces.length));
             Piece piece = pieces[pix];
-            pieces[pix] = pieces[length-1];
+            pieces[pix] = pieces[$-1];
             pieces.length = pieces.length - 1;
 
             pos.place_piece(piece, sbit);
         }
     }
 
-    void setup_board(Side s, inout Position pos)
+    void setup_board(Side s, ref Position pos)
     {
         int offset = (s == Side.WHITE) ? 0 : 6;
         RabbitSetup rsetup = rabbit_style;
@@ -114,7 +114,7 @@ class SetupGenerator
             int total_weight = 0;
             for (int i=0; i <= RabbitSetup.max; i++)
                 total_weight += setup_weights[i];
-            int choice_weight = rand.uniformR!(int)(total_weight);
+            int choice_weight = uniform(0, cast(int)(total_weight));
             int cur_weight = 0;
             for (int i=0; i <= RabbitSetup.max; i++)
             {
@@ -150,7 +150,7 @@ class SetupGenerator
     private ulong random_bit(ulong bits)
     {
         int num = popcount(bits);
-        int bix = rand.uniformR!(int)(num);
+        int bix = uniform(0, cast(int)(num));
         ulong b;
         for (int i=0; i <= bix; i++)
         {
@@ -160,7 +160,7 @@ class SetupGenerator
         return b;
     }
 
-    void setup_handicap(Piece[] pieces, inout Position pos)
+    void setup_handicap(Piece[] pieces, ref Position pos)
     {
         ulong squares = 0xFFFF;
         if (pieces[0] > Piece.WELEPHANT)

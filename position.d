@@ -1,26 +1,25 @@
 
-import std.intrinsic;
-import tango.core.Memory;
-import tango.core.sync.Mutex;
-import tango.io.Stdout;
-import tango.math.random.Random;
-import tango.text.convert.Format;
-import tango.text.Text;
-import tango.text.Unicode;
-import tango.text.Util;
-import tango.util.Convert;
+import core.bitop : bsf, bsr;
+import core.memory;
+import core.sync.mutex;
+import std.array : split;
+import std.ascii : isDigit;
+import std.conv : to;
+import std.random : uniform;
+import std.stdio : writeln;
+import std.string : indexOf, splitLines, strip;
 
+import tango_compat;
+
+import d1_literals;
 import zobristkeys;
 
-private int find(char[] src, char pattern)
+private int find(const(char)[] src, char pattern)
 {
-    int index = locate!(char)(src, pattern);
-    if (index == src.length)
-        index = -1;
-    return index;
+    return cast(int)indexOf(src, pattern);
 }
 
-typedef byte bitix;
+alias bitix = byte;
 
 enum Side : byte { WHITE, BLACK }
 enum Piece : byte { EMPTY, WRABBIT, WCAT, WDOG, WHORSE, WCAMEL, WELEPHANT,
@@ -65,7 +64,7 @@ in
     // one and only one bit must be set in value
     assert (value && (value == (value & ((value ^ ALL_BITS_SET) +1))));
 }
-body
+do
 {
     bitix index = cast(bitix)((value & 0xAAAAAAAAAAAAAAAAUL) != 0);
     index |= ((value & 0xCCCCCCCCCCCCCCCCUL) != 0) << 1;
@@ -91,7 +90,7 @@ int popcount(ulong value)
             ((value >> 2) & 0x3333333333333333UL);
     value = (value + (value >> 4)) & 0x0F0F0F0F0F0F0F0FUL;
     value = (value * 0x0101010101010101UL) >> 56;
-    return value;
+    return cast(int)value;
 }
 
 ulong neighbors_of(ulong value)
@@ -114,27 +113,27 @@ ulong rabbit_steps(Side side, ulong bits)
     return expanded;
 }
 
-char[] ix_to_alg(bitix index)
+string ix_to_alg(bitix index)
 {
-    char[] alg;
+    string alg;
     alg ~= "hgfedcba"[index % 8];
-    alg ~= to!(char[])((index / 8) + 1);
+    alg ~= to!string((index / 8) + 1);
 
     return alg;
 }
 
-char[] bits_to_str(ulong bits)
+string bits_to_str(ulong bits)
 {
-    char[] boardstr = " +-----------------+\n".dup;
+    string boardstr = " +-----------------+\n";
     for (int rownum = 8; rownum > 0; rownum--)
     {
-        char[] rowstr = to!(char[])(rownum) ~ "| ";
+        string rowstr = to!string(rownum) ~ "| ";
         int rowix = 8 * (rownum - 1);
         for (int colnum = 0; colnum < 8; colnum++)
         {
             int index = rowix + (7 - colnum);
             ulong squarebit = 1UL << index;
-            char[] piecestr;
+            string piecestr;
             if (squarebit & bits)
             {
                 piecestr = "* ";
@@ -158,11 +157,11 @@ char[] bits_to_str(ulong bits)
     return boardstr;
 }
 
-static const ulong INV_STEP = 3UL;
+enum ulong INV_STEP = 3UL;
 
-static int[64][64] taxicab_dist;
+__gshared int[64][64] taxicab_dist;
 
-static this()
+shared static this()
 {
     for (int i = 0; i < 64; i++)
     {
@@ -226,14 +225,14 @@ struct Step
         push = p;
     }
 
-    char[] toString()
+    string toString()
     {
         return toString(false);
     }
 
-    char[] toString(bool showpush=false)
+    string toString(bool showpush=false)
     {
-        char[] str;
+        string str;
         if (frombit == INV_STEP)
             return "pass";
         str ~= ix_to_alg(fromix);
@@ -267,20 +266,20 @@ struct Step
     }
 }
 
-const static Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
+immutable Step NULL_STEP = { frombit: INV_STEP, tobit: INV_STEP };
 
 class StepList
 {
-    const int ALLOCA_MULT = 2;
+    enum int ALLOCA_MULT = 2;
     Step[] steps;
     int numsteps = 0;
 
-    private static Mutex reserve_lock;
-    private static StepList[] reservelists;
-    private static int reservesize;
-    static int allocated = 0;
+    private __gshared Mutex reserve_lock;
+    private __gshared StepList[] reservelists;
+    private __gshared int reservesize;
+    __gshared int allocated = 0;
 
-    static this()
+    shared static this()
     {
         reserve_lock = new Mutex();
     }
@@ -321,7 +320,7 @@ class StepList
     this(int startlength=32)
     {
         steps.length = startlength;
-        GC.setAttr(cast(void*)steps, GC.BlkAttr.NO_SCAN);
+        GC.setAttr(steps.ptr, GC.BlkAttr.NO_SCAN);
         allocated += 1;
     }
 
@@ -337,7 +336,7 @@ class StepList
         StepList newlist = allocate();
         newlist.steps[0..numsteps] = steps[0..numsteps];
         newlist.numsteps = numsteps;
-        GC.setAttr(cast(void*)newlist.steps, GC.BlkAttr.NO_SCAN);
+        GC.setAttr(newlist.steps.ptr, GC.BlkAttr.NO_SCAN);
         return newlist;
     }
 
@@ -357,7 +356,7 @@ class StepList
         if (numsteps == steps.length)
         {
             steps.length = steps.length * ALLOCA_MULT;
-            GC.setAttr(cast(void*)steps, GC.BlkAttr.NO_SCAN);
+            GC.setAttr(steps.ptr, GC.BlkAttr.NO_SCAN);
         }
         return &steps[numsteps++];
     }
@@ -367,9 +366,9 @@ class StepList
         numsteps = 0;
     }
 
-    char[] to_move_str(Position start)
+    string to_move_str(Position start)
     {
-        char [] move;
+        string move;
         Position current = start.dup;
 
         foreach (Step step; steps[0..numsteps])
@@ -444,9 +443,9 @@ class StepList
         if (move.length == 0)
             throw new ValueException("Tried to make move with no or pass only steps");
 
-        move = move[0..length-1];
-        if (move[length-2] == ' ')
-            move = move[0..length-2];
+        move = move[0..$-1];
+        if (move[$-2] == ' ')
+            move = move[0..$-2];
 
         return move;
     }
@@ -581,12 +580,12 @@ class Position
         }
     }
 
-    private static Mutex reserve_lock;
-    private static Position[] reserve;
-    private static int reservesize;
-    static int allocated;
+    private __gshared Mutex reserve_lock;
+    private __gshared Position[] reserve;
+    private __gshared int reservesize;
+    __gshared int allocated;
 
-    static this()
+    shared static this()
     {
         reserve_lock = new Mutex();
     }
@@ -598,13 +597,13 @@ class Position
 
     static real reserve_size()
     {
-        return ((reservesize * Position.classinfo.init.length)
+        return ((reservesize * __traits(classInstanceSize, Position))
             / cast(real)(1024*1024));
     }
 
     static int rlistsize()
     {
-        return reserve.length;
+        return cast(int)reserve.length;
     }
 
     static Position allocate()
@@ -657,11 +656,10 @@ class Position
     {
         synchronized (reserve_lock)
         {
-            int max_num = cast(int)((size * 1024*1024) / Position.classinfo.init.length);
+            int max_num = cast(int)((size * 1024*1024) / __traits(classInstanceSize, Position));
             while (reservesize > max_num)
             {
-                delete reserve[--reservesize];
-                reserve[reservesize] = null;
+                reserve[--reservesize] = null;
                 allocated--;
             }
         }
@@ -827,6 +825,10 @@ class Position
         }
     }
 
+    // Keep Object.opEquals visible so == on Positions resolves to the
+    // content comparison below, as it did in D1.
+    alias opEquals = Object.opEquals;
+
     bool opEquals(Position other)
     {
         if (zobrist != other.zobrist ||
@@ -942,7 +944,7 @@ class Position
         assert (side >= -1 && side <= Side.max);
         assert (piece >= -1 && piece < Piece.max);
     }
-    body
+    do
     {
         if (side == -1)
         {
@@ -957,22 +959,22 @@ class Position
         return popcount(bitBoards[piece]);
     }
 
-    char[] to_long_str(bool dots=false)
+    string to_long_str(bool dots=false)
     {
         ulong notempty = ~bitBoards[Piece.EMPTY];
-        char[] boardstr = " +-----------------+\n".dup;
+        string boardstr = " +-----------------+\n";
         for (int rownum = 8; rownum > 0; rownum--)
         {
-            char[] rowstr = to!(char[])(rownum) ~ "| ";
+            string rowstr = to!string(rownum) ~ "| ";
             int rowix = 8 * (rownum - 1);
             for (int colnum = 0; colnum < 8; colnum++)
             {
                 int index = rowix + (7 - colnum);
                 ulong squarebit = 1UL << index;
-                char[] piecestr = "* ";
+                string piecestr = "* ";
                 if (squarebit & notempty)
                 {
-                    foreach (int pix, ulong piece; bitBoards[1..length])
+                    foreach (int pix, ulong piece; bitBoards[1..$])
                     {
                         if (squarebit & piece)
                         {
@@ -1003,17 +1005,17 @@ class Position
         return boardstr;
     }
 
-    char[] to_short_str()
+    string to_short_str()
     {
         ulong notempty = ~bitBoards[Piece.EMPTY];
-        char[] boardstr = "[".dup;
+        string boardstr = "[";
         for (int index = 63; index >= 0; index--)
         {
             ulong squarebit = 1UL << index;
             char piecech = '*';
             if (squarebit & notempty)
             {
-                foreach (int pix, ulong board; bitBoards[1..length])
+                foreach (int pix, ulong board; bitBoards[1..$])
                 {
                     if (squarebit & board)
                     {
@@ -1031,11 +1033,11 @@ class Position
         return boardstr;
     }
 
-    char[] to_placing_move(int side=-1)
+    string to_placing_move(int side=-1)
     {
-        const static char[] piece_char = " RCDHMErcdhme";
+        static immutable string piece_char = " RCDHMErcdhme";
 
-        char[] mstr;
+        string mstr;
         if (side == Side.WHITE || side == -1)
         {
             if (side == -1)
@@ -1240,11 +1242,11 @@ class Position
         zobrist ^= ZOBRIST_STEP[stepsLeft];
     }
 
-    void do_str_move(char[] move)
+    void do_str_move(const(char)[] move)
     {
         Side start_side = side;
 
-        foreach (char[] step; split!(char)(move, " "))
+        foreach (step; split(move))
         {
             Piece piece = cast(Piece)(find("RCDHMErcdhme", step[0]) +1);
             if (piece <= 0)
@@ -1625,9 +1627,9 @@ class Position
 class PosStore
 {
     private:
-        const int START_SIZE = 14;
-        const double MAX_LOAD = 0.7;
-        static Position DELETED_ENTRY;
+        enum int START_SIZE = 14;
+        enum double MAX_LOAD = 0.7;
+        __gshared Position DELETED_ENTRY;
         Position[] positions;
         StepList[] steplists;
         int numstored = 0;
@@ -1658,8 +1660,8 @@ class PosStore
             newpos.length = 1 << newsize;
             newlists.length = newpos.length;
             // find a new step that is relatively prime to the length
-            int newstep = (newpos.length/13)+1;
-            while (!isrprime(newpos.length, newstep))
+            int newstep = cast(int)(newpos.length/13)+1;
+            while (!isrprime(cast(int)newpos.length, newstep))
             {
                 newstep++;
                 if (newstep > newpos.length/2)
@@ -1673,7 +1675,7 @@ class PosStore
             {
                 if (positions[ix] !is null && positions[ix] !is DELETED_ENTRY)
                 {
-                    int key = positions[ix].zobrist & newmask;
+                    int key = cast(int)(positions[ix].zobrist & newmask);
                     while (newpos[key] !is null)
                     {
                         key = (key + newstep) & newmask;
@@ -1691,7 +1693,7 @@ class PosStore
         }
 
     public:
-    static this()
+    shared static this()
     {
         DELETED_ENTRY = new Position();
     }
@@ -1702,7 +1704,7 @@ class PosStore
         steplists.length = 1 << keysize;
     }
 
-    int opApply(int delegate(inout Position) lpbody)
+    int opApply(int delegate(ref Position) lpbody)
     {
         int result = 0;
         for (int ix = 0; ix < positions.length; ix++)
@@ -1747,7 +1749,7 @@ class PosStore
 
     bool haspos(Position pos)
     {
-        int key = pos.zobrist & keymask;
+        int key = cast(int)(pos.zobrist & keymask);
         while (positions[key] !is null)
         {
             assert(positions[key].zobrist != pos.zobrist || positions[key] == pos, "Zobrist key collision");
@@ -1767,7 +1769,7 @@ class PosStore
         if (load >= MAX_LOAD)
             expand();
 
-        int key = pos.zobrist & keymask;
+        int key = cast(int)(pos.zobrist & keymask);
         while (positions[key] !is null && positions[key] !is DELETED_ENTRY)
         {
             key = (key + keystep) & keymask;
@@ -1780,7 +1782,7 @@ class PosStore
 
     Position delpos(Position pos)
     {
-        int key = pos.zobrist & keymask;
+        int key = cast(int)(pos.zobrist & keymask);
         int nextkey = (key + keystep) & keymask;
         Position fpos = null;
 
@@ -1806,7 +1808,7 @@ class PosStore
 
     StepList getpos(Position pos)
     {
-        int key = pos.zobrist & keymask;
+        int key = cast(int)(pos.zobrist & keymask);
         while (positions[key] !is null
                 && (positions[key] is DELETED_ENTRY
                 || positions[key] != pos))
@@ -1839,22 +1841,22 @@ class PosStore
 }
 
 
-Position parse_long_str(char[] boardstr)
+Position parse_long_str(const(char)[] boardstr)
 {
-    char[][] rowstrs = splitLines!(char)(boardstr);
+    const(char)[][] rowstrs = splitLines(boardstr);
     if (rowstrs.length < 10)
         throw new InvalidBoardException("Not enough lines for a full board.");
-    rowstrs[0] = trim!(char)(rowstrs[0]);
-    foreach (int rownum, char[] row; rowstrs[1..10])
+    rowstrs[0] = strip(rowstrs[0]);
+    foreach (int rownum, row; rowstrs[1..10])
     {
-        row = trim!(char)(row);
+        row = strip(row);
         if (row.length < 17)
             throw new InvalidBoardException("Short row encountered in board, rownum " ~
-                   to!(char[])(rownum+2));
+                   to!string(rownum+2));
     }
 
     Side color;
-    char sidechar = rowstrs[0][length-1];
+    char sidechar = rowstrs[0][$-1];
     if (sidechar == 'w' || sidechar == 'g')
     {
         color = Side.WHITE;
@@ -1866,14 +1868,13 @@ Position parse_long_str(char[] boardstr)
         throw new InvalidBoardException("Invalid side to move.");
     }
 
-    auto first_row = new Text!(char)(rowstrs[1]);
-    if (!first_row.trim().equals("+-----------------+"))
+    if (strip(rowstrs[1]) != "+-----------------+")
         throw new InvalidBoardException("Invalid board header.");
 
     ulong[Piece.max+1] bitboards;
-    foreach (int lineix, char[] line; rowstrs[2..10])
+    foreach (int lineix, line; rowstrs[2..10])
     {
-        if (to!(int)(line[0..1]) != 8-lineix)
+        if (to!int(line[0..1]) != 8-lineix)
             throw new InvalidBoardException(Format("Invalid row marker, expected {} got {}",
                        7-lineix, line[0]));
         for (int squareix = 3; squareix < 18; squareix += 2)
@@ -1896,12 +1897,12 @@ Position parse_long_str(char[] boardstr)
     return new Position(color, 4, bitboards);
 }
 
-Position parse_short_str(Side side, int steps, char[] boardstr)
+Position parse_short_str(Side side, int steps, const(char)[] boardstr)
 {
     if (steps > 4 || steps < 1)
         throw new InvalidBoardException("Incorrect number of steps left.");
 
-    boardstr = trim!(char)(boardstr);
+    boardstr = strip(boardstr);
     if (boardstr.length < 66)
         throw new InvalidBoardException("Not long enough for full board.");
 
@@ -1916,13 +1917,13 @@ Position parse_short_str(Side side, int steps, char[] boardstr)
     return new Position(side, steps, bitboards);
 }
 
-char[] random_setup_move(Side side)
+string random_setup_move(Side side)
 {
     char[] setup;
 
     char[] piece_chars;
     piece_chars = "RRRRRRRRCCDDHHME".dup;
-    char[] rank_chars = "12";
+    string rank_chars = "12";
     if (side == Side.BLACK)
     {
         piece_chars = "rrrrrrrrccddhhme".dup;
@@ -1931,12 +1932,12 @@ char[] random_setup_move(Side side)
 
     for (int i=0; i < 16; i++)
     {
-        int pix = rand.uniformR!(int)(piece_chars.length);
+        int pix = uniform(0, cast(int)piece_chars.length);
         char piece = piece_chars[pix];
-        piece_chars[pix] = piece_chars[length-1];
+        piece_chars[pix] = piece_chars[$-1];
         piece_chars.length = piece_chars.length - 1;
 
-        int start = setup.length;
+        size_t start = setup.length;
         setup.length = setup.length + 4;
         setup[start] = piece;
         setup[start+1] = "abcdefgh"[i % 8];
@@ -1944,7 +1945,7 @@ char[] random_setup_move(Side side)
         setup[start+3] = ' ';
     }
 
-    return setup;
+    return setup.idup;
 }
 
 struct PlayoutResult
@@ -1976,7 +1977,7 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
             }
             break;
         }
-        int stepix = rand.uniformR!(int)(steps.numsteps);
+        int stepix = uniform(0, steps.numsteps);
         pos.do_step(steps.steps[stepix]);
         steps.clear();
         if (pos.side != curside)
@@ -1992,9 +1993,9 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
     return result;
 }
 
-real FAME(Position pos, real scale = 33.695652173913032)
+real FAME(Position pos, real scale = D1_33_695652173913032)
 {
-    static const int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
+    static immutable int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
 
     real famescore = 0;
 
@@ -2070,25 +2071,25 @@ real FAME(Position pos, real scale = 33.695652173913032)
     {
         int bpieces = popcount(pos.placement[Side.BLACK]
             & ~pos.bitBoards[Piece.BRABBIT]);
-        famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
+        famescore += wr_left * (600.0L/(brabbits+(2*bpieces)));
     } else {
-        famescore = 3369.562173913032;
+        famescore = D1_3369_562173913032;
     }
 
     if (pos.placement[Side.WHITE])
     {
         int wpieces = popcount(pos.placement[Side.WHITE]
             & ~pos.bitBoards[Piece.WRABBIT]);
-        famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
+        famescore -= br_left * (600.0L/(wrabbits+(2*wpieces)));
     } else {
-        famescore = -3369.562173913032;
+        famescore = -D1_3369_562173913032;
     }
 
     return famescore / scale;
 }
 
-const static int[] pop_offset = [24, 0, 4, 6, 8, 10, 11, 12, 16, 18, 20, 22, 23];
-const static int[] pop_mask = [0, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1];
+static immutable int[] pop_offset = [24, 0, 4, 6, 8, 10, 11, 12, 16, 18, 20, 22, 23];
+static immutable int[] pop_mask = [0, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1, 0xF, 0x3, 0x3, 0x3, 0x1, 0x1];
 
 int population(Position pos)
 {
@@ -2113,18 +2114,18 @@ int population(Position pos)
 
     debug (check_population)
     {
-        Stdout("Check population count").newline;
+        writeln("Check population count");
         for (Piece p = Piece.WRABBIT; p <= Piece.BELEPHANT; p++)
         {
             int p2c = pop2count(count, p);
             int pc = popcount(pos.bitBoards[p]);
             if (p2c != pc)
             {
-                Stdout.format("p2c {} != pc {} for {} from {:X}", p2c, pc, p,
-                        count).newline;
-                Stdout.format("piece board: {:X}", pos.bitBoards[p]).newline;
-                Stdout.format("offset: {} mask: {:X}", pop_offset[p],
-                        pop_mask[p]).newline;
+                writeln(Format("p2c {} != pc {} for {} from {:X}", p2c, pc, p,
+                        count));
+                writeln(Format("piece board: {:X}", pos.bitBoards[p]));
+                writeln(Format("offset: {} mask: {:X}", pop_offset[p],
+                        pop_mask[p]));
                 debug
                 {
                     assert(false, "Bad population count");
@@ -2153,7 +2154,7 @@ class FastFAME
     int[int] cache;
     real scale;
 
-    this(real s = 33.695652173913032)
+    this(real s = D1_33_695652173913032)
     {
         scale = s;
     }
@@ -2177,7 +2178,7 @@ class FastFAME
 
     real popfame(int population)
     {
-        static const int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
+        static immutable int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
 
         real famescore = 0;
 
@@ -2256,9 +2257,9 @@ class FastFAME
         }
         if (bpieces || brabbits)
         {
-            famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
+            famescore += wr_left * (600.0L/(brabbits+(2*bpieces)));
         } else {
-            return 3369.562173913032 / scale;
+            return D1_3369_562173913032 / scale;
         }
 
         int wpieces = 0;
@@ -2268,9 +2269,9 @@ class FastFAME
         }
         if (wpieces || wrabbits)
         {
-            famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
+            famescore -= br_left * (600.0L/(wrabbits+(2*wpieces)));
         } else {
-            return -3369.562173913032 / scale;
+            return -D1_3369_562173913032 / scale;
         }
 
         return famescore / scale;
@@ -2279,7 +2280,7 @@ class FastFAME
 
 class InvalidBoardException : Exception
 {
-    this(char[] msg)
+    this(string msg)
     {
         super(msg);
     }
@@ -2287,7 +2288,7 @@ class InvalidBoardException : Exception
 
 class ValueException : Exception
 {
-    this(char[] msg)
+    this(string msg)
     {
         super(msg);
     }

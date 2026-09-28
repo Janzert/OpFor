@@ -1,7 +1,6 @@
 
 import position;
 
-import tango.util.log.Trace;
 
 void piece_mobility(Position pos, ulong pbit, ulong freezers,
         ulong[] reachable, out ulong frozen)
@@ -12,7 +11,7 @@ in
     assert (pbit & ~(pos.bitBoards[Piece.WRABBIT] |
                 pos.bitBoards[Piece.BRABBIT]));
 }
-body
+do
 {
     reachable[0] = pbit;
     if (pbit & pos.frozen)

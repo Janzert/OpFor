@@ -1,12 +1,18 @@
-To build OpFor use a D language 1.x compiler and the Tango library of at least
-version 0.99.9. If the compiler is on the path the script build.py will build
-the bot.
+To build OpFor use LDC, the LLVM based D compiler (tested with 1.43). If
+ldc2 is on the path, or the LDC environment variable names it, the script
+build.py will build the bot.
 
 Running build.py with no arguments builds an optimized executable. Giving
 the argument "-static" to the script will build a statically linked executable.
-This is probably only useful for meeting the requirements for the Computer
-Championship. Any other arguments will be passed directly to the compiler and
-will stop the script from giving the compiler it's won default arguments.
+Any other arguments will be passed directly to the compiler and will stop the
+script from giving the compiler its own default arguments.
+
+OpFor was originally written in D 1 with the Tango library. The last version
+of that is tagged d1-final. The D 2 port gives identical search results; the
+comments in d1_literals.d, alphabeta.d (TT_ENTRY_SIZE) and staticeval.d
+(d1_int_shift) explain the places where that took care. The test tools
+(eval_eval.d, goal_fuzzer.d, handicaptest.d, mcdud.d, parseboard.d,
+trap_check.d, trap_fuzzer.d) have not been ported yet.
 
 This software is being provided with a written authorization from Arimaa.com
 and in compliance with "Section 3 of the Arimaa Public License".
