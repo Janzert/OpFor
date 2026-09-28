@@ -22,14 +22,6 @@ enum int ABORT_SCORE = MAX_SCORE+100;
 
 enum SType { EXACT, ALPHA, BETA }
 
-/*
- * Bytes per transposition table entry used to size the table. This is
- * TTNode.sizeof in the original 32-bit build, where ulong was 4 byte
- * aligned. Keeping the same entry count keeps search results identical to
- * that build; the entries themselves are larger on 64-bit.
- */
-enum size_t TT_ENTRY_SIZE = 44;
-
 struct TTNode
 {
     ulong zobrist;
@@ -72,7 +64,7 @@ class TransTable
     void set_size(int size)
     {
         store.length = 0;
-        store.length = (size*1024*1024) / TT_ENTRY_SIZE;
+        store.length = (size*1024*1024) / TTNode.sizeof;
         store.length = store.length < 1 ? 1 : store.length;
         GC.setAttr(store.ptr, GC.BlkAttr.NO_SCAN);
         age();
