@@ -6,10 +6,10 @@ import std.string;
 import position;
 import setupboard;
 
-static char[] usage_str = 
+enum usage_str =
     "usage: handicaptest <handicap pieces> [number of playouts]";
 
-int main(char[][] args)
+int main(string[] args)
 {
     SetupGenerator setgen = new SetupGenerator();
     setgen.random_all = true;
@@ -18,15 +18,15 @@ int main(char[][] args)
     int wins = 0;
     if (args.length < 2)
     {
-        writefln(usage_str);
+        writeln(usage_str);
         return 1;
     }
 
     if (args.length > 2)
     {
         try {
-            tests = toUint(args[2]);
-        } catch (ConvError E)
+            tests = to!uint(args[2]);
+        } catch (ConvException E)
         {
             writefln("Could not understand the number of playouts");
             writefln("\n%s", usage_str);
@@ -37,7 +37,7 @@ int main(char[][] args)
     int[13] handicap = [0, 8,2,2,2,1,1, 8,2,2,2,1,1];
     for (int i = 0; i < args[1].length; i++)
     {
-        int p = find(".RCDHMErcdhme", args[1][i]);
+        int p = cast(int)indexOf(".RCDHMErcdhme", args[1][i]);
         if (p < 1)
         {
             writefln("Illegal piece given, %s", args[1][i]);
@@ -45,7 +45,7 @@ int main(char[][] args)
         }
         if (handicap[p] == 0)
         {
-            writefln("All %s pieces already handicapped");
+            writefln("All %s pieces already handicapped", args[1][i]);
             return 1;
         }
         handicap[p] -= 1;
@@ -58,7 +58,7 @@ int main(char[][] args)
         for (int j=0; j < handicap[i]; j++)
         {
             pieces[pside].length = pieces[pside].length + 1;
-            pieces[pside][length-1] = cast(Piece)i;
+            pieces[pside][$-1] = cast(Piece)i;
         }
     }
 

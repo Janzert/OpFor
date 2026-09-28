@@ -1,51 +1,54 @@
+#!/usr/bin/env python3
+"""Run the movement and parseboard checks on every board in a file.
 
+A board starts with a line like "12w" (a number and the side to move) and
+is 12 lines long, in the format parseboard reads. Build the tools first
+with "build.py tools".
+"""
+
+import os
 import re
-import os.path
+import subprocess
 import sys
-import time
+import tempfile
 
-from subprocess import Popen
+TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
 
-if len(sys.argv) < 2:
-    print "usage: %s <board file>" % os.path.basename(sys.argv[0])
-    sys.exit(0)
 
-test_boards = open(sys.argv[1], "rU")
+def boards(path):
+    with open(path) as f:
+        lines = f.readlines()
+    i = 0
+    while i < len(lines):
+        if re.match(r"[0-9]+[wbgs]", lines[i]):
+            yield lines[i].strip(), "".join(lines[i:i + 12])
+            i += 12
+        else:
+            i += 1
 
-board_num = 0
-while True:
-    next_line = test_boards.readline()
-    while re.match("[0-9]+[wb]", next_line) == None:
-        next_line = test_boards.readline()
-        if next_line == "":
-            break
-    if next_line == "":
-        break
-    board_name = next_line
-    while True:
-        try:
-            check_file = open("regression_board", "w")
-            break
-        except IOError:
-            print "Could not open regression_board"
-            time.sleep(1)
-    for i in range(12):
-        check_file.write(next_line)
-        next_line = test_boards.readline()
-    check_file.close()
 
-    board_num += 1
-    print "Checking movement on #%d, %s" % (board_num, board_name)
-    movement = Popen(["movement", "regression_board"])
-    if movement.wait():
-        print "Movement error found"
-        sys.exit(0)
-    print
-    print "Checking #%d, %s" % (board_num, board_name)
-    parseboard = Popen(["parseboard", "regression_board"])
-    if parseboard.wait():
-        print "Error found"
-        sys.exit(0)
-    print
+def main():
+    if len(sys.argv) < 2:
+        print(f"usage: {os.path.basename(sys.argv[0])} <board file>")
+        return 2
+    count = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        board_file = os.path.join(tmp, "regression_board")
+        for name, board in boards(sys.argv[1]):
+            with open(board_file, "w") as f:
+                f.write(board)
+            count += 1
+            for tool in ("movement", "parseboard"):
+                print(f"Checking {tool} on #{count}, {name}")
+                status = subprocess.call(
+                    [os.path.join(TOOL_DIR, tool), board_file])
+                print()
+                if status:
+                    print(f"{tool} found an error")
+                    return 1
+    print(f"Finished checking {count} boards without an error.")
+    return 0
 
-print "Finished checking %d boards without an error." % board_num
+
+if __name__ == "__main__":
+    sys.exit(main())

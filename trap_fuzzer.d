@@ -1,6 +1,6 @@
 
-import tango.io.Stdout;
-import tango.math.random.Random;
+import tango_compat;
+import std.random : uniform;
 
 import position;
 import trapmoves;
@@ -10,7 +10,7 @@ import trap_check;
 private ulong random_bit(ulong bits)
 {
     int num = popcount(bits);
-    int bix = rand.uniformR!(int)(num);
+    int bix = uniform(0, cast(int)(num));
     ulong b;
     for (int i=0; i <= bix; i++)
     {
@@ -20,7 +20,7 @@ private ulong random_bit(ulong bits)
     return b;
 }
 
-void gen_position(inout Position pos)
+void gen_position(ref Position pos)
 {
     Piece[] white_pieces;
     white_pieces = [Piece.WELEPHANT, Piece.WCAMEL, Piece.WHORSE,
@@ -49,7 +49,7 @@ void gen_position(inout Position pos)
     pos.set_steps_left(4);
 }
 
-int main(char[][] args)
+int main(string[] args)
 {
     Position pos = new Position();
     StepList steps = StepList.allocate();

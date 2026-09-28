@@ -15,6 +15,27 @@ With no arguments it builds an optimized executable. "-static" builds a
 statically linked executable. Any other arguments are passed to the compiler
 in place of the default optimization flags.
 
+"python3 build.py tools" builds the test tools, optimized and with
+assertions on:
+
+    movement      checks the mobility estimate against real move generation,
+                  on a board file or (with -r) on random positions
+    parseboard    reports moves, goals, captures and the evaluation for a
+                  board file ([steps_left] boardfile [playouts])
+    trap_fuzzer   checks capture detection on random positions until it
+                  finds an error
+    goal_fuzzer   checks goal detection on random positions until it finds
+                  an error
+    eval_eval     looks for random positions where removing a piece moves
+                  the evaluation the opposite way from its material value
+    handicaptest  win rate of random playouts for a handicap, given as the
+                  pieces to remove (for example "Ee"), and a playout count
+    mcdud         random playout search of the moves from a board file
+
+regression_test.py runs movement and parseboard on every board in a file.
+Board files use the long format with a first line like "12w" (a move number
+and the side to move).
+
 Running
 -------
 
@@ -51,20 +72,27 @@ History
 
 OpFor was written in D 1 with the Tango library and played in the Arimaa
 Computer Championships 2008 to 2011 (see the ArimaaCC_* tags). The last D 1
-version is tagged d1-final. The port to D 2 gives search results identical
-to that version. The comments in d1_literals.d, alphabeta.d (TT_ENTRY_SIZE)
-and staticeval.d (d1_int_shift) explain where that took care.
+version is tagged d1-final.
 
-The port changed behavior only outside normal play:
+The port to D 2 (commit 262e835) gave search results identical to d1-final.
+Later commits then fixed things the port had kept only to match it:
+
+- goal_threat shifted int constants by 40 to place gold's defence sectors.
+  That was undefined; the 32-bit build gave gold a sector of almost the
+  whole board. They are now shifted as 64-bit values.
+- DMD 1 read some decimal constants in the evaluation one bit off; they
+  are now correctly rounded.
+- The transposition table is sized by its real entry size, so the hash
+  option sets its memory use.
+- The threaded engine's check that each PV step is legal never ran.
+
+The port also changed behavior outside normal play:
 
 - A position with no legal moves gets a warning and an empty bestmove
   rather than a crash.
 - setoption warns about unrecognized options (the check was inverted).
 - Commands split across socket packets are put back together correctly.
 - Moves may be separated by any amount of whitespace.
-
-The test tools (eval_eval.d, goal_fuzzer.d, handicaptest.d, mcdud.d,
-parseboard.d, trap_check.d, trap_fuzzer.d) have not been ported yet.
 
 License
 -------

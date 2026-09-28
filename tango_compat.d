@@ -7,15 +7,19 @@ module tango_compat;
 
 import core.atomic;
 import core.time;
+import std.algorithm : canFind;
 import std.array : appender;
+import std.string : stripRight;
 import std.format : formattedWrite;
-import std.math : fabs, isFinite;
+import std.conv : to;
+import std.math : fabs, floor, isFinite;
 import std.traits : isFloatingPoint, isIntegral, OriginalType;
+static import stdio = std.stdio;
 
 /**
  * Format with Tango placeholders: `{}` for the next argument, plus the
- * specifiers OpFor uses: `{:X}` (uppercase hex), `{:.2}` and `{:f1}` (fixed
- * decimals). Floats format like Tango's `{}`, with two decimals. Enums
+ * specifiers OpFor uses: `{:X}` (uppercase hex), `{:fN}` (N decimals) and
+ * `{:.N}` (at most N decimals). Floats format like Tango's `{}`, with two decimals. Enums
  * format as their numeric value, as in Tango.
  */
 string Format(Args...)(const(char)[] fmt, Args args)
@@ -66,10 +70,19 @@ private void formatArg(W, T)(ref W w, const(char)[] spec, T arg)
     }
     else static if (isFloatingPoint!T)
     {
-        if (spec == ".2")
-            formattedWrite(w, "%.2f", arg);
-        else if (spec == "f1")
-            formattedWrite(w, "%.1f", arg);
+        // {:fN} gives N decimals; {:.N} at most N, without trailing zeros.
+        // Tango rounds halves away from zero.
+        if (spec.length > 1 && spec[0] == 'f')
+            formattedWrite(w, "%." ~ spec[1 .. $] ~ "f", roundHalfAway(arg, spec[1 .. $]));
+        else if (spec.length > 1 && spec[0] == '.')
+        {
+            auto fixed = appender!string();
+            formattedWrite(fixed, "%." ~ spec[1 .. $] ~ "f", roundHalfAway(arg, spec[1 .. $]));
+            string digits = fixed.data;
+            if (digits.canFind('.'))
+                digits = digits.stripRight("0").stripRight(".");
+            w.put(digits);
+        }
         else if (isFinite(arg) && fabs(arg) >= 1e10)
             formattedWrite(w, "%.2e", arg);
         else
@@ -86,6 +99,15 @@ private void formatArg(W, T)(ref W w, const(char)[] spec, T arg)
     {
         formattedWrite(w, "%s", arg);
     }
+}
+
+private real roundHalfAway(real value, const(char)[] decimals)
+{
+    if (!isFinite(value))
+        return value;
+    real scale = 10.0L ^^ to!int(decimals);
+    real scaled = floor(fabs(value) * scale + 0.5L) / scale;
+    return value < 0 ? -scaled : scaled;
 }
 
 /// A span of time in 100ns ticks, like Tango's TimeSpan.
@@ -235,6 +257,65 @@ struct Atomic(T)
     }
 }
 
+/**
+ * Like Tango's Stdout and Stderr, for the test tools: format and formatln
+ * take Tango format strings, calling it prints its arguments separated by
+ * ", ", and every method returns the output so calls chain.
+ */
+struct TangoOutput
+{
+    private bool to_stderr;
+
+    private void put(const(char)[] s)
+    {
+        if (to_stderr)
+            stdio.stderr.write(s);
+        else
+            stdio.stdout.write(s);
+    }
+
+    TangoOutput format(Args...)(const(char)[] fmt, Args args)
+    {
+        put(Format(fmt, args));
+        return this;
+    }
+
+    TangoOutput formatln(Args...)(const(char)[] fmt, Args args)
+    {
+        put(Format(fmt, args));
+        return newline();
+    }
+
+    TangoOutput opCall(Args...)(Args args)
+    {
+        foreach (i, arg; args)
+        {
+            if (i)
+                put(", ");
+            put(Format("{}", arg));
+        }
+        return this;
+    }
+
+    TangoOutput newline()
+    {
+        put("\n");
+        return flush();
+    }
+
+    TangoOutput flush()
+    {
+        if (to_stderr)
+            stdio.stderr.flush();
+        else
+            stdio.stdout.flush();
+        return this;
+    }
+}
+
+enum Stdout = TangoOutput(false);
+enum Stderr = TangoOutput(true);
+
 /// Seconds as a Duration, for waits that Tango took as a double.
 Duration fromSeconds(double s)
 {
@@ -247,6 +328,8 @@ unittest
     assert(Format("{:X} {:X}", 255, 0xDEADBEEF12345678UL) == "FF DEADBEEF12345678");
     assert(Format("{} {}", 0.24, 1.0f) == "0.24 1.00");
     assert(Format("{:f1} {:.2}", 12.36, 1234.5678) == "12.4 1234.57");
+    assert(Format("{:.2} {:.2} {:.2} {:f1}", 100.0, 87.1, 1e9, 0.0) == "100 87.1 1000000000 0.0");
+    assert(Format("{:.2} {:f2} {:.2}", 90.625, 0.125, -2.675L) == "90.63 0.13 -2.68");
     assert(Format("{} {}", true, 'x') == "true x");
     enum E { A, B }
     assert(Format("{}", E.B) == "1");

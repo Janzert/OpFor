@@ -1,7 +1,7 @@
 
+import std.datetime.stopwatch : StopWatch;
 import std.file;
 import std.path;
-import std.perf;
 import std.stdio;
 
 import position;
@@ -14,26 +14,26 @@ struct Move
     int tests;
 }
 
-int main(char[][] args)
+int main(string[] args)
 {
     if (args.length < 2)
     {
-        writefln("usage: %s boardfile", getBaseName(args[0]));
+        writefln("usage: %s boardfile", baseName(args[0]));
         return 1;
     }
-    char[] boardstr;
+    string boardstr;
     try
     {
-        boardstr = cast(char[])read(args[1]);
+        boardstr = cast(string)read(args[1]);
     } catch (FileException fx)
     {
-        writefln("A file exception occured: " ~ fx.toString());
+        writeln("A file exception occured: ", fx.msg);
         return 2;
     }
 
     Position pos = parse_long_str(boardstr);
-    writefln("wb"[pos.side]);
-    writefln(pos.to_long_str(true));
+    writeln("wb"[pos.side]);
+    writeln(pos.to_long_str(true));
     PosStore movestore = pos.get_moves();
     writefln("%d possible moves.", movestore.length);
 
@@ -52,7 +52,7 @@ int main(char[][] args)
     int lastdisplay = 0;
     int displaystep = 1000;
     ulong totalsteps = 0;
-    PerformanceCounter timer = new PerformanceCounter();
+    StopWatch timer;
     timer.start();
     Position gamepos = Position.allocate();
     while (true)
@@ -79,7 +79,7 @@ int main(char[][] args)
             {
                 timer.stop();
                 reportstats(moves, totalplays, totalsteps);
-                writefln("%.2f games per second.", displaystep/(cast(double)timer.microseconds/1000000));
+                writefln("%.2f games per second.", displaystep/(cast(double)timer.peek.total!"usecs"/1000000));
                 if (stopplays > 0 && totalplays >= stopplays)
                     break;
                 lastdisplay = totalplays;
@@ -91,6 +91,7 @@ int main(char[][] args)
                     displaystep = 100000;
                 else
                     displaystep = 250000;
+                timer.reset();
                 timer.start();
             }
         }
@@ -117,7 +118,7 @@ void reportstats(Move[] moves, int totalplays, ulong totalsteps)
     }
     writefln("best move after %d plays with %d tests is %d and %.2f steps per playout.",
                 totalplays, moves[bestmove].tests, bestmove, cast(double)totalsteps/totalplays);
-    writefln(moves[bestmove].position.to_long_str());
+    writeln(moves[bestmove].position.to_long_str());
     float winper = cast(float)moves[bestmove].wins /
                     moves[bestmove].tests;
     writefln("Win percentage = %.2f", winper);

@@ -1,6 +1,6 @@
 
-import tango.io.Stdout;
-import tango.math.random.Random;
+import tango_compat;
+import std.random : uniform;
 
 import alphabeta;
 import logging;
@@ -11,7 +11,7 @@ import trapmoves;
 
 ulong random_bit(ulong bits) {
     int num = popcount(bits);
-    int bix = rand.uniformR!(int)(num);
+    int bix = uniform(0, cast(int)(num));
     ulong b;
     for (int i=0; i <= bix; i++) {
         b = bits & -bits;
@@ -20,7 +20,7 @@ ulong random_bit(ulong bits) {
     return b;
 }
 
-void gen_position(inout Position pos) {
+void gen_position(ref Position pos) {
     Piece[] white_pieces;
     white_pieces = [Piece.WELEPHANT, Piece.WCAMEL, Piece.WHORSE,
         Piece.WHORSE, Piece.WDOG, Piece.WDOG, Piece.WCAT, Piece.WCAT].dup;
@@ -36,7 +36,7 @@ void gen_position(inout Position pos) {
     ulong empty = ALL_BITS_SET;
     ulong sqb;
     float[2] piece_prob;
-    piece_prob[0] = rand.uniformR2!(float)(0.2, 1);
+    piece_prob[0] = uniform(0.2f, 1.0f);
     piece_prob[1] = piece_prob[0];
     for (Piece pt=Piece.WRABBIT; pt <= Piece.BELEPHANT; pt++)
     {
@@ -46,7 +46,7 @@ void gen_position(inout Position pos) {
             if (pt != Piece.WELEPHANT && pt != Piece.BELEPHANT
                     && !((pt == Piece.WRABBIT || pt == Piece.BRABBIT)
                         && n == 0)) {
-                if (rand.uniform!(float)() > piece_prob[pt_side])
+                if (uniform(0.0f, 1.0f) > piece_prob[pt_side])
                     continue;
             }
             sqb = random_bit(empty & ~(TRAPS
@@ -56,7 +56,7 @@ void gen_position(inout Position pos) {
             pos.place_piece(pt, sqb);
         }
     }
-    pos.set_steps_left(rand.uniformR2(1, 5));
+    pos.set_steps_left(uniform(1, 5));
 }
 
 int abs(int v) {
@@ -67,7 +67,7 @@ int sign(int v) {
     return v < 0 ? -1 : (v > 0 ? 1 : 0);
 }
 
-int main(char[][] args) {
+int main(string[] args) {
     Position pos = new Position();
     Position mpos = new Position();
     Logger log = new Logger();

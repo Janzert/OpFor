@@ -217,11 +217,10 @@ do
 
 debug (test_movement)
 {
-    import tango.io.FilePath;
-    import tango.io.Stdout;
-    import tango.io.UnicodeFile;
-    import tango.math.random.Random;
-    import tango.text.Ascii;
+    import std.file : read;
+    import std.path : baseName;
+    import std.random : uniform;
+    import tango_compat;
 
     void test_pos(Position pos, out uint true_moves,
             out uint reported_moves, out uint false_blockade,
@@ -238,7 +237,6 @@ debug (test_movement)
             }
         }
         moves.free_items();
-        delete moves;
         pos.set_side(Side.BLACK);
         moves = pos.get_moves();
         foreach (Position result; moves)
@@ -324,7 +322,7 @@ debug (test_movement)
     ulong random_bit(ulong bits)
     {
         int num = popcount(bits);
-        int bix = rand.uniformR!(int)(num);
+        int bix = uniform(0, num);
         ulong b;
         for (int i=0; i <= bix; i++)
         {
@@ -333,7 +331,7 @@ debug (test_movement)
         }
         return b;
     }
-    void random_pos(inout Position pos)
+    void random_pos(ref Position pos)
     {
         Piece[] white_pieces;
         white_pieces = [Piece.WELEPHANT, Piece.WCAMEL, Piece.WHORSE,
@@ -351,7 +349,7 @@ debug (test_movement)
         for (Piece pt=Piece.WRABBIT; pt <= Piece.BELEPHANT; pt++)
         {
             int pt_side = pt < Piece.BRABBIT ? Side.WHITE : Side.BLACK;
-            auto place_num = rand.uniformR!(int)(num_piece[pt]);
+            auto place_num = uniform(0, num_piece[pt]);
             if ((pt_side == Side.WHITE && pt >= Piece.WHORSE)
                     || (pt_side == Side.BLACK && pt >= Piece.BHORSE))
                 place_num = num_piece[pt];
@@ -367,20 +365,18 @@ debug (test_movement)
         pos.set_steps_left(4);
     }
 
-    int main(char[][] args)
+    int main(string[] args)
     {
         if (args.length < 2)
         {
-            FilePath exec = new FilePath(args[0]);
             Stdout.format("usage: {} <boardfile> | -r",
-                    exec.name).newline;
+                    baseName(args[0])).newline;
             return 1;
         }
 
-        if (compare("-r", args[1]))
+        if (args[1] != "-r")
         {
-            char[] boardstr;
-            boardstr = UnicodeFile!(char)(args[1], Encoding.Unknown).read();
+            string boardstr = cast(string)read(args[1]);
 
             Position pos = position.parse_long_str(boardstr);
             Stdout("wb"[pos.side]).newline;

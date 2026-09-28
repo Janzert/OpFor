@@ -1,11 +1,10 @@
 
-import tango.core.Exception;
-import tango.core.Memory;
-import tango.io.device.File;
-import tango.io.FilePath;
-import tango.io.Stdout;
-import tango.time.StopWatch;
-import tango.util.Convert;
+import core.memory;
+import std.conv : ConvException, to;
+import std.file : FileException, read;
+import std.path : baseName;
+
+import tango_compat;
 
 import logging;
 import goalsearch;
@@ -15,33 +14,33 @@ import trapmoves;
 import position;
 
 
-int main(char[][] args)
+int main(string[] args)
 {
     if (args.length < 2)
     {
-        Stdout.format("usage: %s boardfile [run_playouts]",
-                FilePath(args[0]).name);
+        Stdout.formatln("usage: {} [steps_left] boardfile [run_playouts]",
+                baseName(args[0]));
         return 1;
     }
     int file_arg = 2;
     int steps_left = 4;
     try {
-        steps_left = to!(int)(args[1]);
-    } catch (ConversionException) {
+        steps_left = to!int(args[1]);
+    } catch (ConvException) {
         file_arg = 1;
     }
-    char[] boardstr;
+    string boardstr;
     try
     {
-        boardstr = cast(char[])File.get(args[file_arg]);
-    } catch (IOException fx)
+        boardstr = cast(string)read(args[file_arg]);
+    } catch (FileException fx)
     {
-        Stdout.format("A file exception occured: " ~ fx.toString());
+        Stdout.formatln("A file exception occured: {}", fx.msg);
         return 2;
     }
     int run_playouts = 0;
     if (args.length > file_arg + 1)
-        run_playouts = to!(int)(args[file_arg + 1]);
+        run_playouts = to!int(args[file_arg + 1]);
 
     Logger log = new Logger();
     log.to_console = true;
@@ -60,7 +59,7 @@ int main(char[][] args)
     pos.get_steps(steps);
     Stdout.format("There are {} initial steps.",
                 steps.numsteps).newline;
-    auto timer = new StopWatch();
+    StopWatch timer;
     timer.start();
     PosStore moves = pos.get_moves();
     timer.stop();
@@ -92,7 +91,6 @@ int main(char[][] args)
     if (shortest_goal != gsdt.NOT_FOUND)
         shortest_move = shortest_move.dup;
     moves.free_items();
-    delete moves;
     GC.collect();
 
     real slow_score = FAME(pos);
@@ -173,7 +171,7 @@ int main(char[][] args)
     {
         if (tgen.find_captures(pos, s))
         {
-            const char[] piece_names = ".RCDHMErcdhme";
+            immutable string piece_names = ".RCDHMErcdhme";
             if (s == pos.side)
                 Stdout.format("{} can capture:", ["Gold", "Silver"][s]).newline;
             else

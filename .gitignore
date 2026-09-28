@@ -6,3 +6,10 @@
 regression_board
 bot_opfor
 *.o
+eval_eval
+goal_fuzzer
+handicaptest
+mcdud
+movement
+parseboard
+trap_fuzzer

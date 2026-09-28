@@ -1,6 +1,6 @@
 
-import tango.io.Stdout;
-import tango.math.random.Random;
+import tango_compat;
+import std.random : uniform;
 
 import position;
 import goalsearch;
@@ -8,7 +8,7 @@ import goalsearch;
 ulong random_bit(ulong bits)
 {
     int num = popcount(bits);
-    int bix = rand.uniformR!(int)(num);
+    int bix = uniform(0, cast(int)(num));
     ulong b;
     for (int i=0; i <= bix; i++)
     {
@@ -18,7 +18,7 @@ ulong random_bit(ulong bits)
     return b;
 }
 
-void gen_possible_goal_position(inout Position pos)
+void gen_possible_goal_position(ref Position pos)
 {
     Piece[] white_pieces;
     white_pieces = [Piece.WELEPHANT, Piece.WCAMEL, Piece.WHORSE,
@@ -60,7 +60,7 @@ void gen_possible_goal_position(inout Position pos)
     pos.set_steps_left(4);
 }
 
-int main(char[][] args)
+int main(string[] args)
 {
     Position pos = new Position();
     GoalSearchDT gs = new GoalSearchDT();
@@ -102,7 +102,6 @@ int main(char[][] args)
         else
             shortest_move = StepList.allocate();
         moves.free_items();
-        delete moves;
         if (shortest_goal < gs.NOT_FOUND)
             Stdout.format("Is white goal in {}", shortest_goal).newline;
         gs.set_start(pos);

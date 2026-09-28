@@ -1,5 +1,5 @@
 
-import tango.io.Stdout;
+import tango_compat;
 
 import position;
 import trapmoves;
@@ -50,7 +50,6 @@ class TrapCheck
             }
         }
         moves.free_items();
-        delete moves;
 
         return victims;
     }
