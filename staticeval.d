@@ -9,18 +9,6 @@ import movement;
 import position;
 import trapmoves;
 
-/*
- * goal_threat() shifts int constants by sector_shift, which is 40 for gold.
- * The original 32-bit build did that as an int shift: x86 uses the count
- * mod 32, and the int result sign extends to ulong. LLVM treats an int
- * shift of 32 or more as undefined, so compute the D1 result explicitly.
- * (The intended values were likely the constants shifted as ulongs.)
- */
-private ulong d1_int_shift(int value, int shift)
-{
-    return value << (shift & 31);
-}
-
 struct SCNode
 {
     ulong zobrist;
@@ -1487,14 +1475,14 @@ class StaticEval
                     }
                     defender_num = sector_defenders[0] < sector_defenders[1] ? sector_defenders[0] : sector_defenders[1];
                 } else {
-                    ulong sector = d1_int_shift(0xFFFFFF, sector_shift);
+                    ulong sector = 0xFFFFFFUL << sector_shift;
                     defender_num = popcount(defenders & sector);
                     if (sector & (safe_traps[s^1] & ~safe_traps[s]))
                         defender_num >>= 1;
                     num_threats++;
-                    if (goals.goal_squares & d1_int_shift(0x030303, sector_shift))
+                    if (goals.goal_squares & (0x030303UL << sector_shift))
                         num_threats++;
-                    if (goals.goal_squares & d1_int_shift(0xC0C0C0, sector_shift))
+                    if (goals.goal_squares & (0xC0C0C0UL << sector_shift))
                         num_threats++;
                 }
                 switch (num_threats)
