@@ -23,6 +23,9 @@ enum BOT_NAME = "OpFor";
 enum BOT_AUTHOR = "Janzert";
 
 enum int START_SEARCH_NODES = 30000;
+// Seconds the engine searches between checks for input. Commands that end
+// a search (stop, makemove, newgame) wait up to this long to be handled.
+enum double SEARCH_SLICE = 0.1;
 
 struct PositionRecord
 {
@@ -1177,7 +1180,7 @@ class SeqEngine : Engine
         if (searcher.nodes_searched
                 && (search_length.microsec > 2000000))
         {
-            check_nodes = cast(uint)(searcher.nodes_searched
+            check_nodes = cast(uint)(searcher.nodes_searched * SEARCH_SLICE
                     / (cast(double)(search_length.microsec) / 1000000));
         } else {
             check_nodes = START_SEARCH_NODES;
@@ -1847,7 +1850,7 @@ int main(string[] args)
             case EngineState.SEARCHING:
                 PositionNode cur_best = engine.pos_list;
                 Time now = Clock.now();
-                double check_time = 1.0;
+                double check_time = SEARCH_SLICE;
                 if (tc_max_search != TimeSpan.zero && !pondering)
                 {
                     Time abort_time = move_start + tc_max_search;
@@ -1859,7 +1862,7 @@ int main(string[] args)
                     }
                     abort_checker.abort_time = abort_time;
                     auto abort_length = abort_time - now;
-                    if (abort_length.interval < 1.0)
+                    if (abort_length.interval < check_time)
                     {
                         check_time = abort_length.interval;
                         check_time = check_time > 0 ? check_time : 0;
