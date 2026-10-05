@@ -37,6 +37,8 @@ TOOL_FLAGS = ["-O2", "-g"]
 
 
 def compile(args, sources, output):
+    if os.name == "nt":
+        output += ".exe"
     cmd = [os.environ.get("LDC", "ldc2")] + args + sources + ["-of=" + output]
     print(" ".join(cmd))
     return subprocess.call(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))

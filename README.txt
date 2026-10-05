@@ -6,12 +6,13 @@ Building
 --------
 
 Build OpFor with LDC, the LLVM based D compiler (tested with 1.43 on 64-bit
-Linux). If ldc2 is on the path, or the LDC environment variable names it,
+Linux and Windows; Windows also needs the Visual Studio C++ build tools). If ldc2 is on the path, or the LDC environment variable names it,
 the script build.py builds bot_opfor:
 
     python3 build.py
 
-With no arguments it builds an optimized executable. "-static" builds a
+With no arguments it builds an optimized executable (bot_opfor.exe on
+Windows). "-static" builds a
 statically linked executable. Any other arguments are passed to the compiler
 in place of the default optimization flags.
 

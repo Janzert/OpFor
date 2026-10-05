@@ -5,7 +5,6 @@
 
 import core.stdc.errno : EINTR, errno;
 import core.sync.mutex;
-import core.sys.posix.unistd : read;
 import core.thread;
 import std.algorithm : canFind, splitter;
 import std.array : array;
@@ -19,9 +18,16 @@ import logging;
 import position;
 import utility;
 
-version(windows)
+version(Windows)
 {
     pragma(lib, "ws2_32.lib");
+    // The C runtime's name for POSIX read.
+    extern(C) nothrow @nogc int _read(int fd, void* buf, uint count);
+    alias read = _read;
+}
+else
+{
+    import core.sys.posix.unistd : read;
 }
 
 private int find(const(char)[] src, const(char)[] pattern)

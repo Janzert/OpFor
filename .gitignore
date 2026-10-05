@@ -3,6 +3,7 @@
 *.def
 *~
 *.map
+*.pdb
 regression_board
 bot_opfor
 *.o
