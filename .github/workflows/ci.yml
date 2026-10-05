@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.43.0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Build the bot
+        run: dub build -b release --compiler="$DC"
+
+      - name: Unit tests
+        run: dub test --compiler="$DC"
+
+      - name: Build the test tools
+        run: |
+          for tool in mobility parseboard trap_fuzzer goal_fuzzer eval_eval handicaptest mcdud; do
+            dub build -c "$tool" -b checked --compiler="$DC"
+          done
+
+      - name: Self-play over AEI
+        run: |
+          python -m pip install aei
+          python tests/selfplay.py
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bot_opfor-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            bot_opfor
+            bot_opfor.exe
