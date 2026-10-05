@@ -8,17 +8,7 @@ import position;
 import goalsearch;
 import staticeval;
 import trapmoves;
-
-ulong random_bit(ulong bits) {
-    int num = popcount(bits);
-    int bix = uniform(0, cast(int)(num));
-    ulong b;
-    for (int i=0; i <= bix; i++) {
-        b = bits & -bits;
-        bits ^= b;
-    }
-    return b;
-}
+import randompos : random_bit;
 
 void gen_position(ref Position pos) {
     Piece[] white_pieces;

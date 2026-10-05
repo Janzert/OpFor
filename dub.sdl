@@ -1,0 +1,119 @@
+name "opfor"
+description "OpFor, an Arimaa engine that talks AEI"
+license "MIT"
+authors "Brian Haskin Jr."
+
+targetType "executable"
+targetName "bot_opfor"
+targetPath "."
+mainSourceFile "source/bot_opfor.d"
+
+// The flags build.py used. dub's own release type leaves bounds checks on.
+buildType "release" {
+	buildOptions "releaseMode" "optimize" "inline" "noBoundsCheck"
+}
+
+// Optimized, with assertions and debug info, for the test tools.
+buildType "checked" {
+	buildOptions "optimize" "debugInfo"
+}
+
+// `dub test` optimizes too. The tests check every position change with
+// Position's invariant, which unoptimized is about eight times slower.
+buildType "unittest" {
+	buildOptions "unittests" "optimize" "debugInfo"
+}
+
+configuration "bot" {
+}
+
+configuration "static" {
+	dflags "-static" platform="linux"
+}
+
+// `dub test`: the unittest blocks in source/ and the tests in tests/,
+// which share their random positions and checks with the tools, run by
+// unit-threaded (tests/ut.d lists the modules). Arguments after `--` go to
+// the runner: a test name prefix to run only those, -s for one thread, -h
+// for the rest. Position's invariant (debug verify_position) checks its
+// bitboards and hash after every change.
+configuration "unittest" {
+	targetName "opfor-test"
+	targetPath "build"
+	mainSourceFile "tests/ut.d"
+	dependency "unit-threaded" version="~>2.2"
+	debugVersions "verify_position"
+	excludedSourceFiles "source/bot_opfor.d"
+	sourcePaths "source" "tests"
+	importPaths "source" "tests" "tools"
+	sourceFiles "tools/randompos.d" "tools/mobility_check.d" \
+		"tools/goal_check.d" "tools/trap_check.d"
+}
+
+// The test tools, one configuration each: `dub build -c <tool> -b checked`.
+// They are written to build/.
+configuration "mobility" {
+	targetName "mobility"
+	targetPath "build"
+	mainSourceFile "tools/mobility.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/mobility.d" "tools/mobility_check.d" \
+		"tools/randompos.d"
+}
+
+configuration "parseboard" {
+	targetName "parseboard"
+	targetPath "build"
+	mainSourceFile "tools/parseboard.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/parseboard.d" "tools/trap_check.d"
+}
+
+configuration "trap_fuzzer" {
+	targetName "trap_fuzzer"
+	targetPath "build"
+	mainSourceFile "tools/trap_fuzzer.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/trap_fuzzer.d" "tools/trap_check.d" \
+		"tools/randompos.d"
+}
+
+configuration "goal_fuzzer" {
+	targetName "goal_fuzzer"
+	targetPath "build"
+	mainSourceFile "tools/goal_fuzzer.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/goal_fuzzer.d" "tools/goal_check.d" \
+		"tools/randompos.d"
+}
+
+configuration "eval_eval" {
+	targetName "eval_eval"
+	targetPath "build"
+	mainSourceFile "tools/eval_eval.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/eval_eval.d" "tools/randompos.d"
+}
+
+configuration "handicaptest" {
+	targetName "handicaptest"
+	targetPath "build"
+	mainSourceFile "tools/handicaptest.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/handicaptest.d"
+}
+
+configuration "mcdud" {
+	targetName "mcdud"
+	targetPath "build"
+	mainSourceFile "tools/mcdud.d"
+	excludedSourceFiles "source/bot_opfor.d"
+	importPaths "source" "tools"
+	sourceFiles "tools/mcdud.d"
+}

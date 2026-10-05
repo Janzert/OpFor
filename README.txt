@@ -5,21 +5,43 @@ to run engines against each other or on a game server.
 Building
 --------
 
-Build OpFor with LDC, the LLVM based D compiler (tested with 1.43 on 64-bit
-Linux and Windows; Windows also needs the Visual Studio C++ build tools). If ldc2 is on the path, or the LDC environment variable names it,
-the script build.py builds bot_opfor:
+Build OpFor with LDC, the LLVM based D compiler, and dub, the D package
+manager and build tool that comes with it (tested with LDC 1.43 on 64-bit
+Linux, Windows and macOS; Windows also needs the Visual Studio C++ build
+tools). From this directory:
 
-    python3 build.py
+    dub build -b release
 
-With no arguments it builds an optimized executable (bot_opfor.exe on
-Windows). "-static" builds a
-statically linked executable. Any other arguments are passed to the compiler
-in place of the default optimization flags.
+builds an optimized bot_opfor (bot_opfor.exe on Windows) here. Add
+"-c static" on Linux for a statically linked executable. Without "-b
+release" dub makes a debug build. If ldc2 isn't the D compiler dub finds
+first, add "--compiler=<path to ldc2>".
 
-"python3 build.py tools" builds the test tools, optimized and with
-assertions on:
+Sources are in source/, the test tools in tools/ and the tests in tests/.
 
-    movement      checks the mobility estimate against real move generation,
+Testing
+-------
+
+    dub test
+
+runs the unit tests with unit-threaded, which dub fetches the first time.
+They check move generation against counts from pyrimaa, the Python
+reference implementation of the rules, and run the fuzzers below on a
+fixed set of random positions. Arguments after "--" go to the test
+runner: a module or test name to run only those, "-c" for the time each
+test took, "-h" for the rest.
+
+tests/selfplay.py plays the bot against itself over AEI and checks every
+move with pyrimaa (pip install aei):
+
+    python3 tests/selfplay.py [--moves N] [--depth D] [engine]
+
+Each test tool is a dub configuration, built optimized with assertions
+on into build/:
+
+    dub build -c <tool> -b checked
+
+    mobility      checks the mobility estimate against real move generation,
                   on a board file or (with -r) on random positions
     parseboard    reports moves, goals, captures and the evaluation for a
                   board file ([steps_left] boardfile [playouts])
@@ -33,9 +55,13 @@ assertions on:
                   pieces to remove (for example "Ee"), and a playout count
     mcdud         random playout search of the moves from a board file
 
-regression_test.py runs movement and parseboard on every board in a file.
-Board files use the long format with a first line like "12w" (a move number
-and the side to move).
+tools/regression_test.py runs mobility and parseboard on every board in a
+file. Board files use the long format with a first line like "12w" (a move
+number and the side to move).
+
+Each push and pull request on GitHub builds the bot and the tools, runs
+the unit tests and plays a self-play game on Linux, Windows and macOS
+(.github/workflows/ci.yml).
 
 Running
 -------

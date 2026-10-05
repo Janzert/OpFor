@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run the movement and parseboard checks on every board in a file.
+"""Run the mobility and parseboard checks on every board in a file.
 
 A board starts with a line like "12w" (a number and the side to move) and
 is 12 lines long, in the format parseboard reads. Build the tools first
-with "build.py tools".
+with "dub build -c mobility -b checked" and "dub build -c parseboard -b
+checked".
 """
 
 import os
@@ -12,7 +13,9 @@ import subprocess
 import sys
 import tempfile
 
-TOOL_DIR = os.path.dirname(os.path.abspath(__file__))
+TOOL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "build")
+EXE = ".exe" if os.name == "nt" else ""
 
 
 def boards(path):
@@ -38,10 +41,10 @@ def main():
             with open(board_file, "w") as f:
                 f.write(board)
             count += 1
-            for tool in ("movement", "parseboard"):
+            for tool in ("mobility", "parseboard"):
                 print(f"Checking {tool} on #{count}, {name}")
                 status = subprocess.call(
-                    [os.path.join(TOOL_DIR, tool), board_file])
+                    [os.path.join(TOOL_DIR, tool + EXE), board_file])
                 print()
                 if status:
                     print(f"{tool} found an error")
