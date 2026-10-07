@@ -113,7 +113,7 @@ jobs:
               "id": f"github.com/{repo}",
               "name": "OpFor",
               "version": version,
-              "author": "Brian Haskin Jr.",
+              "author": "Brian Haskin (Janzert)",
               "description": "An alpha-beta Arimaa engine, bot_OpFor on arimaa.com.",
               "homepage": f"https://github.com/{repo}",
               "license": "MIT",
