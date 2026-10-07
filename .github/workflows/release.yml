@@ -1,10 +1,15 @@
 name: Release
 
-# A tag like v2026.10.0 builds the bot for each platform, packages it with
+# A tag like v2026.10.6 builds the bot for each platform, packages it with
 # its license, and publishes a GitHub release with the archives and an
 # engine manifest (engine.json, AEI's ENGINE_MANIFEST.md) giving each
 # archive's digest. Controllers find the newest release through
 # releases/latest/download/engine.json.
+#
+# Versions are the release date, vYEAR.MONTH.DAY without zero padding
+# (v2026.10.6), so they read like the championship bots' names
+# (bot_OpFor2010) and compare as dotted numbers. A second release on
+# the same day adds a fourth number: v2026.10.6.1.
 #
 # Run by hand (workflow_dispatch), it builds, packages and writes the
 # manifest as artifacts, without publishing anything.
