@@ -104,7 +104,14 @@ class _StdioCom : Thread
                 if (got < 0 && errno == EINTR)
                     continue;
                 if (got <= 0) // end of input or error
+                {
+                    // The controller is gone (closed our stdin or died), so
+                    // quit rather than wait forever as an orphan.
+                    if (pending.length)
+                        inq.set(pending ~ "\n");
+                    inq.set("quit\n");
                     break;
+                }
                 pending ~= buf[0..got];
                 ptrdiff_t eol;
                 while ((eol = indexOf(pending, '\n')) >= 0)
