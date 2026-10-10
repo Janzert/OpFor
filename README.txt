@@ -79,8 +79,9 @@ search. Command line options:
 
 Besides the standard AEI time control options, setoption accepts:
 
-    depth               fixed search depth in steps (4 or more), or 0
-                        (or "infinite") to use the time control
+    depth               maximum search depth in steps (4 or more), or 0
+                        (or "infinite") for none; a time control still
+                        applies, so send none for a fixed-depth search
     hash                transposition table size in MB (default 10)
     threads             number of search threads for --threads
     target_min_time, target_max_time

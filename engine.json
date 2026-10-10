@@ -28,7 +28,7 @@
       "type": "spin",
       "default": 0,
       "min": 0,
-      "description": "Search to this many steps (at least 4), ignoring the time control. 0 for no fixed depth."
+      "description": "Stop searching at this many steps (at least 4). The time control still applies. 0 for no fixed depth."
     }
   ]
 }

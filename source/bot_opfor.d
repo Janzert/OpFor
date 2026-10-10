@@ -1690,20 +1690,16 @@ int main(string[] args)
                     switch (scmd.name)
                     {
                         case "depth":
-                            // AEI uses 0 or less for no fixed depth.
+                            // AEI uses 0 or less for no fixed depth. A
+                            // time control still applies with a fixed depth.
                             if (scmd.value == "infinite"
                                     || to!int(scmd.value) <= 0)
                             {
                                 max_depth = -1;
-                                if (tc_permove.interval)
-                                {
-                                    use_tc = true;
-                                }
                                 logger.log("Search depth set to infinite");
                             } else {
                                 int depth = to!int(scmd.value);
                                 max_depth = (depth > 3) ? depth - 4 : 0;
-                                use_tc = false;
                                 logger.log("Search depth set to {}",
                                         max_depth+4);
                             }
@@ -1711,10 +1707,7 @@ int main(string[] args)
                         case "tcmove":
                             tc_permove = TimeSpan.fromInterval(
                                     to!double(scmd.value));
-                            if (max_depth == -1)
-                            {
-                                use_tc = true;
-                            }
+                            use_tc = true;
                             if (tc_permove.minutes < 10)
                             {
                                 GC.disable();
