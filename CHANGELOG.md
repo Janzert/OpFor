@@ -5,7 +5,7 @@ Notable changes to OpFor. Releases since 2026 are tagged with their date
 version is tagged `ArimaaCC_<year>`. Entries up to 2012 are a summary
 drawn from the commit history.
 
-## Unreleased
+## 2026.10.10 (2026-10-10)
 
 - **Changed:** a `depth` only caps the search, as in Sharp. With a time
   control the search now ends at the depth or the clock, whichever
