@@ -1,0 +1,34 @@
+{
+  "manifest_version": 1,
+  "id": "github.com/Janzert/OpFor",
+  "name": "OpFor",
+  "version": "dev",
+  "author": "Brian Haskin (Janzert)",
+  "description": "An alpha-beta Arimaa engine, bot_OpFor on arimaa.com.",
+  "homepage": "https://github.com/Janzert/OpFor",
+  "license": "MIT",
+  "update_url": "https://github.com/Janzert/OpFor/releases/latest/download/engine.json",
+  "options": [
+    {
+      "name": "hash",
+      "type": "spin",
+      "default": 10,
+      "min": 1,
+      "description": "Transposition table size in megabytes. Not changed during a search."
+    },
+    {
+      "name": "threads",
+      "type": "spin",
+      "default": 1,
+      "min": 1,
+      "description": "Search threads."
+    },
+    {
+      "name": "depth",
+      "type": "spin",
+      "default": 0,
+      "min": 0,
+      "description": "Search to this many steps (at least 4), ignoring the time control. 0 for no fixed depth."
+    }
+  ]
+}

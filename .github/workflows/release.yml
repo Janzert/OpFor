@@ -6,6 +6,10 @@ name: Release
 # archive's digest. Controllers find the newest release through
 # releases/latest/download/engine.json.
 #
+# The manifest starts from engine.json in the repo (name, options and so
+# on, version "dev", no downloads), which also serves a developer's own
+# build; this fills in the release's version and downloads.
+#
 # Versions are the release date, vYEAR.MONTH.DAY without zero padding
 # (v2026.10.6), so they read like the championship bots' names
 # (bot_OpFor2010) and compare as dotted numbers. A second release on
@@ -78,6 +82,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           pattern: package-*
@@ -108,24 +113,11 @@ jobs:
                   "archive": archive,
                   "program": f"opfor/{exe}",
               }
-          manifest = {
-              "manifest_version": 1,
-              "id": f"github.com/{repo}",
-              "name": "OpFor",
-              "version": version,
-              "author": "Brian Haskin (Janzert)",
-              "description": "An alpha-beta Arimaa engine, bot_OpFor on arimaa.com.",
-              "homepage": f"https://github.com/{repo}",
-              "license": "MIT",
-              "update_url": f"https://github.com/{repo}/releases/latest/download/engine.json",
-              "downloads": downloads,
-              "options": [
-                  {"name": "hash", "type": "spin", "default": 10, "min": 1,
-                   "description": "Transposition table size in megabytes. Not changed during a search."},
-                  {"name": "threads", "type": "spin", "default": 1, "min": 1,
-                   "description": "Search threads."},
-              ],
-          }
+          # engine.json in the repo has everything but the release's version
+          # and downloads.
+          manifest = json.loads(pathlib.Path("engine.json").read_text())
+          manifest["version"] = version
+          manifest["downloads"] = downloads
           (dist / "engine.json").write_text(json.dumps(manifest, indent=2) + "\n")
           print((dist / "engine.json").read_text())
           EOF
