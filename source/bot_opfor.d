@@ -1690,7 +1690,9 @@ int main(string[] args)
                     switch (scmd.name)
                     {
                         case "depth":
-                            if (scmd.value == "infinite")
+                            // AEI uses 0 or less for no fixed depth.
+                            if (scmd.value == "infinite"
+                                    || to!int(scmd.value) <= 0)
                             {
                                 max_depth = -1;
                                 if (tc_permove.interval)
