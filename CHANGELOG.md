@@ -5,6 +5,16 @@ Notable changes to OpFor. Releases since 2026 are tagged with their date
 version is tagged `ArimaaCC_<year>`. Entries up to 2012 are a summary
 drawn from the commit history.
 
+## Unreleased
+
+- **Fixed:** memory no longer grows with every move under a time
+  control. Garbage collection has been off during timed games since
+  2008, to keep collection pauses out of the search, so a process
+  reused for many games (as in engine test runs) grew by about 60 MB a
+  game, without limit. It now collects after each search, once the move
+  is sent (about 0.01 s). A repeated `tcmove` no longer stacks
+  `GC.disable` calls, which a later long `tcmove` couldn't undo.
+
 ## 2026.10.10 (2026-10-10)
 
 - **Changed:** a `depth` only caps the search, as in Sharp. With a time

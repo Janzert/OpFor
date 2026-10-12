@@ -1516,6 +1516,9 @@ int main(string[] args)
     AbortChecker abort_checker = new AbortChecker(server);
 
     bool use_tc = false; // is there a timecontrol in effect and should it be followed
+    // Garbage collection is off during timed searches, so it runs after
+    // each search instead; without that memory grows with every move.
+    bool gc_disabled = false;
     TimeSpan tc_permove = TimeSpan.zero; // time given per move
     TimeSpan tc_maxreserve = TimeSpan.zero; // maximum reserve size
     TimeSpan tc_maxmove = TimeSpan.zero; // maximum time for a move
@@ -1710,9 +1713,13 @@ int main(string[] args)
                             use_tc = true;
                             if (tc_permove.minutes < 10)
                             {
-                                GC.disable();
+                                if (!gc_disabled)
+                                    GC.disable();
+                                gc_disabled = true;
                             } else {
-                                GC.enable();
+                                if (gc_disabled)
+                                    GC.enable();
+                                gc_disabled = false;
                             }
                             break;
                         case "tcmax":
@@ -1829,6 +1836,15 @@ int main(string[] args)
                     server.bestmove(engine.bestmove);
                 }
                 engine.cleanup_search();
+                if (gc_disabled)
+                {
+                    StopWatch collect_timer;
+                    collect_timer.start();
+                    GC.collect();
+                    GC.minimize();
+                    logger.log("Garbage collection took {} seconds",
+                            collect_timer.stop());
+                }
                 logger.log("Positions allocated {}, in reserve {}({}MB).",
                         Position.allocated, Position.reserved, Position.reserve_size);
                 if (PositionNode.allocated != PositionNode.reserved)
