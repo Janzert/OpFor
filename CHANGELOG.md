@@ -7,6 +7,12 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the blockade term's "even blockader" factor used the gold
+  piece of the same rank for both sides, so for gold equal-rank
+  blockers never counted as even and were counted as weak ones instead.
+  It now uses the enemy piece of the same rank. Test: 8000 games against
+  the build before, at 1s/move: +3.8 Elo [−3.8, +11.4] (95%), SPRT
+  [0, 10] undecided at 4000 pairs (LLR −0.79).
 - **Fixed:** memory no longer grows with every move under a time
   control. Garbage collection has been off during timed games since
   2008, to keep collection pauses out of the search, so a process

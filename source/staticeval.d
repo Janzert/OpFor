@@ -857,6 +857,8 @@ class StaticEval
             {
                 int epiece = p + mcorr;
                 int cutpiece = p + mcorr - 1;
+                // the enemy piece of the same rank
+                ulong even = pos.bitBoards[p - enemyoffset];
                 ulong pieces = pos.bitBoards[p];
                 if (pieces)
                 {
@@ -907,18 +909,18 @@ class StaticEval
                         blk_num = popcount(blockaders[1] & stronger);
                         blk_num = blk_num > 4 ? 4 : blk_num;
                         sc *= BLOCK_STRONGER_FAR[blk_num];
-                        blk_num = popcount(blockaders[0] & pos.bitBoards[epiece]);
+                        blk_num = popcount(blockaders[0] & even);
                         assert (blk_num < 3);
                         sc *= BLOCK_EVEN_CL[blk_num];
-                        blk_num = popcount(blockaders[1] & pos.bitBoards[epiece]);
+                        blk_num = popcount(blockaders[1] & even);
                         assert (blk_num < 3);
                         sc *= BLOCK_EVEN_FAR[blk_num];
                         blk_num = popcount(blockaders[0] &
-                                ~(stronger | pos.bitBoards[epiece]));
+                                ~(stronger | even));
                         blk_num = (blk_num < 6) ? blk_num : 6;
                         sc *= BLOCK_WEAK_CL[blk_num];
                         blk_num = popcount(blockaders[1] &
-                                ~(stronger | pos.bitBoards[epiece]));
+                                ~(stronger | even));
                         blk_num = (blk_num < 8) ? blk_num : 8;
                         sc *= BLOCK_WEAK_FAR[blk_num];
                         real bpiece_penalty = 0;
