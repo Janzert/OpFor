@@ -7,6 +7,18 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the goal search for the side not to move could finish a
+  pull with the piece the side to move had just stepped, which only the
+  side to move can do. Mid-turn, this gave gold (and silver, mid-push)
+  phantom goal threats
+  (silver's step c8-b8 beside a gold rabbit on d7 made a goal "in 2"),
+  which fed the goal-threat eval, the PV goal extension and the
+  quiescence search's choice of steps. That side's goal search now
+  ignores the last step. A shift by 64 when there was no last step,
+  which made h1 look like the last step's square, is gone too.
+  Test: 6000 games against the build before, at 1s/move and a 100-turn
+  limit: +2.0 Elo [−6.8, +10.7] (95%), SPRT [0, 10] undecided at 3000
+  pairs (LLR −1.52).
 - **Fixed:** the blockade term's "even blockader" factor used the gold
   piece of the same rank for both sides, so for gold equal-rank
   blockers never counted as even and were counted as weak ones instead.

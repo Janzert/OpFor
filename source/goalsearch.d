@@ -213,7 +213,8 @@ class GoalSearchDT
             & (neighbors_of(start.placement[side]
                     & ~start.bitBoards[myrabbit]
                     & ~start.frozen)
-                    | (1UL << start.lastfrom));
+                    | (start.lastpiece != Piece.EMPTY
+                        ? 1UL << start.lastfrom : 0));
         while (side_empties)
         {
             ulong se_bit = side_empties & -side_empties;
@@ -3844,6 +3845,14 @@ class GoalSearchDT
 
     void find_goals()
     {
+        // Only the side to move can finish a pull with the piece that last
+        // stepped. Search for the other side as at the start of its turn.
+        Piece lastpiece = start.lastpiece;
+        bitix lastfrom = start.lastfrom;
+        scope (exit) start.set_last_step(lastpiece, lastfrom);
+
+        if (start.side != Side.WHITE)
+            start.set_last_step(Piece.EMPTY, 64);
         int goal = NOT_FOUND;
         ulong goal_bits = RANK_8;
         while (goal_bits)
@@ -3866,6 +3875,8 @@ class GoalSearchDT
         }
         shortest[Side.WHITE] = goal;
 
+        start.set_last_step(start.side == Side.BLACK ? lastpiece : Piece.EMPTY,
+                start.side == Side.BLACK ? lastfrom : 64);
         goal = NOT_FOUND;
         goal_bits = RANK_1;
         while (goal_bits)

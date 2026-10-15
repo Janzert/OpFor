@@ -759,6 +759,16 @@ class Position
         inpush = false;
     }
 
+    /// Sets the piece that last stepped and the square it left, as do_step
+    /// does, keeping the hash up to date.
+    void set_last_step(Piece piece, bitix from)
+    {
+        zobrist ^= ZOBRIST_LAST_PIECE[lastpiece][lastfrom]
+            ^ ZOBRIST_LAST_PIECE[piece][from];
+        lastpiece = piece;
+        lastfrom = from;
+    }
+
     private void update_derived()
     {
         if (side)
