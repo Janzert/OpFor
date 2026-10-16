@@ -1257,67 +1257,86 @@ class StaticEval
         int score = 0;
         if (trap_search.find_captures(pos, side))
         {
-            ulong[3] valuable_vbit;
-            Piece[3] valuable_victim;
-            int[3] valuable_length;
-            ulong[3] valuable_traps;
+            static immutable real[] victim_per = [0.65L, 0.75L, 0.85L];
+            static immutable real frozen_per = 0.2L;
+            static immutable real multivic_per = 0.4L;
+            static immutable real multitrap_per = 1.5L;
+
+            // Each victim once, with its shortest capture and all its traps.
+            ulong[16] vic_bit;
+            Piece[16] vic_piece;
+            int[16] vic_length;
+            ulong[16] vic_traps;
+            int num_vics = 0;
             for (int i=0; i < trap_search.num_captures; i++)
             {
                 ulong vbit = trap_search.captures[i].victim_bit;
                 ulong tbit = trap_search.captures[i].trap_bit;
                 active_traps[side] |= tbit;
-                Piece vic = trap_search.captures[i].victim;
-                int len = trap_search.captures[i].length;
-                for (int v=0; v < valuable_vbit.length; v++)
+                int v = 0;
+                while (v < num_vics && vic_bit[v] != vbit)
+                    v++;
+                if (v == num_vics)
                 {
-                    if (vbit != valuable_vbit[v]
-                            && (vic > valuable_victim[v]
-                                || (vic == valuable_victim[v]
-                                    && len < valuable_length[v])))
-                    {
-                        ulong tvbit = valuable_vbit[v];
-                        Piece tvic = valuable_victim[v];
-                        int tlen = valuable_length[v];
-                        ulong ttbits = valuable_traps[v];
-                        valuable_vbit[v] = vbit;
-                        valuable_victim[v] = vic;
-                        valuable_length[v] = len;
-                        valuable_traps[v] = tbit;
-                        vbit = tvbit;
-                        vic = tvic;
-                        tbit = ttbits;
-                        len = tlen;
-                    } else if (vbit == valuable_vbit[v])
-                    {
-                        if (valuable_length[v] > len)
-                        {
-                            valuable_length[v] = len;
-                        }
-                        valuable_traps[v] |= tbit;
-                        break;
-                    }
+                    vic_bit[v] = vbit;
+                    vic_piece[v] = trap_search.captures[i].victim;
+                    vic_length[v] = trap_search.captures[i].length;
+                    vic_traps[v] = tbit;
+                    num_vics++;
+                } else {
+                    if (trap_search.captures[i].length < vic_length[v])
+                        vic_length[v] = trap_search.captures[i].length;
+                    vic_traps[v] |= tbit;
                 }
             }
 
-            if (valuable_victim[0] == valuable_victim[1]
-                    && valuable_length[0] > valuable_length[1])
+            // The three most valuable victims, the shortest capture first.
+            // Ties go to the victim that scores more (frozen, several traps,
+            // or a trap no victim before it uses), then to the one with more
+            // traps not yet used. Victims still tied then have the same new
+            // traps, so the order they are found in can't change the score.
+            ulong[3] valuable_vbit;
+            Piece[3] valuable_victim;
+            int[3] valuable_length;
+            ulong[3] valuable_traps;
+            ulong picked = 0;
+            ulong picked_traps = 0;
+            for (int k=0; k < 3; k++)
             {
-                int l = valuable_length[0];
-                valuable_length[0] = valuable_length[1];
-                valuable_length[1] = l;
-                ulong b = valuable_vbit[0];
-                valuable_vbit[0] = valuable_vbit[1];
-                valuable_vbit[1] = b;
-            }
-            if (valuable_victim[1] == valuable_victim[2]
-                    && valuable_length[1] > valuable_length[2])
-            {
-                int l = valuable_length[1];
-                valuable_length[1] = valuable_length[2];
-                valuable_length[2] = l;
-                ulong b = valuable_vbit[1];
-                valuable_vbit[1] = valuable_vbit[2];
-                valuable_vbit[2] = b;
+                int best = -1;
+                real best_per = 0;
+                for (int v=0; v < num_vics; v++)
+                {
+                    if (vic_bit[v] & picked)
+                        continue;
+                    real per = victim_per[k];
+                    if (vic_bit[v] & pos.frozen)
+                        per += frozen_per;
+                    if ((vic_traps[v] & picked_traps) == vic_traps[v])
+                        per *= multivic_per;
+                    if (popcount(vic_traps[v]) > 1)
+                        per *= multitrap_per;
+                    if (best == -1 || vic_piece[v] > vic_piece[best]
+                            || (vic_piece[v] == vic_piece[best]
+                                && (vic_length[v] < vic_length[best]
+                                    || (vic_length[v] == vic_length[best]
+                                        && (per > best_per
+                                            || (per == best_per
+                                                && popcount(vic_traps[v] & ~picked_traps)
+                                                > popcount(vic_traps[best] & ~picked_traps)))))))
+                    {
+                        best = v;
+                        best_per = per;
+                    }
+                }
+                if (best == -1)
+                    break;
+                valuable_vbit[k] = vic_bit[best];
+                valuable_victim[k] = vic_piece[best];
+                valuable_length[k] = vic_length[best];
+                valuable_traps[k] = vic_traps[best];
+                picked |= vic_bit[best];
+                picked_traps |= vic_traps[best];
             }
 
             int attacksteps = 0;
@@ -1352,15 +1371,11 @@ class StaticEval
             // multiple traps for one victim
             // multiple victims one trap
             // nearness stronger or even piece
-            static immutable real[] victim_per = [0.65L, 0.75L, 0.85L];
             static immutable real[] length_per = [1.0L,
                 1.0L, 1.0L, 0.9L, 0.9L,
                 0.3L, 0.3L, 0.2L, 0.1L,
                 0.05L, 0.05L, 0.01L, 0.01L];
             static immutable real[] defense_per = [1.0L, 0.9L, 0.8L, 0.6L, 0.4L];
-            static immutable real frozen_per = 0.2L;
-            static immutable real multivic_per = 0.4L;
-            static immutable real multitrap_per = 1.5L;
             static immutable real max_victim_per = 0.9L;
             real defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
             ulong used_traps = 0;
@@ -1392,6 +1407,7 @@ class StaticEval
                     } else {
                         val = valuable_value[i] * max_victim_per;
                     }
+                    used_traps |= valuable_traps[i];
 
                     score = cast(int)(score - (val));
                 }

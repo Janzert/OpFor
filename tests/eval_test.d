@@ -7,11 +7,12 @@ import position;
 import staticeval;
 import trapmoves;
 
-private StaticEval evaluator(string board, int steps = 4)
+private StaticEval evaluator(string board, int steps = 4,
+        Side side = Side.WHITE)
 {
     StaticEval ev = new StaticEval(new Logger(), new GoalSearchDT(),
             new TrapGenerator());
-    ev.pos = parse_short_str(Side.WHITE, steps, board);
+    ev.pos = parse_short_str(side, steps, board);
     ev.material_values(population(ev.pos));
     ev.trap_safety();
     return ev;
@@ -55,4 +56,26 @@ unittest
     enum mirror = "[   M   e" ~ "     H  " ~ "       E" ~ "   R C  "
         ~ "h      r" ~ " R     h" ~ "H R  r m" ~ " R      ]";
     assert(goal_threat(board) == goal_threat(mirror));
+}
+
+private int capture_threat(string board)
+{
+    StaticEval ev = evaluator(board, 3, Side.BLACK);
+    int pop = population(ev.pos);
+    return ev.static_trap_eval(Side.WHITE, pop, ev.material_values(pop));
+}
+
+@("capture threats don't depend on the order captures are found")
+unittest
+{
+    // Gold threatens a silver horse and several silver rabbits, two of
+    // them equally near capture. The frozen one must be among those
+    // counted, whichever order they are found in.
+    enum board = "[rE      " ~ "  Rh Re " ~ " R    Rr" ~ " mr H   "
+        ~ "  h r  R" ~ "      Hr" ~ "   M   c" ~ "  D     ]";
+    enum mirror = "[      Er" ~ " eR hR  " ~ "rR    R " ~ "   H rm "
+        ~ "R  r h  " ~ "rH      " ~ "c   M   " ~ "     D  ]";
+    int score = capture_threat(board);
+    assert(score > 0);
+    assert(score == capture_threat(mirror));
 }

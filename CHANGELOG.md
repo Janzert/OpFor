@@ -7,6 +7,19 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the capture-threat eval's choice of its three victims. A
+  victim could be counted twice, its traps could stay with another
+  victim after a reorder, and ties between equal victims went to
+  whichever capture was found first, so a frozen victim or one with
+  several traps could lose its place and the score changed when the
+  board was mirrored. The reduction for several victims sharing one
+  trap never applied, since the traps used were never recorded; it does
+  now. Each victim is now counted once with all its traps, and ties go
+  to the victim that scores more. Over the game positions of a
+  6000-game test the opponent's threats changed in 10.6% and the side
+  to move's in 6.7%, by a median of 30 and 22 points. Test: 6000 games
+  against the build before, at 1s/move and a 100-turn limit: +3.9 Elo
+  [−4.8, +12.7] (95%), SPRT [0, 10] undecided at 3000 pairs (LLR −0.53).
 - **Fixed:** the goal-threat eval counted the goal squares it found as
   one threat or two depending on which side of the board they were on.
   Its two defence sectors (files a to e and d to h) overlap on d and e,
