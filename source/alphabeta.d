@@ -1061,10 +1061,11 @@ class ABQSearch : ABSearch
 
     ulong nodes_quiesced = 0;
 
-    int max_qdepth = -16;
+    int max_qdepth = -4;
     int do_qsearch = 1;
 
-    int qdepth;
+    // Quiescence steps below the first quiescence node (eval_qdepth)
+    int qdepth = -4;
 
     this(Logger l, TransTable t)
     {
@@ -1188,9 +1189,12 @@ class ABQSearch : ABSearch
             }
         }
 
+        // Against a goal threat, the first quiescence node searches every
+        // step; deeper ones only captures and evasions, since searching
+        // every step at each level grows as a full-width search.
         StepList steps = StepList.allocate();
         if (!pos.inpush
-                && !(evaluator.goals.shortest[pos.side^1] < 5))
+                && (depth < 0 || !(evaluator.goals.shortest[pos.side^1] < 5)))
         {
             trap_search.find_captures(pos, pos.side);
             for (int six=0; six < trap_search.num_captures; six++)

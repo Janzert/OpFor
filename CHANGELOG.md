@@ -7,6 +7,18 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Changed:** the quiescence search now goes 4 steps beyond its first
+  step (the `eval_qdepth` option, which had defaulted to 0 since 2008, so
+  it could never finish a capture), and only its first step searches
+  every step when the opponent threatens a goal; deeper it looks at
+  captures and evasions only. Test: 655 games against the build before,
+  at 1s/move and a 100-turn limit: +60.1 Elo [+33.4, +87.5] (95%), SPRT
+  [0, 10] passed after 325 pairs (LLR 2.98). Without the second part,
+  depth 4 lost 59 Elo and depth 8 212, from searching every step at
+  every level; with it, depth 8 lost 41.6 Elo [−66.8, −16.9] to depth 4.
+- **Fixed:** after a score-cache hit the quiescence search chose between
+  captures and every step from the goal search of whatever position was
+  evaluated last. The cache now keeps each position's shortest goals.
 - **Fixed:** the penalty for pieces standing on traps counted only the
   last occupied trap (in square order, from h1 up) instead of adding up
   every one, so with two or more trap squares occupied it depended on
