@@ -7,6 +7,19 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the goal-threat eval counted the goal squares it found as
+  one threat or two depending on which side of the board they were on.
+  Its two defence sectors (files a to e and d to h) overlap on d and e,
+  and the first sector claimed those files, so goal squares b to e made
+  one threat but their mirror d to g made two, which halves the defence
+  allowance (one position scored +128, its mirror −376). Two threats now
+  needs goal squares on both sides of d/e. Over the game positions of a
+  6000-game test the term changed in 0.48%, by a median of 215 points.
+  Test: 1102 games against the build before, at 1s/move and a 100-turn
+  limit: −28.4 Elo [−49.3, −7.8] (95%), SPRT [0, 10] rejected after 551
+  pairs (LLR −3.02). Kept as a correct fix, to be balanced by retuning
+  the eval weights: the old count's extra threats seem to have made goal
+  threats stronger, and that helped.
 - **Changed:** the quiescence search now goes 4 steps beyond its first
   step (the `eval_qdepth` option, which had defaulted to 0 since 2008, so
   it could never finish a capture), and only its first step searches

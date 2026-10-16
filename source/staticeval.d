@@ -1461,29 +1461,23 @@ class StaticEval
                 int defender_num;
                 if (goals.goal_squares & ~(MIDDLE_SECTOR << sector_shift) & GOAL_RANK[s])
                 {
-                    ulong counted_threats = 0UL;
-                    ulong sector = DEFENSE_SECTORS[0] << sector_shift;;
+                    // The sectors overlap on the d and e files. The goal
+                    // squares are two threats only when no one sector holds
+                    // them all, that is when some are on each side of d/e.
                     int[2] sector_defenders;
-                    if (goals.goal_squares & sector & GOAL_RANK[s])
+                    for (int i = 0; i < 2; i++)
                     {
-                        sector_defenders[0] = popcount(sector & defenders);
-                        if (sector & (safe_traps[s^1] & ~safe_traps[s]))
-                            sector_defenders[0] >>= 1;
-                        num_threats++;
-                        counted_threats = goals.goal_squares & sector;
-                    } else {
-                        sector_defenders[0] = 8;
-                    }
-                    sector = DEFENSE_SECTORS[1] << sector_shift;
-                    if (goals.goal_squares & sector & GOAL_RANK[s])
-                    {
-                        sector_defenders[1] = popcount(sector & defenders);
-                        if (sector & (safe_traps[s^1] & ~safe_traps[s]))
-                            sector_defenders[1] >>= 1;
-                        if (goals.goal_squares & sector & ~counted_threats)
-                            num_threats++;
-                    } else {
-                        sector_defenders[1] = 8;
+                        ulong sector = DEFENSE_SECTORS[i] << sector_shift;
+                        if (goals.goal_squares & sector & GOAL_RANK[s])
+                        {
+                            sector_defenders[i] = popcount(sector & defenders);
+                            if (sector & (safe_traps[s^1] & ~safe_traps[s]))
+                                sector_defenders[i] >>= 1;
+                            if (goals.goal_squares & sector & ~(MIDDLE_SECTOR << sector_shift))
+                                num_threats++;
+                        } else {
+                            sector_defenders[i] = 8;
+                        }
                     }
                     defender_num = sector_defenders[0] < sector_defenders[1] ? sector_defenders[0] : sector_defenders[1];
                 } else {
@@ -1492,22 +1486,9 @@ class StaticEval
                     if (sector & (safe_traps[s^1] & ~safe_traps[s]))
                         defender_num >>= 1;
                     num_threats++;
-                    if (goals.goal_squares & (0x030303UL << sector_shift))
-                        num_threats++;
-                    if (goals.goal_squares & (0xC0C0C0UL << sector_shift))
-                        num_threats++;
                 }
-                switch (num_threats)
-                {
-                    case 2:
-                        dsteps >>= 1;
-                        break;
-                    case 3:
-                        dsteps >>= 1;
-                        defender_num >>= 1;
-                        break;
-                    default:
-                }
+                if (num_threats == 2)
+                    dsteps >>= 1;
                 score = cast(int)(score + (GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s]));
                 debug (goal_threat) {
                     logger.log("gthreat: sq {:X}", goals.goal_squares);

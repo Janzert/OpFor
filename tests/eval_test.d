@@ -7,11 +7,11 @@ import position;
 import staticeval;
 import trapmoves;
 
-private StaticEval evaluator(string board)
+private StaticEval evaluator(string board, int steps = 4)
 {
     StaticEval ev = new StaticEval(new Logger(), new GoalSearchDT(),
             new TrapGenerator());
-    ev.pos = parse_short_str(Side.WHITE, 4, board);
+    ev.pos = parse_short_str(Side.WHITE, steps, board);
     ev.material_values(population(ev.pos));
     ev.trap_safety();
     return ev;
@@ -33,4 +33,26 @@ unittest
     assert(score == evaluator(mirror).on_trap());
     assert(score < evaluator(cat_only).on_trap());
     assert(score < evaluator(dog_only).on_trap());
+}
+
+private int goal_threat(string board)
+{
+    StaticEval ev = evaluator(board, 3);
+    ev.goals.set_start(ev.pos);
+    ev.goals.find_goals();
+    assert(ev.goals.shortest[Side.WHITE] == 4);
+    assert(ev.goals.shortest[Side.BLACK] == 1);
+    return ev.goal_threat();
+}
+
+@("goal threat doesn't depend on file order")
+unittest
+{
+    // Gold can reach goal on d8 to f8, silver on b1 to e1. The file-flipped
+    // board must score the same.
+    enum board = "[e   M   " ~ "  H     " ~ "E       " ~ "  C R   "
+        ~ "r      h" ~ "h     R " ~ "m r  R H" ~ "      R ]";
+    enum mirror = "[   M   e" ~ "     H  " ~ "       E" ~ "   R C  "
+        ~ "h      r" ~ " R     h" ~ "H R  r m" ~ " R      ]";
+    assert(goal_threat(board) == goal_threat(mirror));
 }
