@@ -7,6 +7,14 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the penalty for pieces standing on traps counted only the
+  last occupied trap (in square order, from h1 up) instead of adding up
+  every one, so with two or more trap squares occupied it depended on
+  which trap came last. Test: 4563 games against the build before, at
+  1s/move and a 100-turn limit: −2.9 Elo [−12.9, +7.1] (95%), SPRT
+  [0, 10] rejected after 2281 pairs (LLR −3.01). Kept as a correct fix
+  with no measurable effect; the weight was tuned around the old
+  behaviour.
 - **Fixed:** the goal search for the side not to move could finish a
   pull with the piece the side to move had just stepped, which only the
   side to move can do. Mid-turn, this gave gold (and silver, mid-push)

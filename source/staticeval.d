@@ -234,9 +234,9 @@ class StaticEval
 
             if (safe_traps[tside] & tbit)
             {
-                score = -piece_value[tpiece] * ON_TRAP_MUL / 2.0L;
+                score -= piece_value[tpiece] * ON_TRAP_MUL / 2.0L;
             } else {
-                score = -piece_value[tpiece] * ON_TRAP_MUL;
+                score -= piece_value[tpiece] * ON_TRAP_MUL;
             }
 
         }
