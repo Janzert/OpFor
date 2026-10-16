@@ -12,6 +12,17 @@ struct SCNode
 {
     ulong zobrist;
     int score;
+    // goals.shortest for the position, which the quiescence search reads
+    // after static_eval
+    byte[2] shortest;
+
+    void set(ulong zobrist, int score, ref const int[2] shortest)
+    {
+        this.zobrist = zobrist;
+        this.score = score;
+        this.shortest[0] = cast(byte)shortest[0];
+        this.shortest[1] = cast(byte)shortest[1];
+    }
 }
 
 class ScoreCache
@@ -1538,10 +1549,16 @@ class StaticEval
 
     int static_eval(Position pos)
     {
-        // check if the score is cached for this position
+        // check if the score is cached for this position. Either way
+        // goals.shortest is left set for pos, which the quiescence search
+        // reads next.
         SCNode* sc_entry = sc_cache.get(pos);
         if (sc_entry.zobrist == pos.zobrist)
+        {
+            goals.shortest[0] = sc_entry.shortest[0];
+            goals.shortest[1] = sc_entry.shortest[1];
             return sc_entry.score;
+        }
 
         int score;
         if (pos.is_endstate() && pos.is_goal(cast(Side)(pos.side^1)))
@@ -1550,8 +1567,9 @@ class StaticEval
             // is when there is an opposing rabbit on the goal line that might
             // still get pulled back off before the end of the turn
             score = -(WIN_SCORE - pos.stepsLeft);
-            sc_entry.zobrist = pos.zobrist;
-            sc_entry.score = score;
+            goals.shortest[pos.side] = goals.NOT_FOUND;
+            goals.shortest[pos.side^1] = 0;
+            sc_entry.set(pos.zobrist, score, goals.shortest);
             return score;
         }
 
@@ -1562,8 +1580,7 @@ class StaticEval
                 && goals.shortest[pos.side] <= pos.stepsLeft)
         {
             score = WIN_SCORE - goals.shortest[pos.side];
-            sc_entry.zobrist = pos.zobrist;
-            sc_entry.score = score;
+            sc_entry.set(pos.zobrist, score, goals.shortest);
             return score;
         }
 
@@ -1593,8 +1610,7 @@ class StaticEval
         score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;
 
         // Enter the score into the cache
-        sc_entry.zobrist = pos.zobrist;
-        sc_entry.score = score;
+        sc_entry.set(pos.zobrist, score, goals.shortest);
         return score;
     }
 
