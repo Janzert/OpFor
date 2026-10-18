@@ -919,9 +919,11 @@ class ThreadEngine : Engine
         StepList bestline = pos_list.move.dup;
         Position pos = pos_list.pos.dup;
         StepList pos_steps = StepList.allocate();
-        TTNode* n = ttable.get(pos);
         for (int pvdepth = 0; pvdepth < depth * 2; pvdepth++)
         {
+            // The search threads keep writing the table, so read the entry
+            // once and check and use only that copy.
+            TTNode n = *ttable.get(pos);
             if (n.zobrist != pos.zobrist
                 || (n.beststep.frombit == 0 && n.beststep.tobit == 0))
             {
@@ -937,7 +939,6 @@ class ThreadEngine : Engine
             Step* next_step = bestline.newstep();
             *next_step = n.beststep;
             pos.do_step(n.beststep);
-            n = ttable.get(pos);
         }
 
         StepList.free(pos_steps);

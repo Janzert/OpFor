@@ -7,6 +7,14 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** a rare crash while reporting the principal variation
+  during a search (the default multithreaded engine). The report walks
+  the hash table while the search thread writes it, and read each
+  entry's best step twice, so it could check one step and use another
+  and then fail on an impossible move ("Piece disappeared without being
+  trapped"). It happened once in 6000 test games. Each entry is now
+  read once. Play is unchanged (fixed-depth comparison: 200 of 200
+  positions identical).
 - **Fixed:** the capture-threat eval's choice of its three victims. A
   victim could be counted twice, its traps could stay with another
   victim after a reorder, and ties between equal victims went to
