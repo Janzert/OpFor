@@ -7,6 +7,17 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the bonus for a strong advanced rabbit was all or nothing.
+  Its share of support was an integer division, so it was 0 unless the
+  rabbit had full support, and then 1; it now grows with the support as
+  intended. The rabbit square table also gave c3 (and silver's f6) 0.13
+  where its mirror has 0.14, so the term changed when the board was
+  mirrored; it no longer does. Over the game positions of a 6000-game
+  test the rabbit term changed in 38.8%, by a median of 21 points (90th
+  percentile 137). Test: 4452 games against the build before, at
+  1s/move and a 100-turn limit: +5.5 Elo [−4.9, +15.9] (95%), SPRT
+  [0, 10] undecided (LLR 0.16), stopped once it had under a 5% chance
+  of deciding within 3000 pairs.
 - **Fixed:** a rare crash while reporting the principal variation
   during a search (the default multithreaded engine). The report walks
   the hash table while the search thread writes it, and read each

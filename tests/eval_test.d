@@ -79,3 +79,35 @@ unittest
     assert(score > 0);
     assert(score == capture_threat(mirror));
 }
+
+@("rabbit strength doesn't depend on file order")
+unittest
+{
+    // A gold rabbit on c3 and its mirror on f3.
+    enum board = "[e       " ~ "        " ~ "        " ~ "        "
+        ~ "        " ~ "  R     " ~ "        " ~ "        ]";
+    enum mirror = "[       e" ~ "        " ~ "        " ~ "        "
+        ~ "        " ~ "     R  " ~ "        " ~ "        ]";
+    assert(evaluator(board).rabbit_strength()
+            == evaluator(mirror).rabbit_strength());
+}
+
+@("strong rabbit bonus grows with its support")
+unittest
+{
+    // A gold rabbit on c6 with a gold cat behind it, close (c5) or one
+    // square further (c4). Neither gives full support, so both get part
+    // of the bonus, the closer cat more.
+    enum close = "[        " ~ "        " ~ "  R     " ~ "  C     "
+        ~ "        " ~ "        " ~ "        " ~ "       e]";
+    enum far = "[        " ~ "        " ~ "  R     " ~ "        "
+        ~ "  C     " ~ "        " ~ "        " ~ "       e]";
+    StaticEval ev_close = evaluator(close);
+    StaticEval ev_far = evaluator(far);
+    ev_close.rweak_w = 0;
+    ev_far.rweak_w = 0;
+    real s_close = ev_close.rabbit_strength();
+    real s_far = ev_far.rabbit_strength();
+    assert(s_far > 0);
+    assert(s_close > s_far);
+}

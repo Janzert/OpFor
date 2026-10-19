@@ -441,7 +441,7 @@ class StaticEval
         // Try to encourage rabbits to the edges.
         static immutable real[] rsq = [0.0L, 0, 0, 0, 0, 0, 0, 0,
               0.05L, 0.07L, 0.09L, 0.10L, 0.10L, 0.09L, 0.07L, 0.05L,
-              0.11L, 0.12L, 0.14L, 0.15L, 0.15L, 0.13L, 0.12L, 0.11L,
+              0.11L, 0.12L, 0.14L, 0.15L, 0.15L, 0.14L, 0.12L, 0.11L,
               0.10L, 0.11L, 0.13L, 0.14L, 0.14L, 0.13L, 0.11L, 0.10L,
               0.09L, 0.10L, 0.11L, 0.12L, 0.12L, 0.11L, 0.10L, 0.09L,
               0.09L, 0.10L, 0.10L, 0.11L, 0.11L, 0.10L, 0.10L, 0.09L,
@@ -534,7 +534,7 @@ class StaticEval
                 {
                     int full_strong = STRONG_SPAN + power_balance;
                     power = (power < full_strong) ? power : full_strong;
-                    real sfactor = power / full_strong;
+                    real sfactor = cast(real) power / full_strong;
                     real rv = rankval[s][rix/8];
                     real rval = STRONG_VAL * rv * sfactor;
                     if (rbit & TRAPS)
