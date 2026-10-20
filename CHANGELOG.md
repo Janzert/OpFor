@@ -7,6 +7,15 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Changed:** the goal-threat term counts 2.8 times as much (the
+  `eval_goal` option, which defaulted to 1). Fitting the evaluation's
+  weights to the results of 7.7 million positions from engine and
+  arimaa.com games put it at 2.7 to 3 times its old value every way the
+  fit was set up, so the threat of a rabbit reaching goal next turn was
+  badly undervalued. Test: 765 games of 2.8 (set by the option) against
+  the default, at 1s/move and a 100-turn limit: +51.3 Elo [+26.6,
+  +76.6] (95%), SPRT [0, 10] passed after 382 pairs (LLR 2.95).
+
 - **Fixed:** four search errors. The quiescence search played on at
   the start of a turn when the opponent's rabbit was already on goal,
   so it could "save" a lost game by pulling the rabbit back. A late
