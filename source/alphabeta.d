@@ -802,20 +802,24 @@ class ABSearch
         } else {
             if (use_nmh && depth > 4 && !pos.inpush && pos.stepsLeft < 4)
             {
+                // The opponent's turn starts at n; ending it back at n
+                // would be a move that changes nothing.
                 Position mynull = nullmove;
-                nullmove = pos;
                 Position n = pos.dup;
                 n.do_step(NULL_STEP);
+                nullmove = n.dup;
+                nullmove.do_step(NULL_STEP);
 
                 use_nmh = false;
                 int null_score = -alphabeta(n, depth-4, -beta, -alpha, height+1);
                 use_nmh = true;
 
+                Position.free(nullmove);
                 Position.free(n);
                 nullmove = mynull;
 
-                if (score == -ABORT_SCORE
-                        || score == ABORT_SCORE)
+                if (null_score == -ABORT_SCORE
+                        || null_score == ABORT_SCORE)
                     return ABORT_SCORE;
 
                 if (null_score >= beta)
@@ -879,6 +883,7 @@ class ABSearch
                                             // loss since it's actually an illegal move
                 } else {
                     bool had_nw = false;
+                    bool reduced = false;
                     int first_val;
                     if (use_lmr && !in_pv && depth > 2
                             && sorted_steps.num > 3
@@ -899,6 +904,7 @@ class ABSearch
                             first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1, curstep);
                         }
                         had_nw = true;
+                        reduced = true;
                         use_lmr = true;
                     }
                     else if (in_pv && sorted_steps.num > 1) // NegaScout
@@ -943,6 +949,13 @@ class ABSearch
                     }
                     else if (first_val > alpha)
                     {
+                        // A null window search at full depth fails soft, so
+                        // its value bounds the re-search from below unless
+                        // it already reaches beta. A reduced search's value
+                        // bounds nothing.
+                        int re_alpha = alpha;
+                        if (!reduced && first_val < beta)
+                            re_alpha = first_val-1;
                         if (npos.stepsLeft == 4)
                         {
                             Position mynull = nullmove;
@@ -950,11 +963,11 @@ class ABSearch
                             nullmove = nullreplace;
                             nullmove.do_step(NULL_STEP);
 
-                            cal = -alphabeta(npos, depth-1, -beta, -(first_val-1), height+1, curstep);
+                            cal = -alphabeta(npos, depth-1, -beta, -re_alpha, height+1, curstep);
 
                             nullmove = mynull;
                         } else {
-                            cal = alphabeta(npos, depth-1, first_val-1, beta, height+1, curstep);
+                            cal = alphabeta(npos, depth-1, re_alpha, beta, height+1, curstep);
                         }
                     } else {
                         cal = first_val;
@@ -1128,7 +1141,8 @@ class ABQSearch : ABSearch
         nodes_quiesced++;
 
         int score = MIN_SCORE;
-        if (pos.is_endstate() && (!pos.is_goal(cast(Side)(pos.side^1))
+        if (pos.is_endstate() && (pos.stepsLeft == 4
+                    || !pos.is_goal(cast(Side)(pos.side^1))
                     || pos.stepsLeft < 2))
         {
             score = pos.endscore() * WIN_SCORE;

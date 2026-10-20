@@ -8,4 +8,5 @@ mixin runTestsMain!(
     "movegen_test",
     "fuzz_test",
     "eval_test",
+    "search_test",
 );

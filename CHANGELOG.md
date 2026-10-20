@@ -7,6 +7,21 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** four search errors. The quiescence search played on at
+  the start of a turn when the opponent's rabbit was already on goal,
+  so it could "save" a lost game by pulling the rabbit back. A late
+  move reduction's full-depth re-search used the reduced search's
+  value as its lower bound, which can leave an empty or inverted
+  window; it now uses the node's own window, as does a principal
+  variation re-search when the null-window search already reached
+  beta. The null-move search ignored an abort (it checked the wrong
+  variable), and inside it the opponent could play a move that changes
+  nothing. Fixed-depth comparison: 192 of 200 positions identical at
+  depth 6, the rest differing in node counts only; at depth 8, 21 of
+  40 differ in node counts, 8% less time in all. Test: 2465 games
+  against the build before, at 1s/move and a 100-turn limit: +18.6 Elo
+  [+5.3, +32.0] (95%), SPRT [0, 10] passed (LLR 2.95).
+
 - **Fixed:** the bonus for a strong advanced rabbit was all or nothing.
   Its share of support was an integer division, so it was 0 unless the
   rabbit had full support, and then 1; it now grows with the support as
