@@ -7,6 +7,7 @@ mixin runTestsMain!(
     "tango_compat",
     "movegen_test",
     "fuzz_test",
+    "goal_test",
     "eval_test",
     "search_test",
 );

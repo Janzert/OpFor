@@ -16,6 +16,31 @@ drawn from the commit history.
   the default, at 1s/move and a 100-turn limit: +51.3 Elo [+26.6,
   +76.6] (95%), SPRT [0, 10] passed after 382 pairs (LLR 2.95).
 
+- **Fixed:** the goal search reported goals that don't exist and missed
+  some that do. Most of the false ones came from finishing a pull with
+  the piece that last stepped: the pulled piece could land on the goal
+  square or on the square the rabbit had to cross, a rabbit could be
+  sent through an occupied square or step while frozen by another piece,
+  a pull onto a trap counted as unfreezing the rabbit while another
+  piece still froze it, a pull could take the only square the piece on
+  the goal square could step aside to, and a piece of equal strength
+  counted as able to pull. With 3 steps left, these made the
+  evaluation score a win that wasn't there. At any point in a turn, a
+  check of whether a piece would be frozen beside the goal compared the
+  wrong square and always passed, and moving an enemy rabbit away
+  counted as unfreezing a rabbit. Missed: when the only piece freezing a
+  rabbit was the one on the goal square ahead of it, pulling that piece
+  aside wasn't seen to free the rabbit, so a goal in 3 came out as 4 or
+  as none, and some goals in 4 as none. Checked against a search of
+  every step on 470,000 turn starts from games, each in both colours:
+  with a pull pending, false wins for the side to move fell from 338 of
+  158,276 checks to 6, and at the start of a turn, missed goals for the
+  side not to move fell from 44 of 940,038 to 6. At depth 6, 185 of 200
+  comparison positions are identical, the rest differing in node counts
+  only. Test: 5537 games against the build before, at 1s/move and a
+  100-turn limit: +8.4 Elo [−0.6, +17.4] (95%), SPRT [0, 10] undecided
+  at its 3000-pair cap (LLR 1.63). 144 of the games repeat earlier ones,
+  so the error bars are somewhat too narrow.
 - **Fixed:** four search errors. The quiescence search played on at
   the start of a turn when the opponent's rabbit was already on goal,
   so it could "save" a lost game by pulling the rabbit back. A late
