@@ -100,9 +100,32 @@ class Engine : AEIEngine
     int last_score;
     int depth;
 
+    // The transposition table, eval caches and history table hold results
+    // from an earlier game or from other eval and search settings. They're
+    // cleared before the next search rather than at once, so a batch of
+    // setoptions costs one clear.
+    bool tables_stale = false;
+
     this(Logger l)
     {
         super(l);
+    }
+
+    override void new_game()
+    {
+        tables_stale = true;
+        super.new_game();
+    }
+
+    void clear_tables() { }
+
+    void clear_stale_tables()
+    {
+        if (tables_stale)
+        {
+            clear_tables();
+            tables_stale = false;
+        }
     }
 
     int cur_score() { return 0; }
@@ -263,6 +286,14 @@ class SearchThread : Thread
         synchronized (search_lock)
         {
             searcher.prepare();
+        }
+    }
+
+    void clear_caches()
+    {
+        synchronized (search_lock)
+        {
+            searcher.clear_caches();
         }
     }
 
@@ -536,15 +567,19 @@ class ThreadEngine : Engine
                 break;
             case "history":
                 StepSorter.use_history = to!(bool)(value);
+                tables_stale = true;
                 break;
             case "capture_sort":
                 StepSorter.capture_first = to!(bool)(value);
+                tables_stale = true;
                 break;
             case "use_killers":
                 StepSorter.use_killers = to!(bool)(value);
+                tables_stale = true;
                 break;
             case "prune_unrelated":
                 StepSorter.prune_unrelated = to!(bool)(value);
+                tables_stale = true;
                 break;
             case "set_steps":
                 if (position !is null) {
@@ -559,6 +594,8 @@ class ThreadEngine : Engine
                     {
                         handled = handled && thread.set_option(name, value);
                     }
+                    if (handled)
+                        tables_stale = true;
                 } else {
                     logger.warn("Currently searching did not try to set option {} on search threads.", name);
                     handled = false;
@@ -612,8 +649,18 @@ class ThreadEngine : Engine
         threads[0].searcher.logged_eval(pos);
     }
 
+    override void clear_tables()
+    {
+        ttable.clear();
+        foreach (thread; threads)
+        {
+            thread.clear_caches();
+        }
+    }
+
     override void start_search()
     {
+        clear_stale_tables();
         if (ply < 3)
         {
             Position pos = position.dup;
@@ -1033,6 +1080,7 @@ class SeqEngine : Engine
                 break;
             case "root_lmr":
                 root_lmr = cast(bool)to!int(value);
+                tables_stale = true;
                 break;
             case "setup_rabbits":
                 switch (toUpper(value))
@@ -1065,6 +1113,8 @@ class SeqEngine : Engine
                 break;
             default:
                 handled = searcher.set_option(option, value);
+                if (handled)
+                    tables_stale = true;
         }
         return handled;
     }
@@ -1101,8 +1151,15 @@ class SeqEngine : Engine
         super.new_game();
     }
 
+    override void clear_tables()
+    {
+        ttable.clear();
+        searcher.clear_caches();
+    }
+
     override void start_search()
     {
+        clear_stale_tables();
         if (ply < 3)
         {
             Position pos = position.dup;

@@ -40,6 +40,11 @@ class ScoreCache
         cache.length = size;
     }
 
+    void clear()
+    {
+        cache[] = SCNode.init;
+    }
+
     SCNode* get(Position pos)
     {
         return &cache[pos.zobrist % cache.length];

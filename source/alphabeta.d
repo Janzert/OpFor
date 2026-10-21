@@ -125,6 +125,14 @@ class TransTable
             store[i].aged = true;
         }
     }
+
+    // Aging only lets entries be replaced first, a probe still uses an aged
+    // entry's score. Scores from a different eval or search need clearing.
+    void clear()
+    {
+        store[] = TTNode.init;
+        age();
+    }
 }
 
 class HistoryHeuristic
@@ -160,6 +168,12 @@ class HistoryHeuristic
             }
             pass_score[s] /= tunables.HISTORY_DECAY;
         }
+    }
+
+    void clear()
+    {
+        score = typeof(score).init;
+        pass_score = typeof(pass_score).init;
     }
 }
 
@@ -1055,6 +1069,13 @@ class ABSearch
         tthits = 0;
     }
 
+    // Everything but the shared transposition table, which the caller
+    // clears.
+    void clear_caches()
+    {
+        cuthistory.clear();
+    }
+
     void cleanup()
     {
         ttable.age();
@@ -1117,6 +1138,12 @@ class ABQSearch : ABSearch
     override void set_depth(int depth)
     {
         super.set_depth(depth);
+    }
+
+    override void clear_caches()
+    {
+        super.clear_caches();
+        evaluator.sc_cache.clear();
     }
 
     override int eval(Position pos, int alpha, int beta)
