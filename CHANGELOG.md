@@ -11,7 +11,10 @@ drawn from the commit history.
   be set by AEI `setoption`, as `tune_<name>` or `tune_<name>_<i>` for a
   table entry (`source/tunables.d` lists them), for automatic tuning.
   Tables kept for both colours are set as gold's half and mirrored, so a
-  tuned set stays symmetric. With nothing set OpFor plays as before:
+  tuned set stays symmetric. Most tables can also be reshaped as a whole
+  by two to four `tune_<table>_shape_<k>` values (56 in all): an added
+  curve by rank for the rabbit tables, a factor that changes how fast
+  the decaying tables fall off. With nothing set OpFor plays as before:
   fixed-depth comparison 200 of 200 positions identical at depth 6, and
   the same speed.
 

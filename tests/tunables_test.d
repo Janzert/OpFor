@@ -77,3 +77,37 @@ unittest
     }
     assert(registry.length > 200);
 }
+
+@("shape values start at 0 and change whole tables")
+unittest
+{
+    size_t shapes;
+    foreach (t; registry)
+        if (t.name.length > 8 && t.name[$ - 8 .. $ - 1] == "_shape_")
+        {
+            assert(t.initial == 0, t.name);
+            shapes++;
+        }
+    assert(shapes == 56);
+
+    // On local tables, so the shared values stay as they are.
+    int[8] base = [2, 2, 2, 3, 10, 20, 40, 0];
+    int[8] entry;
+    real[3] none = 0;
+    add_curve(entry[], base[], 0, 6, 40, none[]);
+    assert(entry == base);
+    real[3] up = [0, 0, 1];
+    add_curve(entry[], base[], 0, 6, 40, up[]);
+    assert(entry[0] == 2 && entry[3] == 13 && entry[6] == 80 && entry[7] == 0);
+
+    real[5] decay = [1.0L, 0.6L, 0.4L, 0.2L, 0.1L];
+    real[5] scaled;
+    real[2] none2 = 0;
+    scale_curve(scaled[], decay[], 0, 4, none2[]);
+    assert(scaled == decay);
+    real[2] steeper = [-0.5L, 0];
+    scale_curve(scaled[], decay[], 0, 4, steeper[]);
+    import std.conv : text;
+    import std.math : isClose;
+    assert(scaled[0] == 1.0L && isClose(scaled[4], 0.05L) && isClose(scaled[2], 0.3L), text(scaled));
+}
