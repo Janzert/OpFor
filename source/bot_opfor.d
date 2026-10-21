@@ -18,6 +18,7 @@ import logging;
 import position;
 import setupboard;
 import utility;
+static import tunables;
 
 enum BOT_NAME = "OpFor";
 enum BOT_AUTHOR = "Janzert";
@@ -191,7 +192,7 @@ class SearchThread : Thread
     Atomic!(bool) searching;
 
     bool root_lmr = true;
-    static immutable int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
+    alias reduction_margins = tunables.ROOT_REDUCTION_MARGINS;
     }
 
     this(ThreadEngine ctl)
@@ -998,7 +999,7 @@ class SeqEngine : Engine
     uint aborts_reported = 0;
 
     bool root_lmr = true;
-    static immutable int[] reduction_margins = [150, 350, 1000, 2600, 6000, 15000, 30000];
+    alias reduction_margins = tunables.ROOT_REDUCTION_MARGINS;
 
     StopWatch search_length;
 

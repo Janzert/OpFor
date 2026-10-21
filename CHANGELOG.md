@@ -7,6 +7,14 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Added:** about 250 of the evaluation's and search's constants can
+  be set by AEI `setoption`, as `tune_<name>` or `tune_<name>_<i>` for a
+  table entry (`source/tunables.d` lists them), for automatic tuning.
+  Tables kept for both colours are set as gold's half and mirrored, so a
+  tuned set stays symmetric. With nothing set OpFor plays as before:
+  fixed-depth comparison 200 of 200 positions identical at depth 6, and
+  the same speed.
+
 - **Changed:** the goal-threat term counts 2.8 times as much (the
   `eval_goal` option, which defaulted to 1). Fitting the evaluation's
   weights to the results of 7.7 million positions from engine and

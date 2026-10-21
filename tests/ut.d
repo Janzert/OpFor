@@ -10,4 +10,5 @@ mixin runTestsMain!(
     "goal_test",
     "eval_test",
     "search_test",
+    "tunables_test",
 );

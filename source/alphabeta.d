@@ -12,6 +12,7 @@ import logging;
 import position;
 import staticeval;
 import trapmoves;
+static import tunables;
 
 enum int MAX_EVAL_SCORE = 63979;
 enum int MIN_WIN_SCORE = 63980;
@@ -154,10 +155,10 @@ class HistoryHeuristic
             {
                 for (int t=0; t < 64; t++)
                 {
-                    score[s][f][t] /= 10;
+                    score[s][f][t] /= tunables.HISTORY_DECAY;
                 }
             }
-            pass_score[s] /= 10;
+            pass_score[s] /= tunables.HISTORY_DECAY;
         }
     }
 }
@@ -767,7 +768,7 @@ class ABSearch
         bool stop_search = false;
         if (!pos.inpush && depth < 1)
         {
-            if (in_pv && height <= max_depth + 8)
+            if (in_pv && height <= max_depth + tunables.GOAL_EXT_EXTRA)
             {
                 goal_search.set_start(pos);
                 goal_search.find_goals();
@@ -800,7 +801,7 @@ class ABSearch
 
             new_best.clear();
         } else {
-            if (use_nmh && depth > 4 && !pos.inpush && pos.stepsLeft < 4)
+            if (use_nmh && depth > tunables.NMH_MIN_DEPTH && !pos.inpush && pos.stepsLeft < 4)
             {
                 // The opponent's turn starts at n; ending it back at n
                 // would be a move that changes nothing.
@@ -811,7 +812,7 @@ class ABSearch
                 nullmove.do_step(NULL_STEP);
 
                 use_nmh = false;
-                int null_score = -alphabeta(n, depth-4, -beta, -alpha, height+1);
+                int null_score = -alphabeta(n, depth - tunables.NMH_REDUCTION, -beta, -alpha, height+1);
                 use_nmh = true;
 
                 Position.free(nullmove);
@@ -843,7 +844,7 @@ class ABSearch
                 sorters.length = height+1;
                 sorters[height] = sorted_steps;
             }
-            if (depth > max_depth - 4 && depth > max_depth / 2)
+            if (depth > max_depth - tunables.UNRELATED_WINDOW && depth > max_depth / 2)
                 sorted_steps.remove_unrelated = false;
             Step* curstep = sorted_steps.next_step();
             if (curstep is null)
@@ -885,9 +886,9 @@ class ABSearch
                     bool had_nw = false;
                     bool reduced = false;
                     int first_val;
-                    if (use_lmr && !in_pv && depth > 2
-                            && sorted_steps.num > 3
-                            && sorted_steps.history_num > 1)
+                    if (use_lmr && !in_pv && depth > tunables.LMR_MIN_DEPTH
+                            && sorted_steps.num > tunables.LMR_MIN_STEPS
+                            && sorted_steps.history_num > tunables.LMR_MIN_HISTORY)
                     {
                         use_lmr = false;
                         if (npos.stepsLeft == 4)
@@ -897,11 +898,11 @@ class ABSearch
                             nullmove = nullreplace;
                             nullmove.do_step(NULL_STEP);
 
-                            first_val = -alphabeta(npos, depth-2, -(alpha+1), -alpha, height+1, curstep);
+                            first_val = -alphabeta(npos, depth - tunables.LMR_REDUCTION, -(alpha+1), -alpha, height+1, curstep);
 
                             nullmove = mynull;
                         } else {
-                            first_val = alphabeta(npos, depth-2, alpha, alpha+1, height+1, curstep);
+                            first_val = alphabeta(npos, depth - tunables.LMR_REDUCTION, alpha, alpha+1, height+1, curstep);
                         }
                         had_nw = true;
                         reduced = true;
@@ -1213,7 +1214,7 @@ class ABQSearch : ABSearch
             trap_search.find_captures(pos, pos.side);
             for (int six=0; six < trap_search.num_captures; six++)
             {
-                if (trap_search.captures[six].length <= pos.stepsLeft + 2)
+                if (trap_search.captures[six].length <= pos.stepsLeft + tunables.Q_CAPTURE_EXTRA)
                 {
                     bool duplicate = false;
                     for (int cix=0; cix < steps.numsteps; cix++)
