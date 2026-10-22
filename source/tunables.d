@@ -20,7 +20,7 @@
 /// with S the table's largest default (so the shape values are fractions
 /// of it); the rabbit square table also gets s3 times its distance from
 /// the centre files. A decaying table gets a factor,
-///     entry[i] = base[i] * (1 + s0 x + s1 x^2),  x = (i - lo) / (hi - lo),
+///     entry[i] = base[i] * max(0, 1 + s0 x + s1 x^2),  x = (i - lo) / (hi - lo),
 /// over its used entries lo to hi, so its first entry stays as it is.
 /// `base` is the table's own entries (`tune_<table>_<i>`). All shape values
 /// are 0 by default, which leaves every table as it was.
@@ -269,7 +269,8 @@ void add_curve(T)(T[] entry, const T[] base, size_t lo, size_t hi,
 }
 
 /// entry[i] = base[i] * (1 + s0 x + s1 x^2), x = (i - lo) / (hi - lo),
-/// for entries lo to hi; the others are copied.
+/// for entries lo to hi; the others are copied. The factor stops at 0, so
+/// no shape turns a multiplier's sign.
 void scale_curve(T)(T[] entry, const T[] base, size_t lo, size_t hi,
         const real[] s)
 {
@@ -277,7 +278,8 @@ void scale_curve(T)(T[] entry, const T[] base, size_t lo, size_t hi,
     foreach (i; lo .. hi + 1)
     {
         real x = (i - lo) / cast(real)(hi - lo);
-        entry[i] = to_entry!T(base[i] * (1 + s[0] * x + s[1] * x * x));
+        real factor = 1 + s[0] * x + s[1] * x * x;
+        entry[i] = to_entry!T(base[i] * (factor > 0 ? factor : 0));
     }
 }
 

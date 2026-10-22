@@ -110,4 +110,7 @@ unittest
     import std.conv : text;
     import std.math : isClose;
     assert(scaled[0] == 1.0L && isClose(scaled[4], 0.05L) && isClose(scaled[2], 0.3L), text(scaled));
+    real[2] negative = [-3, 0];
+    scale_curve(scaled[], decay[], 0, 4, negative[]);
+    assert(scaled[0] == 1.0L && scaled[4] == 0 && scaled[3] == 0, text(scaled));
 }
