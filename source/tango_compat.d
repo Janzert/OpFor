@@ -101,12 +101,12 @@ private void formatArg(W, T)(ref W w, const(char)[] spec, T arg)
     }
 }
 
-private real roundHalfAway(real value, const(char)[] decimals)
+private double roundHalfAway(double value, const(char)[] decimals)
 {
     if (!isFinite(value))
         return value;
-    real scale = 10.0L ^^ to!int(decimals);
-    real scaled = floor(fabs(value) * scale + 0.5L) / scale;
+    double scale = 10.0 ^^ to!int(decimals);
+    double scaled = floor(fabs(value) * scale + 0.5) / scale;
     return value < 0 ? -scaled : scaled;
 }
 
@@ -329,7 +329,7 @@ unittest
     assert(Format("{} {}", 0.24, 1.0f) == "0.24 1.00");
     assert(Format("{:f1} {:.2}", 12.36, 1234.5678) == "12.4 1234.57");
     assert(Format("{:.2} {:.2} {:.2} {:f1}", 100.0, 87.1, 1e9, 0.0) == "100 87.1 1000000000 0.0");
-    assert(Format("{:.2} {:f2} {:.2}", 90.625, 0.125, -2.675L) == "90.63 0.13 -2.68");
+    assert(Format("{:.2} {:f2} {:.2}", 90.625, 0.125, -2.675) == "90.63 0.13 -2.68");
     assert(Format("{} {}", true, 'x') == "true x");
     enum E { A, B }
     assert(Format("{}", E.B) == "1");

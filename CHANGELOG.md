@@ -7,6 +7,16 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Changed:** the evaluation computes in 64-bit floats (`double`)
+  instead of `real`, which is 80-bit x87 on Linux x86-64 but already
+  64-bit on Windows. Linux and Windows builds now search identically
+  (they disagreed on a small share of eval terms that truncate to a
+  whole number), and the Linux build searches about 30% more nodes per
+  second. The Windows build is unchanged: fixed-depth comparison 200 of
+  200 positions identical at depth 6. On Linux the same comparison gives
+  the same best move, score and PV in all 200, with node counts that
+  differ in 20.
+
 - **Added:** `tools/bench.py`, a benchmark that measures a machine's
   nodes per second on a fixed set of positions and depths. It needs
   only Python 3 and a bot_opfor binary.

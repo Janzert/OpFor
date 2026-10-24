@@ -9,12 +9,11 @@ later and a bot_opfor binary: the positions are built in.
 
 The work is the same from run to run. With the default --seq engine
 and hash size, a given OpFor version searches exactly the same nodes on
-every machine with the same OS, so the total node count works as a
+every machine, Linux or Windows, so the total node count works as a
 signature: two runs with the same signature did the same work, and their
-times compare directly. A Windows build searches slightly differently
-from a Linux one (under 1% more or fewer nodes in total), and so does a
-different OpFor version, --hash or the threaded engine: those give a
-different signature, and their speeds are only roughly comparable.
+times compare directly. A different OpFor version, --hash or the
+threaded engine searches differently: those give a different signature,
+and their speeds are only roughly comparable.
 
 Speed varies a lot from position to position, so compare nodes per
 second only between runs on the same position set.
@@ -44,8 +43,8 @@ import time
 # Positions from seeded self-play games, as `<id> <depth> <side> <board>`
 # with the board as AEI's 64 squares from a8 to h1. The id is the game and
 # ply. Each depth is set so the search takes one to ten seconds on a 2025
-# laptop (a Ryzen AI 7 350, about a million nodes per second); the set
-# takes about 65 seconds there. Changing a line changes the signature.
+# laptop (a Ryzen AI 7 350, about 1.5 million nodes per second); the set
+# takes about 47 seconds there. Changing a line changes the signature.
 POSITIONS = """\
 g008p006 8 g [drrr rrd cc  m h   r  r     e    R       RRDE  Ch    DR HRRMHRCR]
 g033p007 8 s [rr rhrrcc h d  r d  M r      m          CRD R    EH  D CR  HRRRR]

@@ -594,10 +594,10 @@ class Position
         return reservesize;
     }
 
-    static real reserve_size()
+    static double reserve_size()
     {
         return ((reservesize * __traits(classInstanceSize, Position))
-            / cast(real)(1024*1024));
+            / cast(double)(1024*1024));
     }
 
     static int rlistsize()
@@ -651,7 +651,7 @@ class Position
         }
     }
 
-    static void reduce_reserve(real size)
+    static void reduce_reserve(double size)
     {
         synchronized (reserve_lock)
         {
@@ -2002,11 +2002,11 @@ PlayoutResult playout_steps(Position pos, int max_length = 0)
     return result;
 }
 
-real FAME(Position pos, real scale = 33.695652173913032L)
+double FAME(Position pos, double scale = 33.695652173913032)
 {
     static immutable int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
 
-    real famescore = 0;
+    double famescore = 0;
 
     int wrabbits = popcount(pos.bitBoards[Piece.WRABBIT]);
     int brabbits = popcount(pos.bitBoards[Piece.BRABBIT]);
@@ -2080,18 +2080,18 @@ real FAME(Position pos, real scale = 33.695652173913032L)
     {
         int bpieces = popcount(pos.placement[Side.BLACK]
             & ~pos.bitBoards[Piece.BRABBIT]);
-        famescore += wr_left * (600.0L/(brabbits+(2*bpieces)));
+        famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
     } else {
-        famescore = 3369.562173913032L;
+        famescore = 3369.562173913032;
     }
 
     if (pos.placement[Side.WHITE])
     {
         int wpieces = popcount(pos.placement[Side.WHITE]
             & ~pos.bitBoards[Piece.WRABBIT]);
-        famescore -= br_left * (600.0L/(wrabbits+(2*wpieces)));
+        famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
     } else {
-        famescore = -3369.562173913032L;
+        famescore = -3369.562173913032;
     }
 
     return famescore / scale;
@@ -2161,9 +2161,9 @@ int pop2count(int population, Piece piece)
 class FastFAME
 {
     int[int] cache;
-    real scale;
+    double scale;
 
-    this(real s = 33.695652173913032L)
+    this(double s = 33.695652173913032)
     {
         scale = s;
     }
@@ -2185,11 +2185,11 @@ class FastFAME
         return score;
     }
 
-    real popfame(int population)
+    double popfame(int population)
     {
         static immutable int[] matchscore = [256, 85, 57, 38, 25, 17, 11, 7];
 
-        real famescore = 0;
+        double famescore = 0;
 
         int wrabbits = pop2count(population, Piece.WRABBIT);
         int brabbits = pop2count(population, Piece.BRABBIT);
@@ -2266,9 +2266,9 @@ class FastFAME
         }
         if (bpieces || brabbits)
         {
-            famescore += wr_left * (600.0L/(brabbits+(2*bpieces)));
+            famescore += wr_left * (600.0/(brabbits+(2*bpieces)));
         } else {
-            return 3369.562173913032L / scale;
+            return 3369.562173913032 / scale;
         }
 
         int wpieces = 0;
@@ -2278,9 +2278,9 @@ class FastFAME
         }
         if (wpieces || wrabbits)
         {
-            famescore -= br_left * (600.0L/(wrabbits+(2*wpieces)));
+            famescore -= br_left * (600.0/(wrabbits+(2*wpieces)));
         } else {
-            return -3369.562173913032L / scale;
+            return -3369.562173913032 / scale;
         }
 
         return famescore / scale;

@@ -106,8 +106,8 @@ unittest
     StaticEval ev_far = evaluator(far);
     ev_close.rweak_w = 0;
     ev_far.rweak_w = 0;
-    real s_close = ev_close.rabbit_strength();
-    real s_far = ev_far.rabbit_strength();
+    double s_close = ev_close.rabbit_strength();
+    double s_far = ev_far.rabbit_strength();
     assert(s_far > 0);
     assert(s_close > s_far);
 }

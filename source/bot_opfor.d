@@ -1585,9 +1585,9 @@ int main(string[] args)
     TimeSpan tc_breserve = TimeSpan.zero; // black's reserve time
     TimeSpan tc_lastmove = TimeSpan.zero; // time used for opponents last move
     TimeSpan tc_safety_margin = TimeSpan.fromSeconds(11); // safety margin in seconds to end the search
-    real tc_min_search_per = 0.6;  // minimum percentage of permove time to search
-    real tc_confidence_denom = 3;
-    real tc_time_left_denom = 3;
+    double tc_min_search_per = 0.6;  // minimum percentage of permove time to search
+    double tc_confidence_denom = 3;
+    double tc_time_left_denom = 3;
 
     // used to set different thinking times than the game timecontrol
     TimeSpan tc_target_length = TimeSpan.fromSeconds(0);
@@ -1683,7 +1683,7 @@ int main(string[] args)
                         // if reserve is unlimited target it to 4 * move time
                         if (max_reserve == TimeSpan.zero)
                             max_reserve = tc_permove * 4;
-                        real reserve_fill = myreserve.interval / max_reserve.interval;
+                        double reserve_fill = myreserve.interval / max_reserve.interval;
                         reserve_fill = reserve_fill > 1.0 ? 1.0 : reserve_fill;
                         tc_min_search = TimeSpan(cast(long)(tc_permove.ticks
                                 * tc_min_search_per));
@@ -2022,8 +2022,8 @@ int main(string[] args)
                                     * (1.0/tc_time_left_denom))
                                 || (score <= -MIN_WIN_SCORE))
                         {
-                            real tc_cd = 1.0 / (tc_confidence_denom-1);
-                            real tc_tld = 1.0 / (tc_time_left_denom-1);
+                            double tc_cd = 1.0 / (tc_confidence_denom-1);
+                            double tc_tld = 1.0 / (tc_time_left_denom-1);
                             auto length_cutoff = last_decision_change
                                 + TimeSpan.fromInterval((last_decision_change
                                             - move_start).interval * tc_cd);

@@ -16,28 +16,28 @@ unittest
     assert(OPEN_FILE == [[2, 2, 2, 3, 10, 20, 40, 0], [0, -40, -20, -10, -3, -2, -2, -2]]);
     assert(OPEN_ADJ == [[2, 2, 3, 20, 40, 80, 120, 0], [0, -120, -80, -40, -20, -3, -2, -2]]);
     assert(RS_PIECEVAL == [0, 0, 45, 80, 150, 200, 300, 0, -45, -80, -150, -200, -300]);
-    assert(RS_RANKVAL == [[0, 0, 0.1L, 0.2L, 0.4L, 1.0L, 1.2L, 0],
-            [0.0L, -1.2L, -1.0L, -0.4L, -0.2L, -0.1L, 0, 0]]);
-    assert(RS_WEAK_MUL == [[0.0L, 0.00L, 0.02L, 0.05L, 0.10L, 0.20L, 0.08L, 0],
-            [0.0L, 0.08L, 0.20L, 0.10L, 0.05L, 0.02L, 0.00L, 0]]);
-    real[64] rsq = [0.0L, 0, 0, 0, 0, 0, 0, 0,
-          0.05L, 0.07L, 0.09L, 0.10L, 0.10L, 0.09L, 0.07L, 0.05L,
-          0.11L, 0.12L, 0.14L, 0.15L, 0.15L, 0.14L, 0.12L, 0.11L,
-          0.10L, 0.11L, 0.13L, 0.14L, 0.14L, 0.13L, 0.11L, 0.10L,
-          0.09L, 0.10L, 0.11L, 0.12L, 0.12L, 0.11L, 0.10L, 0.09L,
-          0.09L, 0.10L, 0.10L, 0.11L, 0.11L, 0.10L, 0.10L, 0.09L,
-          0.07L, 0.08L, 0.08L, 0.09L, 0.09L, 0.08L, 0.08L, 0.07L,
+    assert(RS_RANKVAL == [[0, 0, 0.1, 0.2, 0.4, 1.0, 1.2, 0],
+            [0.0, -1.2, -1.0, -0.4, -0.2, -0.1, 0, 0]]);
+    assert(RS_WEAK_MUL == [[0.0, 0.00, 0.02, 0.05, 0.10, 0.20, 0.08, 0],
+            [0.0, 0.08, 0.20, 0.10, 0.05, 0.02, 0.00, 0]]);
+    double[64] rsq = [0.0, 0, 0, 0, 0, 0, 0, 0,
+          0.05, 0.07, 0.09, 0.10, 0.10, 0.09, 0.07, 0.05,
+          0.11, 0.12, 0.14, 0.15, 0.15, 0.14, 0.12, 0.11,
+          0.10, 0.11, 0.13, 0.14, 0.14, 0.13, 0.11, 0.10,
+          0.09, 0.10, 0.11, 0.12, 0.12, 0.11, 0.10, 0.09,
+          0.09, 0.10, 0.10, 0.11, 0.11, 0.10, 0.10, 0.09,
+          0.07, 0.08, 0.08, 0.09, 0.09, 0.08, 0.08, 0.07,
           0   , 0   , 0   , 0   , 0   , 0   , 0   , 0   ];
     assert(RS_SQ == rsq);
     assert(PS_PIECEVAL == [0, 0, 8, 12, 24, 36, 44, 0, -8, -12, -24, -36, -44]);
     assert(PS_MAX_POWER == 4400 && PS_MIN_POWER == -4400);
     assert(FROZEN_PENALTY == [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88]);
-    real[33] pop_mul = [0.8L, 0.8L, 0.8L, 0.8L, 0.8L, 0.8L, 0.8L, 0.8L, 0.8L,
-          0.9L, 0.9L, 0.9L, 0.9L, 0.9L, 0.9L, 0.9L, 0.9L,
-          1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L,
-          1.1L, 1.1L, 1.1L, 1.1L, 1.2L, 1.2L, 1.2L, 1.2L];
+    double[33] pop_mul = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
+          0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
+          1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+          1.1, 1.1, 1.1, 1.1, 1.2, 1.2, 1.2, 1.2];
     assert(POPULATION_MUL == pop_mul);
-    assert(MOBILE_SIDE_MUL == [0.1L, -0.1L]);
+    assert(MOBILE_SIDE_MUL == [0.1, -0.1]);
 }
 
 // The values are shared by every thread and the other tests run in
@@ -58,11 +58,11 @@ unittest
 unittest
 {
     int v;
-    real r;
+    double r;
     Tunable("i", true, &v, 0).set(3.6);
     assert(v == 4);
     Tunable("r", false, &r, 0).set(3.6);
-    assert(r == 3.6L);
+    assert(r == 3.6);
 }
 
 @("every tunable's name is unique and its value is its startup value")
@@ -93,24 +93,24 @@ unittest
     // On local tables, so the shared values stay as they are.
     int[8] base = [2, 2, 2, 3, 10, 20, 40, 0];
     int[8] entry;
-    real[3] none = 0;
+    double[3] none = 0;
     add_curve(entry[], base[], 0, 6, 40, none[]);
     assert(entry == base);
-    real[3] up = [0, 0, 1];
+    double[3] up = [0, 0, 1];
     add_curve(entry[], base[], 0, 6, 40, up[]);
     assert(entry[0] == 2 && entry[3] == 13 && entry[6] == 80 && entry[7] == 0);
 
-    real[5] decay = [1.0L, 0.6L, 0.4L, 0.2L, 0.1L];
-    real[5] scaled;
-    real[2] none2 = 0;
+    double[5] decay = [1.0, 0.6, 0.4, 0.2, 0.1];
+    double[5] scaled;
+    double[2] none2 = 0;
     scale_curve(scaled[], decay[], 0, 4, none2[]);
     assert(scaled == decay);
-    real[2] steeper = [-0.5L, 0];
+    double[2] steeper = [-0.5, 0];
     scale_curve(scaled[], decay[], 0, 4, steeper[]);
     import std.conv : text;
     import std.math : isClose;
-    assert(scaled[0] == 1.0L && isClose(scaled[4], 0.05L) && isClose(scaled[2], 0.3L), text(scaled));
-    real[2] negative = [-3, 0];
+    assert(scaled[0] == 1.0 && isClose(scaled[4], 0.05) && isClose(scaled[2], 0.3), text(scaled));
+    double[2] negative = [-3, 0];
     scale_curve(scaled[], decay[], 0, 4, negative[]);
-    assert(scaled[0] == 1.0L && scaled[4] == 0 && scaled[3] == 0, text(scaled));
+    assert(scaled[0] == 1.0 && scaled[4] == 0 && scaled[3] == 0, text(scaled));
 }

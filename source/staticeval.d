@@ -70,30 +70,30 @@ class StaticEval
 
     ScoreCache sc_cache;
 
-    real map_e_w = 2;
-    real tsafety_w = 1;
-    real ontrap_w = 1;
-    real frozen_w = 1;
-    real rwall_w = 1;
-    real ropen_w = 2;
-    real rhome_w = 3;
-    real rweak_w = 1;
-    real rstrong_w = 1;
-    real pstrength_w = 0.00005L;
-    real goal_w = 2.8L;
-    real static_otrap_w = 0.6L;
-    real static_strap_w = 0.5L;
-    real hostage_w = 1;
-    real frame_w = 1;
-    real mobility_w = 1;
-    real threat_w = 1;
+    double map_e_w = 2;
+    double tsafety_w = 1;
+    double ontrap_w = 1;
+    double frozen_w = 1;
+    double rwall_w = 1;
+    double ropen_w = 2;
+    double rhome_w = 3;
+    double rweak_w = 1;
+    double rstrong_w = 1;
+    double pstrength_w = 0.00005;
+    double goal_w = 2.8;
+    double static_otrap_w = 0.6;
+    double static_strap_w = 0.5;
+    double hostage_w = 1;
+    double frame_w = 1;
+    double mobility_w = 1;
+    double threat_w = 1;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
         logger = l;
         goals = g;
         trap_search = t;
-        fame = new FastFAME(0.1716L);
+        fame = new FastFAME(0.1716);
         sc_cache= new ScoreCache(200000);
     }
 
@@ -103,55 +103,55 @@ class StaticEval
         switch (option)
         {
             case "eval_map_e":
-                map_e_w = to!real(value);
+                map_e_w = to!double(value);
                 break;
             case "eval_tsafety":
-                tsafety_w = to!real(value);
+                tsafety_w = to!double(value);
                 break;
             case "eval_frozen":
-                frozen_w = to!real(value);
+                frozen_w = to!double(value);
                 break;
             case "eval_ontrap":
-                ontrap_w = to!real(value);
+                ontrap_w = to!double(value);
                 break;
             case "eval_rwall":
-                rwall_w = to!real(value);
+                rwall_w = to!double(value);
                 break;
             case "eval_ropen":
-                ropen_w = to!real(value);
+                ropen_w = to!double(value);
                 break;
             case "eval_rhome":
-                rhome_w = to!real(value);
+                rhome_w = to!double(value);
                 break;
             case "eval_rweak":
-                rweak_w = to!real(value);
+                rweak_w = to!double(value);
                 break;
             case "eval_rstrong":
-                rstrong_w = to!real(value);
+                rstrong_w = to!double(value);
                 break;
             case "eval_pstrength":
-                pstrength_w = to!real(value) * 0.00001L;
+                pstrength_w = to!double(value) * 0.00001;
                 break;
             case "eval_goal":
-                goal_w = to!real(value);
+                goal_w = to!double(value);
                 break;
             case "eval_static_otrap":
-                static_otrap_w = to!real(value);
+                static_otrap_w = to!double(value);
                 break;
             case "eval_static_strap":
-                static_strap_w = to!real(value);
+                static_strap_w = to!double(value);
                 break;
             case "eval_hostage":
-                hostage_w = to!real(value);
+                hostage_w = to!double(value);
                 break;
             case "eval_frame":
-                frame_w = to!real(value);
+                frame_w = to!double(value);
                 break;
             case "eval_mobility":
-                mobility_w = to!real(value);
+                mobility_w = to!double(value);
                 break;
             case "eval_threat":
-                threat_w = to!real(value);
+                threat_w = to!double(value);
                 break;
             case "eval_cache_size":
                 sc_cache.set_size(to!(int)(value));
@@ -237,9 +237,9 @@ class StaticEval
     {
         //const int ON_TRAP[13] = [0, -6, -9, -12, -18, -33, -88,
         //      6, 9, 12, 18, 33, 88];
-        static immutable real ON_TRAP_MUL = 0.02L;
+        static immutable double ON_TRAP_MUL = 0.02;
 
-        real score = 0;
+        double score = 0;
         ulong occupied_traps = ~pos.bitBoards[Piece.EMPTY] & TRAPS;
         while (occupied_traps)
         {
@@ -251,7 +251,7 @@ class StaticEval
 
             if (safe_traps[tside] & tbit)
             {
-                score -= piece_value[tpiece] * ON_TRAP_MUL / 2.0L;
+                score -= piece_value[tpiece] * ON_TRAP_MUL / 2.0;
             } else {
                 score -= piece_value[tpiece] * ON_TRAP_MUL;
             }
@@ -432,7 +432,7 @@ class StaticEval
         return score;
     }
 
-    real rabbit_strength()
+    double rabbit_strength()
     {
         // Depends on goal search and trap safety being done first
         alias pieceval = tunables.RS_PIECEVAL;
@@ -447,10 +447,10 @@ class StaticEval
         alias STRONG_VAL = tunables.RS_STRONG_VAL;
         const ulong[] DEFENSE_SECTORS = [0xF8F8F8, 0x1F1F1F];
         static immutable int[] rforward = [8, -8];
-        static immutable real[] side_mul = [1, -1];
+        static immutable double[] side_mul = [1, -1];
 
-        real wscore = 0;
-        real sscore = 0;
+        double wscore = 0;
+        double sscore = 0;
         ulong allpieces = (pos.placement[Side.WHITE] | pos.placement[Side.BLACK])
             & ~pos.bitBoards[Piece.WRABBIT] & ~pos.bitBoards[Piece.BRABBIT]
             & ~pos.frozen;
@@ -512,10 +512,10 @@ class StaticEval
                 wscore += -piece_value[rabbit_piece] * rsq[rsi];
                 if (power < 0)
                 {
-                    real full_weak = WEAK_SPAN + power_balance;
-                    real sfactor = -power / full_weak;
+                    double full_weak = WEAK_SPAN + power_balance;
+                    double sfactor = -power / full_weak;
                     sfactor = (sfactor < 1) ? sfactor : 1;
-                    real rval = -piece_value[rabbit_piece] * WEAK_MUL[s][rix/8]
+                    double rval = -piece_value[rabbit_piece] * WEAK_MUL[s][rix/8]
                         * sfactor;
                     wscore += rval;
                     debug (rabbit_strength)
@@ -528,9 +528,9 @@ class StaticEval
                 {
                     int full_strong = STRONG_SPAN + power_balance;
                     power = (power < full_strong) ? power : full_strong;
-                    real sfactor = cast(real) power / full_strong;
-                    real rv = rankval[s][rix/8];
-                    real rval = STRONG_VAL * rv * sfactor;
+                    double sfactor = cast(double) power / full_strong;
+                    double rv = rankval[s][rix/8];
+                    double rval = STRONG_VAL * rv * sfactor;
                     if (rbit & TRAPS)
                         rval *= tunables.RS_STRONG_TRAP_MUL;
                     if (!((safe_traps[s] & ~safe_traps[s^1]) & sector))
@@ -643,7 +643,7 @@ class StaticEval
     int mobility()
     {
 
-        real check_hostage(ulong pbit, Side side, int pieceoffset,
+        double check_hostage(ulong pbit, Side side, int pieceoffset,
                 ulong unsafe, ulong holders, int mobility)
         {
             //static immutable int[] HOSTAGE_VAL = [0, -10, -25, -39, -61, -150, -264,
@@ -653,15 +653,15 @@ class StaticEval
             //                        0, 4, 5, 10, 18, 44];
             alias HOLDER_DIV = tunables.HOLDER_DIV;
             alias FROZEN_HOLDER_DIV = tunables.FROZEN_HOLDER_DIV;
-            static immutable real[] TRAP_DIST_MUL =
-                                    [0.5L, 0.5L, 1.0L, 0.5L, 0.5L, 1.0L, 0.5L, 0.5L,
-                                     0.5L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 0.5L,
-                                     1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L,
-                                     0.5L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 0.5L,
-                                     0.5L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 0.5L,
-                                     1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L,
-                                     0.5L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 1.0L, 0.5L,
-                                     0.5L, 0.5L, 1.0L, 0.5L, 0.5L, 1.0L, 0.5L, 0.5L];
+            static immutable double[] TRAP_DIST_MUL =
+                                    [0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                                     0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5,
+                                     0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5];
             static immutable int[] NEAREST_TRAP =
                 [18, 18, 18, 18, 21, 21, 21, 21,
                  18, 18, 18, 18, 21, 21, 21, 21,
@@ -686,12 +686,12 @@ class StaticEval
                     & ~unsafe;
             }
 
-            real score = 0;
+            double score = 0;
             if (popcount(neighbors_of(pbit) & coverage) < 2)
             {
                 bitix pix = bitindex(pbit);
                 // Should restrict the range -.2 to .2
-                real power_mul = pstrengths[pix] / (8800.0L * 5);
+                double power_mul = pstrengths[pix] / (8800.0 * 5);
                 if (side)
                     power_mul = (power_mul < 0) ? 1+power_mul : tunables.HOSTAGE_POWER_MUL;
                 else
@@ -750,7 +750,7 @@ class StaticEval
             return score * hostage_w;
         }
 
-        real frame_check(ulong pbit, Side side, int enemyoffset)
+        double frame_check(ulong pbit, Side side, int enemyoffset)
         {
             /*
             static immutable int[13] FRAMED_VAL = [0,
@@ -767,7 +767,7 @@ class StaticEval
 
             bitix pix = bitindex(pbit);
             frames |= pbit;
-            real score = 0;
+            double score = 0;
             ulong framers = neighbors_of(pbit) & pos.placement[side^1];
             while (framers)
             {
@@ -812,7 +812,7 @@ class StaticEval
         hostages = 0;
         frames = 0;
         weakframers = 0;
-        real score = 0;
+        double score = 0;
         int[4][2] strongest_left;
         ulong[5][16] reach_map;
         ulong[16] freezes;
@@ -878,7 +878,7 @@ class StaticEval
                         score += (MOBILE_VAL[pieces_checked] * mobility)
                             * SIDE_MUL[side];
                     }
-                    real fhscore = 0.;
+                    double fhscore = 0.;
                     if (mobility == 0 && (pbit & unsafe_traps))
                     {
                         fhscore = frame_check(pbit, side, enemyoffset);
@@ -892,7 +892,7 @@ class StaticEval
                     score += fhscore;
                     if (fhscore == 0 && mobility <= 3 && (pbit & ~pos.frozen))
                     {
-                        real sc = (-piece_value[p] / BLOCKADE_DIV)
+                        double sc = (-piece_value[p] / BLOCKADE_DIV)
                             * MOBILITY_MUL[mobility];
                         ulong[2] blockaders;
                         blockaders[0] = neighbors_of(reach_map[pnum][4])
@@ -919,7 +919,7 @@ class StaticEval
                                 ~(stronger | even));
                         blk_num = (blk_num < 8) ? blk_num : 8;
                         sc *= BLOCK_WEAK_FAR[blk_num];
-                        real bpiece_penalty = 0;
+                        double bpiece_penalty = 0;
                         while (blockaders[0]) {
                             ulong bbit = blockaders[0] & -blockaders[0];
                             blockaders[0] ^= bbit;
@@ -1134,7 +1134,7 @@ class StaticEval
                      1, 4, 5, 7, 15, 25];
                      */
 
-        real threat_score = 0;
+        double threat_score = 0;
         for (Side side = Side.WHITE; side <= Side.BLACK; side++)
         {
             int eside = side^1;
@@ -1291,12 +1291,12 @@ class StaticEval
             for (int k=0; k < 3; k++)
             {
                 int best = -1;
-                real best_per = 0;
+                double best_per = 0;
                 for (int v=0; v < num_vics; v++)
                 {
                     if (vic_bit[v] & picked)
                         continue;
-                    real per = victim_per[k];
+                    double per = victim_per[k];
                     if (vic_bit[v] & pos.frozen)
                         per += frozen_per;
                     if ((vic_traps[v] & picked_traps) == vic_traps[v])
@@ -1361,17 +1361,17 @@ class StaticEval
             alias length_per = tunables.LENGTH_PER;
             alias defense_per = tunables.DEFENSE_PER;
             alias max_victim_per = tunables.MAX_VICTIM_PER;
-            real defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
+            double defense_mul = (side != pos.side) ? defense_per[pos.stepsLeft] : defense_per[4];
             ulong used_traps = 0;
             ulong future_victims = 0;
             for (int i=0; i < 3; i++)
             {
                 if (valuable_victim[i] != 0)
                 {
-                    real val;
+                    double val;
                     if (valuable_length[i])
                     {
-                        real per = victim_per[future_victims];
+                        double per = victim_per[future_victims];
                         if (valuable_vbit[i] & pos.frozen)
                         {
                             per += frozen_per;
@@ -1661,7 +1661,7 @@ class StaticEval
         // clamp the evaluation to be less than a win
         score = (score < MAX_EVAL_SCORE) ? ((score > -(MAX_EVAL_SCORE)) ? score : -(MAX_EVAL_SCORE)) : MAX_EVAL_SCORE;
         logger.log("Final (clamped) score {}", score);
-        logger.info("score cr {}", cast(int)(score/1.96L));
+        logger.info("score cr {}", cast(int)(score/1.96));
         return score;
     }
 }
