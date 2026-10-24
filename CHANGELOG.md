@@ -7,6 +7,10 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Added:** `tools/bench.py`, a benchmark that measures a machine's
+  nodes per second on a fixed set of positions and depths. It needs
+  only Python 3 and a bot_opfor binary.
+
 - **Added:** about 250 of the evaluation's and search's constants can
   be set by AEI `setoption`, as `tune_<name>` or `tune_<name>_<i>` for a
   table entry (`source/tunables.d` lists them), for automatic tuning.

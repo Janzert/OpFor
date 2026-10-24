@@ -59,6 +59,17 @@ tools/regression_test.py runs mobility and parseboard on every board in a
 file. Board files use the long format with a first line like "12w" (a move
 number and the side to move).
 
+tools/bench.py measures a machine's speed: it searches a built-in set of
+positions to fixed depths (about a minute on a recent laptop) and reports
+nodes per second. It needs only Python 3 and a bot_opfor binary, so it
+can be copied to another machine to compare the two:
+
+    python3 bench.py [--rounds N] [--jobs N] path/to/bot_opfor
+
+The node total it prints is the same on every machine (with the same OS)
+for the same OpFor version, which shows the runs did the same work.
+--help has the rest.
+
 Each push and pull request on GitHub builds the bot and the tools, runs
 the unit tests and plays a self-play game on Linux, Windows and macOS
 (.github/workflows/ci.yml).
