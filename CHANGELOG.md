@@ -7,6 +7,14 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** a crash in positions with more than 80 possible captures
+  for one side. The capture generator kept them in a fixed array of 80
+  with no bounds check, and the 81st overwrote the generator's position,
+  so the search segfaulted. It happened once in about 31,000 tuning
+  games. The array now holds 256 and drops any beyond that. Play is
+  unchanged otherwise: fixed-depth comparison 200 of 200 positions
+  identical.
+
 - **Changed:** the evaluation computes in 64-bit floats (`double`)
   instead of `real`, which is 80-bit x87 on Linux x86-64 but already
   64-bit on Windows. Linux and Windows builds now search identically

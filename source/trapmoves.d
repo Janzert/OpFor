@@ -15,7 +15,9 @@ struct CaptureInfo
 
 class TrapGenerator
 {
-    static immutable int MAX_CAPTURES = 80;
+    // Crowded positions can have more than 80 captures (87 seen in a
+    // tuning game).
+    static immutable int MAX_CAPTURES = 256;
 
     int num_captures;
     CaptureInfo[MAX_CAPTURES] captures;
@@ -40,6 +42,9 @@ class TrapGenerator
     }
     do
     {
+        // Past the end the captures would overwrite pos and side.
+        if (num_captures == MAX_CAPTURES)
+            return;
         debug (static_captures)
         {
             writeln(Format("cap {} at {} in {} steps {} trap step from {} to {} is push {}",
@@ -63,6 +68,9 @@ class TrapGenerator
     }
     do
     {
+        // Past the end the captures would overwrite pos and side.
+        if (num_captures == MAX_CAPTURES)
+            return;
         debug (static_captures)
         {
             writeln(Format("cap {} at {} in {} steps {} trap using step {} to {} is push {}",
