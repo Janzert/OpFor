@@ -1,43 +1,45 @@
-/// Tests of the tunable constants: their defaults rebuild the tables the
-/// evaluation had before they were tunable, and options set and reset them.
+/// Tests of the tunable constants: the tables derived from their defaults
+/// (the values tuned by SPSA run 0009 since 2026-10-25), and options that
+/// set and reset them. Before the tuning, the defaults rebuilt the tables
+/// the evaluation had before they were tunable (checked then by
+/// opfor_compare and by this test).
 module tunables_test;
 
 import tunables;
 
-@("derived tables match the original constants")
+@("derived tables follow from the defaults")
 unittest
 {
     reset();
-    assert(BOTH_SAFE == [-5, 5]);
-    assert(WHITE_SAFE == [20, 80]);
-    assert(BLACK_SAFE == [-80, -20]);
-    assert(NORABBIT_FILE == [[1, 1, 1, 2, 3, 5, 7, 0], [0, -7, -5, -3, -2, -1, -1, -1]]);
-    assert(NORABBIT_ADJ == [[1, 1, 1, 2, 2, 4, 4, 0], [0, -4, -4, -2, -2, -1, -1, -1]]);
-    assert(OPEN_FILE == [[2, 2, 2, 3, 10, 20, 40, 0], [0, -40, -20, -10, -3, -2, -2, -2]]);
-    assert(OPEN_ADJ == [[2, 2, 3, 20, 40, 80, 120, 0], [0, -120, -80, -40, -20, -3, -2, -2]]);
-    assert(RS_PIECEVAL == [0, 0, 45, 80, 150, 200, 300, 0, -45, -80, -150, -200, -300]);
-    assert(RS_RANKVAL == [[0, 0, 0.1, 0.2, 0.4, 1.0, 1.2, 0],
-            [0.0, -1.2, -1.0, -0.4, -0.2, -0.1, 0, 0]]);
-    assert(RS_WEAK_MUL == [[0.0, 0.00, 0.02, 0.05, 0.10, 0.20, 0.08, 0],
-            [0.0, 0.08, 0.20, 0.10, 0.05, 0.02, 0.00, 0]]);
-    double[64] rsq = [0.0, 0, 0, 0, 0, 0, 0, 0,
-          0.05, 0.07, 0.09, 0.10, 0.10, 0.09, 0.07, 0.05,
-          0.11, 0.12, 0.14, 0.15, 0.15, 0.14, 0.12, 0.11,
-          0.10, 0.11, 0.13, 0.14, 0.14, 0.13, 0.11, 0.10,
-          0.09, 0.10, 0.11, 0.12, 0.12, 0.11, 0.10, 0.09,
-          0.09, 0.10, 0.10, 0.11, 0.11, 0.10, 0.10, 0.09,
-          0.07, 0.08, 0.08, 0.09, 0.09, 0.08, 0.08, 0.07,
-          0   , 0   , 0   , 0   , 0   , 0   , 0   , 0   ];
-    assert(RS_SQ == rsq);
-    assert(PS_PIECEVAL == [0, 0, 8, 12, 24, 36, 44, 0, -8, -12, -24, -36, -44]);
-    assert(PS_MAX_POWER == 4400 && PS_MIN_POWER == -4400);
-    assert(FROZEN_PENALTY == [0, -6, -9, -12, -18, -33, -88, 6, 9, 12, 18, 33, 88]);
-    double[33] pop_mul = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8,
-          0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9,
-          1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-          1.1, 1.1, 1.1, 1.1, 1.2, 1.2, 1.2, 1.2];
-    assert(POPULATION_MUL == pop_mul);
-    assert(MOBILE_SIDE_MUL == [0.1, -0.1]);
+    assert(BOTH_SAFE == [-TSAFE_BOTH, TSAFE_BOTH]);
+    assert(WHITE_SAFE == [TSAFE_HOME, TSAFE_AWAY]);
+    assert(BLACK_SAFE == [-TSAFE_AWAY, -TSAFE_HOME]);
+    // Silver's rank r is gold's rank 7 - r, and its values are negated
+    // (the weak-rabbit multiplier keeps its sign).
+    foreach (r; 0 .. 8)
+    {
+        assert(NORABBIT_FILE[1][r] == -NORABBIT_FILE[0][7 - r]);
+        assert(NORABBIT_ADJ[1][r] == -NORABBIT_ADJ[0][7 - r]);
+        assert(OPEN_FILE[1][r] == -OPEN_FILE[0][7 - r]);
+        assert(OPEN_ADJ[1][r] == -OPEN_ADJ[0][7 - r]);
+        assert(RS_RANKVAL[1][r] == -RS_RANKVAL[0][7 - r]);
+        assert(RS_WEAK_MUL[1][r] == RS_WEAK_MUL[0][7 - r]);
+        foreach (f; 0 .. 8)
+            assert(RS_SQ[r * 8 + f] == RS_SQ[r * 8 + 7 - f]);
+    }
+    // Shapes only move the ranks they cover.
+    assert(NORABBIT_FILE[0][7] == NORABBIT_FILE_BASE[7]);
+    assert(RS_SQ[0 .. 8] == RS_SQ_BASE[0 .. 8] && RS_SQ[56 .. 64] == RS_SQ_BASE[56 .. 64]);
+    foreach (p; 1 .. 7)
+    {
+        assert(RS_PIECEVAL[p + 6] == -RS_PIECEVAL[p]);
+        assert(PS_PIECEVAL[p + 6] == -PS_PIECEVAL[p]);
+        assert(FROZEN_PENALTY[p + 6] == -FROZEN_PENALTY[p]);
+    }
+    assert(PS_MAX_POWER == PS_PIECEVAL[6] * PS_DISTVAL[0] && PS_MIN_POWER == -PS_MAX_POWER);
+    foreach (n; 0 .. 33)
+        assert(POPULATION_MUL[n] == FROZEN_POP_LEVEL[n <= 8 ? 0 : n <= 16 ? 1 : n <= 24 ? 2 : n <= 28 ? 3 : 4]);
+    assert(MOBILE_SIDE_MUL == [MOBILE_SIDE, -MOBILE_SIDE]);
 }
 
 // The values are shared by every thread and the other tests run in
@@ -45,10 +47,11 @@ unittest
 @("tune options find their value; others are left alone")
 unittest
 {
+    auto open_file = OPEN_FILE;
     assert(set_option("tune_open_file_6", "40"));
     assert(set_option("tune_rs_sq_3_1", "0.11"));
     assert(set_option("tune_nmh_reduction", "4"));
-    assert(OPEN_FILE[0][6] == 40 && OPEN_FILE[1][1] == -40);
+    assert(OPEN_FILE_BASE[6] == 40 && OPEN_FILE == open_file);
     assert(!set_option("tune_no_such_thing", "1"));
     assert(!set_option("eval_goal", "1"));
     assert(!set_option("tune_", "1"));
@@ -78,16 +81,13 @@ unittest
     assert(registry.length > 200);
 }
 
-@("shape values start at 0 and change whole tables")
+@("shape values change whole tables")
 unittest
 {
     size_t shapes;
     foreach (t; registry)
         if (t.name.length > 8 && t.name[$ - 8 .. $ - 1] == "_shape_")
-        {
-            assert(t.initial == 0, t.name);
             shapes++;
-        }
     assert(shapes == 56);
 
     // On local tables, so the shared values stay as they are.

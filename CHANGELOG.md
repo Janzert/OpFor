@@ -7,6 +7,23 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Changed:** the evaluation's tuned values are the defaults. 127 values
+  (the 17 `eval_*` weights and 110 `tune_*` values, 107 of them changed)
+  come from an SPSA run of 2,000 iterations of 8 game pairs (32,000
+  games, at 1s/move with a 100-turn limit), started from weights fitted
+  to bot_Sharp's scores of game positions. The largest changes: the
+  rabbit terms (`rwall` 1 → 3.9, `rhome` 3 → 7.2, and `rweak` 1 → −0.57, which
+  turns the small penalty for rabbits off their home rank into a bonus), `map_e` 2 → 6.0,
+  piece strength 48 times its old weight (it contributed almost nothing
+  before), strong rabbits worth about a third as much, and the frozen
+  pieces term at about 0. Tests at the same time control, SPRT [0, 10]:
+  against the starting weights +231.9 Elo [+168.5, +312.7] (120 games),
+  against the old defaults +178.2 Elo [+122.6, +243.8] (144 games), both
+  passed. Both are self-play against close relatives, which overstates
+  the gain, and both stopped early. The new defaults search exactly as
+  the old build with the tuned values set by option: fixed-depth
+  comparison 200 of 200 positions identical.
+
 - **Fixed:** a crash in positions with more than 80 possible captures
   for one side. The capture generator kept them in a fixed array of 80
   with no bounds check, and the 81st overwrote the generator's position,

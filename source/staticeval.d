@@ -70,23 +70,23 @@ class StaticEval
 
     ScoreCache sc_cache;
 
-    double map_e_w = 2;
-    double tsafety_w = 1;
-    double ontrap_w = 1;
-    double frozen_w = 1;
-    double rwall_w = 1;
-    double ropen_w = 2;
-    double rhome_w = 3;
-    double rweak_w = 1;
-    double rstrong_w = 1;
-    double pstrength_w = 0.00005;
-    double goal_w = 2.8;
-    double static_otrap_w = 0.6;
-    double static_strap_w = 0.5;
-    double hostage_w = 1;
-    double frame_w = 1;
-    double mobility_w = 1;
-    double threat_w = 1;
+    double map_e_w = 5.968485;
+    double tsafety_w = 0.449359;
+    double ontrap_w = 0.221773;
+    double frozen_w = -0.076083;
+    double rwall_w = 3.895628;
+    double ropen_w = 2.415587;
+    double rhome_w = 7.199276;
+    double rweak_w = -0.568718;
+    double rstrong_w = 0.330797;
+    double pstrength_w = 237.865468 * 0.00001;  // eval_pstrength 237.865468
+    double goal_w = 3.221802;
+    double static_otrap_w = 0.571653;
+    double static_strap_w = 0.484686;
+    double hostage_w = 0.942175;
+    double frame_w = 1.029407;
+    double mobility_w = 0.669584;
+    double threat_w = 0.529335;
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
