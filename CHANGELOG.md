@@ -5,7 +5,7 @@ Notable changes to OpFor. Releases since 2026 are tagged with their date
 version is tagged `ArimaaCC_<year>`. Entries up to 2012 are a summary
 drawn from the commit history.
 
-## Unreleased
+## 2026.10.26 (2026-10-26)
 
 - **Changed:** the evaluation's tuned values are the defaults. 127 values
   (the 17 `eval_*` weights and 110 `tune_*` values, 107 of them changed)
