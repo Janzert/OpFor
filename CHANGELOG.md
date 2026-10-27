@@ -5,6 +5,21 @@ Notable changes to OpFor. Releases since 2026 are tagged with their date
 version is tagged `ArimaaCC_<year>`. Entries up to 2012 are a summary
 drawn from the commit history.
 
+## Unreleased
+
+- **Fixed:** more false goals in the goal search, at any point in a
+  turn. A rabbit was sent past a piece on a trap that kept it unfrozen
+  beside the goal, when the rabbit's first step was what left that piece
+  unsupported and captured. A piece on the square behind the goal could
+  push an enemy off a trap and follow it there, to be captured, and was
+  still counted as keeping the rabbit unfrozen. Rabbits counted as
+  stepping backward to unfreeze another piece (two places), which they
+  can't. And with friendly pieces on the goal square and the one behind
+  it, a rabbit beside them was checked for support where it stood
+  instead of on the square behind the goal, where it has to stop. Most
+  of these marked a wrong goal square for the goal threat term; some
+  gave a false shortest goal, for the side waiting in game positions.
+
 ## 2026.10.26 (2026-10-26)
 
 - **Changed:** the evaluation's tuned values are the defaults. 127 values
