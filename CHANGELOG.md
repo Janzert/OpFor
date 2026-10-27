@@ -36,6 +36,18 @@ drawn from the commit history.
   goal square, a piece can push an enemy off a square beside the rabbit
   and stand there to keep it unfrozen while the goal square piece steps
   aside.
+- **Changed:** less memory in a process that plays many games. The
+  pools of positions and step lists kept the largest root move list the
+  process had ever built, at about 1.3 KB a move, so memory rose with
+  each new record (from about 120 to about 400 MB over some 2,000 games
+  at hash 64 in a tuning run). Step lists now start with room for 8
+  steps instead of 32, and after each timed search the pools keep only
+  a small reserve before the collection. A root costs about 0.8 KB a
+  move, and over 200 test positions searched in one process the memory
+  after the busiest one fell from 272 MB to 145 MB. Play and speed are
+  unchanged: fixed-depth comparison 200 of 200 positions identical, both
+  in a fresh process each and all in one process, and the same time over
+  4 side-by-side rounds of 212 searches.
 
 ## 2026.10.26 (2026-10-26)
 

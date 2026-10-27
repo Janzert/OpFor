@@ -288,6 +288,21 @@ class StepList
         return reservesize;
     }
 
+    // Drops pooled lists beyond max_num so the GC can free them.
+    static void reduce_reserve(int max_num)
+    {
+        synchronized (reserve_lock)
+        {
+            while (reservesize > max_num)
+            {
+                reservelists[--reservesize] = null;
+                allocated--;
+            }
+            if (reservelists.length > 2 * max_num + 2)
+                reservelists = reservelists[0..reservesize].dup;
+        }
+    }
+
     static StepList allocate()
     {
         synchronized (reserve_lock)
@@ -316,7 +331,7 @@ class StepList
         }
     }
 
-    this(int startlength=32)
+    this(int startlength=8)
     {
         steps.length = startlength;
         GC.setAttr(steps.ptr, GC.BlkAttr.NO_SCAN);
@@ -661,6 +676,8 @@ class Position
                 reserve[--reservesize] = null;
                 allocated--;
             }
+            if (reserve.length > 2 * max_num + 2)
+                reserve = reserve[0..reservesize].dup;
         }
     }
 

@@ -70,6 +70,18 @@ class PositionNode
         return new PositionNode();
     }
 
+    static void reduce_cache(int max_num)
+    {
+        while (reserved > max_num)
+        {
+            PositionNode n = cache_head;
+            cache_head = n.next;
+            n.next = null;
+            reserved--;
+            allocated--;
+        }
+    }
+
     static void free(PositionNode n)
     {
         if (n.pos !is null)
@@ -1899,6 +1911,11 @@ int main(string[] args)
                 {
                     StopWatch collect_timer;
                     collect_timer.start();
+                    // The pools keep the largest root move list seen;
+                    // let the collection free all but a small reserve.
+                    Position.reduce_reserve(1.0);
+                    StepList.reduce_reserve(4096);
+                    PositionNode.reduce_cache(4096);
                     GC.collect();
                     GC.minimize();
                     logger.log("Garbage collection took {} seconds",
