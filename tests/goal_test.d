@@ -21,10 +21,13 @@ private int[2] goals(string board, Piece last = Piece.EMPTY,
 }
 
 /// Whether the goal search marks the goal square sq (such as "f8") for the
-/// board, gold to move.
-private bool marks(string board, string sq)
+/// board, gold to move, after gold's last step from lastfrom, if any.
+private bool marks(string board, string sq, Piece last = Piece.EMPTY,
+        bitix lastfrom = 64)
 {
-    Position pos = parse_short_str(Side.WHITE, 4, "[" ~ board ~ "]");
+    Position pos = parse_short_str(Side.WHITE, last == Piece.EMPTY ? 4 : 3,
+            "[" ~ board ~ "]");
+    pos.set_last_step(last, lastfrom);
     GoalSearchDT gs = new GoalSearchDT();
     gs.set_start(pos);
     gs.find_goals();
@@ -356,4 +359,276 @@ unittest
         ~ " E     r"
         ~ "   h    ";
     assert(!marks(board, "c8"));
+}
+
+@("a pending pull doesn't drag the goal square piece beside the rabbit")
+unittest
+{
+    // Gold's camel stepped b8-c8. Pulling the a8 dog into b8 puts it beside
+    // the b7 rabbit, which then can't move.
+    enum board =
+          "d MrD  r"
+        ~ " R Rr R "
+        ~ "  ehR  H"
+        ~ "rRmRC RD"
+        ~ "     EH "
+        ~ " r    r "
+        ~ "   cr Rr"
+        ~ " d      ";
+    assert(!marks(board, "a8", Piece.WCAMEL, 62));
+}
+
+@("a pending pull only takes the freezer if it is next to lastfrom")
+unittest
+{
+    // Gold's horse stepped a8-b8. The a7 rabbit beside a8 is no freezer, and
+    // the c7 dog that is can't be pulled into a8: no goal in 3.
+    enum board =
+          " H      "
+        ~ "rRd     "
+        ~ "r       "
+        ~ "        "
+        ~ "        "
+        ~ "        "
+        ~ "        "
+        ~ "        ";
+    assert(goals(board, Piece.WHORSE, 63)[0] == 4);
+}
+
+@("a lone guard on a trap is lost when its only support moves")
+unittest
+{
+    // The b6 rabbit would go b7, c7, c8 past the cat on c8, with the c6
+    // horse beside c7. But the rabbit is the horse's only support.
+    enum board =
+          "  Cd Ch "
+        ~ "   cRER "
+        ~ "RRH    c"
+        ~ "  rD   d"
+        ~ "  rrr RD"
+        ~ " r  r   "
+        ~ "h r     "
+        ~ "      RR";
+    assert(!marks(board, "c8", Piece.WCAT, 62));
+}
+
+@("an unfreezer can't take the goal square piece's only way out")
+unittest
+{
+    // The g8 dog could unfreeze the f7 rabbit from f8, but f8 is the only
+    // square the e8 cat could step aside to.
+    enum board =
+          "rc hC D "
+        ~ " e   RrR"
+        ~ " R   mr "
+        ~ "  R DRMR"
+        ~ "    c r "
+        ~ " rdrr   "
+        ~ "R RH    "
+        ~ "        ";
+    assert(!marks(board, "e8"));
+}
+
+@("a guard lost with its rabbit needs another supporter, not itself")
+unittest
+{
+    // The c6 cat guards c7 but only the b6 rabbit supports it; the cat
+    // itself can't be the piece that supports it on c6.
+    enum board =
+          "Cr D rEh"
+        ~ "   dRRh "
+        ~ "HRC  R  "
+        ~ "RRd   R "
+        ~ "     R  "
+        ~ "r  r   c"
+        ~ " r   r r"
+        ~ "    c   ";
+    assert(!marks(board, "c8", Piece.WDOG, 59));
+}
+
+@("supporting a lost guard doesn't help a rabbit frozen on the way")
+unittest
+{
+    // The e6 dog could support the c6 horse from d6, but the b6 rabbit would
+    // be frozen on b7 by the a7 cat and b8 dog.
+    enum board =
+          "rd rCDMr"
+        ~ "c  dRRhr"
+        ~ "mRH DR  "
+        ~ "RE e RR "
+        ~ "  r     "
+        ~ " r      "
+        ~ "    r   "
+        ~ "        ";
+    assert(!marks(board, "c8", Piece.WHORSE, 53));
+}
+
+@("the guard on a trap falls when the rabbit stepping past leaves")
+unittest
+{
+    // The g7 horse steps aside for the g6 rabbit, which then reaches f7;
+    // but the f6 cat guarding f7 is captured when the rabbit leaves g6.
+    enum board =
+          "hrH r   "
+        ~ "RRR e H "
+        ~ " DRrrCRr"
+        ~ "R dM c d"
+        ~ " r     R"
+        ~ "    r   "
+        ~ "        "
+        ~ "        ";
+    assert(!marks(board, "f8"));
+}
+
+@("an unfreezer can't step onto the goal square")
+unittest
+{
+    // The d8 horse, unfrozen by the rabbit on d7, could only guard c7 from
+    // c8, the goal itself.
+    enum board =
+          "r  He m "
+        ~ "rd    RR"
+        ~ " R RR Rr"
+        ~ "   CRr r"
+        ~ "h       "
+        ~ "        "
+        ~ "c r  Er "
+        ~ "       D";
+    assert(!marks(board, "c8"));
+}
+
+@("a pending pull of a trap's holder can't land on the back square")
+unittest
+{
+    // Gold's cat stepped b7-a7. Pulling the b6 rabbit into b7 captures the
+    // c6 dog, but blocks b7 for the c7 rabbit.
+    enum board =
+          "r r     "
+        ~ "C Rr    "
+        ~ "rrd     "
+        ~ " DE     "
+        ~ "        "
+        ~ "        "
+        ~ "        "
+        ~ "        ";
+    assert(goals(board, Piece.WCAT, 54)[0] == 4);
+}
+
+@("capturing the trap piece doesn't help with another freezer")
+unittest
+{
+    // Pushing the e6 rabbit away captures the elephant on f6, but the e7
+    // dog still freezes the f7 rabbit.
+    enum board =
+          "D H     "
+        ~ " c CdRr "
+        ~ "r RCreRR"
+        ~ "   rRH R"
+        ~ "    rR  "
+        ~ "rh d  r "
+        ~ "    E   "
+        ~ "        ";
+    assert(!marks(board, "f8", Piece.WHORSE, 62));
+}
+
+@("pulling a rabbit off the back square captures the freezer it held")
+unittest
+{
+    // Gold's camel stepped d7-d8 and pulls the c7 rabbit to d7. That leaves
+    // the c6 cat unsupported, and the b7 rabbit goals in 3.
+    enum board =
+          "rr M   r"
+        ~ "rRr  cr "
+        ~ "C c m   "
+        ~ "   R d r"
+        ~ "     E  "
+        ~ " H De hR"
+        ~ "     CD "
+        ~ "R R  RRR";
+    assert(goals(board, Piece.WCAMEL, 52)[0] == 3);
+}
+
+@("pulling a rabbit off the back square in 4 captures the freezer it held")
+unittest
+{
+    // The d7 camel pulls the c7 rabbit; the c6 cat it supported is captured
+    // and the b7 rabbit walks in. From a game.
+    enum board =
+          "rr     r"
+        ~ "rRrM cr "
+        ~ "C c m   "
+        ~ "   R d r"
+        ~ "     E  "
+        ~ " H De hR"
+        ~ "     CD "
+        ~ "R R  RRR";
+    assert(goals(board)[0] == 4);
+}
+
+@("a piece makes room for the puller beside the goal")
+unittest
+{
+    // Silver's elephant steps c1-c2, the camel b1-c1 pulls the a1 horse to
+    // b1, and the a2 rabbit, frozen only by the horse, goals. From a game.
+    enum board =
+          "  r  r  "
+        ~ " cr rr  "
+        ~ "   d    "
+        ~ "        "
+        ~ "   Rr c "
+        ~ " h  C D "
+        ~ "rR  h R "
+        ~ "HmeE   R";
+    assert(goals(board)[1] == 4);
+}
+
+@("the room-making pull for the side to move")
+unittest
+{
+    // The same pattern for gold on h8, gold waiting in a game.
+    enum board =
+          "r   eEMh"
+        ~ " r H  rR"
+        ~ " d c  H "
+        ~ " C Rr   "
+        ~ "        "
+        ~ "    D   "
+        ~ "  RR RC "
+        ~ "  R  R  ";
+    assert(goals(board)[0] == 4);
+}
+
+@("pushing an enemy off a square beside the rabbit to guard it")
+unittest
+{
+    // Silver's c3 dog pushes the b3 rabbit to b4 and takes b3, beside the b2
+    // rabbit; the b1 horse steps aside and the rabbit goals. From a game.
+    enum board =
+          "      rr"
+        ~ " Hr m  r"
+        ~ " r    dR"
+        ~ " C R    "
+        ~ "c r  R D"
+        ~ "hRd     "
+        ~ "DrEeR   "
+        ~ " hRH   R";
+    assert(goals(board)[1] == 4);
+}
+
+@("a rabbit can support the guard on a trap first")
+unittest
+{
+    // The b6 rabbit is the only support of the c6 horse, which guards c7.
+    // The e6 rabbit steps to d6 to support it, then the b6 rabbit goals
+    // through b7 and c7.
+    enum board =
+          "hr     C"
+        ~ "   cr cR"
+        ~ "HRH R h "
+        ~ "Rr rDrR "
+        ~ " r r R  "
+        ~ "        "
+        ~ "     dM "
+        ~ " D    R ";
+    assert(goals(board)[0] == 4);
 }

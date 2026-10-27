@@ -19,6 +19,23 @@ drawn from the commit history.
   instead of on the square behind the goal, where it has to stop. Most
   of these marked a wrong goal square for the goal threat term; some
   gave a false shortest goal, for the side waiting in game positions.
+- **Fixed:** the rest of the goal search's false goals found by
+  checking it against a search of every step, most of them goal squares
+  marked 4 that can't be reached or 3 that take 4. A pending pull could
+  drag the goal square piece beside the rabbit and freeze it, take an
+  enemy rabbit for the freezer, or pull a trap's holder onto the back
+  square. A lone guard beside the back square could be on a trap with
+  the moving rabbit as its only support (three more places), an
+  unfreezer could step onto the goal square or take the goal square
+  piece's only way out, and capturing a piece on a trap was counted as
+  unfreezing a rabbit that another piece still froze.
+- **Fixed:** missed goals. Pulling an enemy rabbit off the back square
+  captures a freezer on a trap that it alone supported, in 3 with a
+  pending pull or in 4. A friendly piece can make room for the puller
+  beside an enemy on the goal square. And with a friendly piece on the
+  goal square, a piece can push an enemy off a square beside the rabbit
+  and stand there to keep it unfrozen while the goal square piece steps
+  aside.
 
 ## 2026.10.26 (2026-10-26)
 
