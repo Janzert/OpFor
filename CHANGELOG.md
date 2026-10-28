@@ -36,6 +36,10 @@ drawn from the commit history.
   goal square, a piece can push an enemy off a square beside the rabbit
   and stand there to keep it unfrozen while the goal square piece steps
   aside.
+  These three entries together change play very little: against
+  2026.10.26 at 1s/move with a 100-turn limit, SPRT [0, 10], −1.7 Elo
+  [−11.1, +7.7] over 5,274 games (failed: no gain of 10 Elo, and no
+  measurable loss either).
 - **Changed:** less memory in a process that plays many games. The
   pools of positions and step lists kept the largest root move list the
   process had ever built, at about 1.3 KB a move, so memory rose with
