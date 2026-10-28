@@ -28,7 +28,8 @@ drawn from the commit history.
   multiplier (continuous, but still largest at balanced power), against
   the build before them at 1s/30s/100/0/100t: +19.9 Elo [+6.3, +33.6]
   (95%), SPRT [0, 10] passed after 1292 pairs (LLR 3.07). The form
-  above, against that earlier one: running.
+  above, against that earlier one: +19.9 Elo [+6.5, +33.4] (95%), SPRT
+  [0, 10] passed after 1291 pairs (LLR 3.20).
 - **Fixed:** more false goals in the goal search, at any point in a
   turn. A rabbit was sent past a piece on a trap that kept it unfrozen
   beside the goal, when the rabbit's first step was what left that piece
