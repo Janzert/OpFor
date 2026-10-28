@@ -587,7 +587,7 @@ class StaticEval
             piece[num_pieces] = pos.pieces[pix];
             value[num_pieces] = pieceval[pos.pieces[pix]];
             if (pbit & pos.frozen)
-                value[num_pieces] >>= 3;
+                value[num_pieces] /= 8;
             ixs[num_pieces++] = pix;
         }
 

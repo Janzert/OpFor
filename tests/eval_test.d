@@ -92,6 +92,22 @@ unittest
             == evaluator(mirror).rabbit_strength());
 }
 
+@("frozen piece power doesn't depend on colour")
+unittest
+{
+    // A gold camel on d4 frozen by a silver elephant on e4, with a silver
+    // horse on a8 far enough away that its power isn't clamped, and the
+    // same with colours and ranks swapped.
+    enum board = "[h      r" ~ "        " ~ "        " ~ "        "
+        ~ "   Me   " ~ "        " ~ "        " ~ "       R]";
+    enum flipped = "[       r" ~ "        " ~ "        " ~ "   mE   "
+        ~ "        " ~ "        " ~ "        " ~ "H      R]";
+    StaticEval ev = evaluator(board);
+    assert(ev.pos.frozen != 0);
+    assert(ev.piece_strength()
+            == -evaluator(flipped, 4, Side.BLACK).piece_strength());
+}
+
 @("strong rabbit bonus grows with its support")
 unittest
 {
