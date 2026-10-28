@@ -106,7 +106,7 @@ __gshared double[33] POPULATION_MUL;
 __gshared double HOSTAGE_DIV = 2.205811;
 __gshared double HOLDER_DIV = 13.208918;
 __gshared double FROZEN_HOLDER_DIV = 3.951234;
-__gshared double HOSTAGE_POWER_MUL = 0.794406;  // when the hostage's power is on its side
+__gshared double HOSTAGE_POWER_MUL = 0.794406;  // with the other side's power at the clamp
 __gshared double[4] MOBILE_MUL_BASE = [1.0, 0.3, 0.1, 0.05];
 __gshared double[2] MOBILE_MUL_SHAPE = [0.014129, 0.06538];
 __gshared double[4] MOBILE_MUL;

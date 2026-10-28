@@ -690,13 +690,17 @@ class StaticEval
             if (popcount(neighbors_of(pbit) & coverage) < 2)
             {
                 bitix pix = bitindex(pbit);
-                // Should restrict the range -.2 to .2
-                double power_mul = pstrengths[pix] / (8800.0 * 5);
-                if (side)
-                    power_mul = (power_mul < 0) ? 1+power_mul : tunables.HOSTAGE_POWER_MUL;
+                // The power around the hostage, positive when its own side
+                // has it. power_mul is 1 at no power, falls to about .9 as
+                // its own side's power grows and to HOSTAGE_POWER_MUL as the
+                // other side's power reaches the clamp.
+                double power = side ? -pstrengths[pix] : pstrengths[pix];
+                double power_mul;
+                if (power > 0)
+                    power_mul = 1 - power / (8800.0 * 5);
                 else
-                    power_mul = (power_mul > 0) ? 1-power_mul : tunables.HOSTAGE_POWER_MUL;
-                // power_mul should now be .8 to 1
+                    power_mul = 1 + (1 - tunables.HOSTAGE_POWER_MUL)
+                        * power / tunables.PS_MAX_POWER;
                 auto hpiece_value = piece_value[pos.pieces[pix]];
                 score = (-hpiece_value / HOSTAGE_DIV)
                     * TRAP_DIST_MUL[pix] * MOBILE_MUL[mobility] * power_mul;
