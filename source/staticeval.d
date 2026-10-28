@@ -629,6 +629,9 @@ class StaticEval
         alias POPULATION_MUL = tunables.POPULATION_MUL;
 
         int score = 0;
+        // Stops before the silver elephant (12) to save a step: elephants
+        // are never frozen. Gold's (6) is left in, since skipping it would
+        // take an extra test.
         for (int p=1; p < 12; p++)
         {
             score += popcount(pos.bitBoards[p] & pos.frozen) * FROZEN_PENALTY[p];
