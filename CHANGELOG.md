@@ -7,6 +7,9 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the score `check_eval` logs left the goal threat term
+  unweighted, so it differed from the score the search uses. Play is
+  unchanged.
 - **Fixed:** the hostage penalty jumped by about 20% as the power
   around the hostage crossed zero, and was largest where the two sides'
   power balanced. With its own side's power the multiplier ran from 1

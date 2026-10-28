@@ -1654,7 +1654,7 @@ class StaticEval
         score = cast(int)(score + (map_elephant() * map_e_w));
         logger.log("map elephant {}", score-pscore);
         pscore = score;
-        score += goal_threat();
+        score = cast(int)(score + (goal_threat() * goal_w));
         logger.log("goal threat {}", score-pscore);
 
         if (pos.side == Side.BLACK)

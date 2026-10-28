@@ -65,6 +65,20 @@ private int capture_threat(string board)
     return ev.static_trap_eval(Side.WHITE, pop, ev.material_values(pop));
 }
 
+@("logged eval matches static eval")
+unittest
+{
+    // The goal threat board above, where gold's goal threat counts.
+    enum board = "[e   M   " ~ "  H     " ~ "E       " ~ "  C R   "
+        ~ "r      h" ~ "h     R " ~ "m r  R H" ~ "      R ]";
+    StaticEval ev = evaluator(board, 3);
+    ev.goals.set_start(ev.pos);
+    ev.goals.find_goals();
+    assert(ev.goal_threat() != 0);
+    Position pos = ev.pos;
+    assert(ev.logged_eval(pos) == evaluator(board, 3).static_eval(pos));
+}
+
 @("capture threats don't depend on the order captures are found")
 unittest
 {
