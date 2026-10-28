@@ -24,8 +24,11 @@ drawn from the commit history.
   rounds down, so a frozen gold camel counted 3 and a silver one -4. It
   now rounds toward zero for both. Piece strength, and through it the
   hostage multiplier above, no longer depends on colour.
-  Test of both fixes together: SPRT [0, 10] against the build before
-  them at 1s/30s/100/0/100t, running.
+  Test of both fixes together, with an earlier form of the hostage
+  multiplier (continuous, but still largest at balanced power), against
+  the build before them at 1s/30s/100/0/100t: +19.9 Elo [+6.3, +33.6]
+  (95%), SPRT [0, 10] passed after 1292 pairs (LLR 3.07). The form
+  above, against that earlier one: running.
 - **Fixed:** more false goals in the goal search, at any point in a
   turn. A rabbit was sent past a piece on a trap that kept it unfrozen
   beside the goal, when the rabbit's first step was what left that piece
