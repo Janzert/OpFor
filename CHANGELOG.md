@@ -14,8 +14,14 @@ drawn from the commit history.
   ramps the multiplier linearly from 1 at zero to `hostage_power_mul`
   at the power clamp, so the option still sets the multiplier at full
   disadvantage. About a quarter of hostages get a larger penalty, the
-  rest are unchanged. Test: SPRT [0, 10] against the build before it
-  at 1s/30s/100/0/100t, running.
+  rest are unchanged.
+- **Fixed:** frozen pieces exerted more power as silver than as gold.
+  Their value was cut to an eighth with an arithmetic shift, which
+  rounds down, so a frozen gold camel counted 3 and a silver one -4. It
+  now rounds toward zero for both. Piece strength, and through it the
+  hostage multiplier above, no longer depends on colour.
+  Test of both fixes together: SPRT [0, 10] against the build before
+  them at 1s/30s/100/0/100t, running.
 - **Fixed:** more false goals in the goal search, at any point in a
   turn. A rabbit was sent past a piece on a trap that kept it unfrozen
   beside the goal, when the rabbit's first step was what left that piece
