@@ -7,6 +7,15 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the hostage penalty jumped by about 20% as the power
+  around the hostage crossed zero. With its own side's power the
+  multiplier runs from 1 down to about 0.9, but any power on the other
+  side's half gave the flat `hostage_power_mul` (0.794). That power now
+  ramps the multiplier linearly from 1 at zero to `hostage_power_mul`
+  at the power clamp, so the option still sets the multiplier at full
+  disadvantage. About a quarter of hostages get a larger penalty, the
+  rest are unchanged. Test: SPRT [0, 10] against the build before it
+  at 1s/30s/100/0/100t, running.
 - **Fixed:** more false goals in the goal search, at any point in a
   turn. A rabbit was sent past a piece on a trap that kept it unfrozen
   beside the goal, when the rabbit's first step was what left that piece
