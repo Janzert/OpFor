@@ -94,6 +94,29 @@ unittest
     assert(score == capture_threat(mirror));
 }
 
+@("this turn's captures use their own weight")
+unittest
+{
+    import tunables : NOW_VICTIM_PER;
+
+    // Gold, to move with 4 steps, can push the silver cat on d3 into c3.
+    enum board = "[       e" ~ "       r" ~ "        " ~ "        "
+        ~ "        " ~ "   cD   " ~ "        " ~ "E      R]";
+    int threat()
+    {
+        StaticEval ev = evaluator(board);
+        int pop = population(ev.pos);
+        return ev.static_trap_eval(Side.WHITE, pop, ev.material_values(pop));
+    }
+    double saved = NOW_VICTIM_PER;
+    scope (exit) NOW_VICTIM_PER = saved;
+    int base = threat();
+    assert(base > 0);
+    NOW_VICTIM_PER = saved * 2;
+    int doubled = threat();
+    assert(doubled >= 2 * base - 1 && doubled <= 2 * base + 1);
+}
+
 @("rabbit strength doesn't depend on file order")
 unittest
 {

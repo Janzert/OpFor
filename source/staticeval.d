@@ -1394,7 +1394,9 @@ class StaticEval
                         val = valuable_value[i] * per;
                         future_victims++;
                     } else {
-                        val = valuable_value[i] * max_victim_per;
+                        // Only the side to move's victims get here: its
+                        // steps left already cover the capture.
+                        val = valuable_value[i] * tunables.NOW_VICTIM_PER;
                     }
                     used_traps |= valuable_traps[i];
 

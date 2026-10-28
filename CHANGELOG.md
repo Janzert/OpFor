@@ -7,6 +7,11 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Added:** option `now_victim_per`, the share of a piece the static
+  capture threat counts when the side to move can finish the capture
+  this turn. It had shared `max_victim_per`, the cap for all other
+  threats, and keeps its value (0.886), so play is unchanged until a
+  tuning run moves it.
 - **Fixed:** the score `check_eval` logs left the goal threat term
   unweighted, so it differed from the score the search uses. Play is
   unchanged.

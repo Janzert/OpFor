@@ -169,6 +169,7 @@ __gshared double[5] DEFENSE_PER_BASE = [1.0, 0.9, 0.8, 0.6, 0.4];
 __gshared double[2] DEFENSE_PER_SHAPE = [0.037926, -0.080372];
 __gshared double[5] DEFENSE_PER;
 __gshared double MAX_VICTIM_PER = 0.88553;
+__gshared double NOW_VICTIM_PER = 0.88553;  // a capture the side to move can finish this turn
 
 // ---- goal threats (StaticEval.goal_threat) ----
 __gshared int[18] GOAL_THREAT_BASE = [10000, 800, 750, 650, 600,
@@ -445,6 +446,7 @@ shared static this()
     add("defense_per", DEFENSE_PER_BASE[], 0, 4);
     add_shape("defense_per", DEFENSE_PER_SHAPE[]);
     add("max_victim_per", &MAX_VICTIM_PER);
+    add("now_victim_per", &NOW_VICTIM_PER);
 
     add("goal_threat", GOAL_THREAT_BASE[], 1, 4);
     add_shape("goal_threat", GOAL_THREAT_SHAPE[]);
