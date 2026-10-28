@@ -8,13 +8,17 @@ drawn from the commit history.
 ## Unreleased
 
 - **Fixed:** the hostage penalty jumped by about 20% as the power
-  around the hostage crossed zero. With its own side's power the
-  multiplier runs from 1 down to about 0.9, but any power on the other
-  side's half gave the flat `hostage_power_mul` (0.794). That power now
-  ramps the multiplier linearly from 1 at zero to `hostage_power_mul`
-  at the power clamp, so the option still sets the multiplier at full
-  disadvantage. About a quarter of hostages get a larger penalty, the
-  rest are unchanged.
+  around the hostage crossed zero, and was largest where the two sides'
+  power balanced. With its own side's power the multiplier ran from 1
+  down to about 0.9, but any power on the other side's half gave the
+  flat `hostage_power_mul` (0.794), so a hostage surrounded by enemy
+  power counted less than a contested one. The multiplier now falls
+  steadily as the hostage's side has more of the power: it is
+  `hostage_power_mul` with the other side's power at the clamp (most
+  hostages, since a stronger holder alone usually reaches it), and
+  goes down by up to the new `hostage_power_slope` (0.1) of that as
+  the power moves to the hostage's side. Hostages with friendly power
+  nearby get a smaller penalty than before.
 - **Fixed:** frozen pieces exerted more power as silver than as gold.
   Their value was cut to an eighth with an arithmetic shift, which
   rounds down, so a frozen gold camel counted 3 and a silver one -4. It

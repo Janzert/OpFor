@@ -107,6 +107,7 @@ __gshared double HOSTAGE_DIV = 2.205811;
 __gshared double HOLDER_DIV = 13.208918;
 __gshared double FROZEN_HOLDER_DIV = 3.951234;
 __gshared double HOSTAGE_POWER_MUL = 0.794406;  // with the other side's power at the clamp
+__gshared double HOSTAGE_POWER_SLOPE = 0.1;  // fraction off it with the hostage's own power at the clamp
 __gshared double[4] MOBILE_MUL_BASE = [1.0, 0.3, 0.1, 0.05];
 __gshared double[2] MOBILE_MUL_SHAPE = [0.014129, 0.06538];
 __gshared double[4] MOBILE_MUL;
@@ -397,6 +398,7 @@ shared static this()
     add("holder_div", &HOLDER_DIV);
     add("frozen_holder_div", &FROZEN_HOLDER_DIV);
     add("hostage_power_mul", &HOSTAGE_POWER_MUL);
+    add("hostage_power_slope", &HOSTAGE_POWER_SLOPE);
     add("mobile_mul", MOBILE_MUL_BASE[], 0, 3);
     add_shape("mobile_mul", MOBILE_MUL_SHAPE[]);
     add("eon_trap", &EON_TRAP);
