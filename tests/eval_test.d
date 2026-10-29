@@ -232,6 +232,24 @@ unittest
     assert(goals_evaluator(RABBIT_A3_FLIPPED, 4, Side.BLACK).goal_estimate() == -a3);
 }
 
+@("goal estimate counts the steps taken this turn")
+unittest
+{
+    int est(int steps, Side side)
+    {
+        return goals_evaluator(RABBIT_A3, steps, side).goal_estimate();
+    }
+    // Gold to move: the steps taken lengthen its rabbit's distance.
+    assert(est(3, Side.WHITE) <= est(4, Side.WHITE));
+    assert(est(2, Side.WHITE) < est(3, Side.WHITE));
+    // Silver to move: gold's threat grows as silver's steps run out,
+    // toward its value with gold to move.
+    assert(est(4, Side.BLACK) < est(3, Side.BLACK));
+    assert(est(3, Side.BLACK) < est(2, Side.BLACK));
+    assert(est(2, Side.BLACK) < est(1, Side.BLACK));
+    assert(est(1, Side.BLACK) < est(4, Side.WHITE));
+}
+
 @("logged eval matches static eval with the longer goal terms")
 unittest
 {

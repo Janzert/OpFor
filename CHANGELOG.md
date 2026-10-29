@@ -13,7 +13,10 @@ drawn from the commit history.
   nearest rabbit by a bitmap estimate of its goal distance (from
   bot_Sharp: own pieces stepping aside, enemies pushed, squares where
   it would freeze; up to 8 steps), with values `tune_goal_est_0` to
-  `_5`. `eval_goal5` gives `tune_goal_five` to the side to move, at the
+  `_5`, which are for a turn start: mid-turn the side to move counts the
+  steps it has taken as part of the distance, and the other side's
+  values move toward the side to move's as the turn's steps run out.
+  `eval_goal5` gives `tune_goal_five` to the side to move, at the
   start of its turn, when it can goal in 5 steps (one step, then a goal
   the 4-step search finds). Their values come from a fit to bot_Sharp's
   scores; use weight 1.

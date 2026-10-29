@@ -1523,22 +1523,32 @@ class StaticEval
     /// would need to reach goal, counting own pieces that must step
     /// aside, dominated enemies to push away and squares where it would
     /// freeze, up to 8. Scores each side's nearest rabbit by GOAL_EST.
+    ///
+    /// The values are for a turn start. Mid-turn, the side to move counts
+    /// the steps it has taken as part of the distance (it has that many
+    /// fewer this turn), and the other side's values move toward the side
+    /// to move's as the steps left to defend run out, reaching them where
+    /// the turn would pass.
     int goal_estimate()
     {
         alias GOAL_EST = tunables.GOAL_EST;
         const int[] SIDE_MUL = [1, -1];
 
         ulong dominated = dominated_pieces();
+        int taken = 4 - pos.stepsLeft;
         int score = 0;
         for (Side s = Side.WHITE; s <= Side.BLACK; s++)
         {
             int dist = goal_distance_estimate(s, dominated);
+            if (s == pos.side)
+                dist += taken;
             int bucket = dist <= 4 ? 0 : (dist <= 6 ? 1 : (dist <= 8 ? 2 : 3));
             if (bucket == 3)
                 continue;
+            int value = GOAL_EST[bucket];
             if (s != pos.side)
-                bucket += 3;
-            score += GOAL_EST[bucket] * SIDE_MUL[s];
+                value += (GOAL_EST[bucket + 3] - value) * pos.stepsLeft / 4;
+            score += value * SIDE_MUL[s];
         }
         return score;
     }
