@@ -6,6 +6,7 @@ import logging;
 import position;
 import staticeval;
 import trapmoves;
+import unit_threaded.runner.attrs : Tags;
 
 private StaticEval evaluator(string board, int steps = 4,
         Side side = Side.WHITE)
@@ -94,7 +95,9 @@ unittest
     assert(score == capture_threat(mirror));
 }
 
+// It changes a tunable, so it runs apart from the other tests (tests/ut.d).
 @("this turn's captures use their own weight")
+@Tags("tunables")
 unittest
 {
     import tunables : NOW_VICTIM_PER;

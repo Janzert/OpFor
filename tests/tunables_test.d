@@ -6,8 +6,12 @@
 module tunables_test;
 
 import tunables;
+import unit_threaded.runner.attrs : Tags;
 
+// Tagged "tunables" (as is every test that changes a tunable), so they run
+// after the other tests, on one thread (tests/ut.d).
 @("derived tables follow from the defaults")
+@Tags("tunables")
 unittest
 {
     reset();
@@ -42,9 +46,9 @@ unittest
     assert(MOBILE_SIDE_MUL == [MOBILE_SIDE, -MOBILE_SIDE]);
 }
 
-// The values are shared by every thread and the other tests run in
-// parallel, so these tests leave every value as it is.
+// These tests leave every value as it is.
 @("tune options find their value; others are left alone")
+@Tags("tunables")
 unittest
 {
     auto open_file = OPEN_FILE;
