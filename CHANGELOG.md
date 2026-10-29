@@ -7,6 +7,10 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the goal threat term rounded gold's threat down before
+  adding silver's, so a position and its colour mirror could differ by
+  one point before weighting (about three after). The term is now
+  summed and returned unrounded.
 - **Added:** option `now_victim_per`, the share of a piece the static
   capture threat counts when the side to move can finish the capture
   this turn. It had shared `max_victim_per`, the cap for all other

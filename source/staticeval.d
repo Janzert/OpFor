@@ -1430,7 +1430,7 @@ class StaticEval
         return score;
     }
 
-    int goal_threat()
+    double goal_threat()
     {
         // Depends on goal search being done first
         alias GOAL_THREAT = tunables.GOAL_THREAT;
@@ -1441,7 +1441,7 @@ class StaticEval
         const ulong[] GOAL_RANK = [RANK_8, RANK_1];
         const int[] SIDE_MUL = [1, -1];
 
-        int score = 0;
+        double score = 0;
         for (Side s = Side.WHITE; s <= Side.BLACK; s++)
         {
             if (goals.shortest[s] != goals.NOT_FOUND)
@@ -1493,7 +1493,8 @@ class StaticEval
                 }
                 if (num_threats == 2)
                     dsteps >>= 1;
-                score = cast(int)(score + (GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps] * DEFENSE_NUM[defender_num] * SIDE_MUL[s]));
+                score += GOAL_THREAT[extrasteps] * DEFENSE_STEPS[dsteps]
+                    * DEFENSE_NUM[defender_num] * SIDE_MUL[s];
                 debug (goal_threat) {
                     logger.log("gthreat: sq {:X}", goals.goal_squares);
                     logger.log("gthreat: num {} extra steps {} dsteps {} dnum {}",

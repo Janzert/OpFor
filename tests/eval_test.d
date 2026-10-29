@@ -37,7 +37,7 @@ unittest
     assert(score < evaluator(dog_only).on_trap());
 }
 
-private int goal_threat(string board)
+private double goal_threat(string board)
 {
     StaticEval ev = evaluator(board, 3);
     ev.goals.set_start(ev.pos);
@@ -57,6 +57,30 @@ unittest
     enum mirror = "[   M   e" ~ "     H  " ~ "       E" ~ "   R C  "
         ~ "h      r" ~ " R     h" ~ "H R  r m" ~ " R      ]";
     assert(goal_threat(board) == goal_threat(mirror));
+}
+
+private double goal_threat(string board, int steps, Side side)
+{
+    StaticEval ev = evaluator(board, steps, side);
+    ev.goals.set_start(ev.pos);
+    ev.goals.find_goals();
+    return ev.goal_threat();
+}
+
+@("goal threat doesn't depend on colour")
+unittest
+{
+    // Both sides have a goal threat, gold's worth about 166 here and
+    // silver's about 366. Adding them must give the same result whichever
+    // is added first, so the colour-flipped board scores the exact
+    // opposite.
+    enum board = "[er    rr" ~ "m  R   d" ~ "   h    " ~ " H h Er "
+        ~ " R      " ~ "    C   " ~ "r    H  " ~ "  D    M]";
+    enum flipped = "[  d    m" ~ "R    h  " ~ "    c   " ~ " r      "
+        ~ " h H eR " ~ "   H    " ~ "M  r   D" ~ "ER    RR]";
+    double score = goal_threat(board, 2, Side.WHITE);
+    assert(score < -150);
+    assert(score == -goal_threat(flipped, 2, Side.BLACK));
 }
 
 private int capture_threat(string board)
