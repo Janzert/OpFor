@@ -87,6 +87,10 @@ class StaticEval
     double frame_w = 1.029407;
     double mobility_w = 0.669584;
     double threat_w = 0.529335;
+    // Longer goal terms, off by default (see goal_estimate, goal_five).
+    double goalest_w = 0;
+    double goal5_w = 0;
+    private GoalSearchDT five_search; // goal_five's, so goals is left as it is
 
     this(Logger l, GoalSearchDT g, TrapGenerator t)
     {
@@ -152,6 +156,12 @@ class StaticEval
                 break;
             case "eval_threat":
                 threat_w = to!double(value);
+                break;
+            case "eval_goalest":
+                goalest_w = to!double(value);
+                break;
+            case "eval_goal5":
+                goal5_w = to!double(value);
                 break;
             case "eval_cache_size":
                 sc_cache.set_size(to!(int)(value));
@@ -1508,6 +1518,150 @@ class StaticEval
         return score;
     }
 
+    /// Bitmap estimate of each side's goal distance, from bot_Sharp
+    /// (Threats::getGoalDistBitmapEst): the steps a rabbit on a square
+    /// would need to reach goal, counting own pieces that must step
+    /// aside, dominated enemies to push away and squares where it would
+    /// freeze, up to 8. Scores each side's nearest rabbit by GOAL_EST.
+    int goal_estimate()
+    {
+        alias GOAL_EST = tunables.GOAL_EST;
+        const int[] SIDE_MUL = [1, -1];
+
+        ulong dominated = dominated_pieces();
+        int score = 0;
+        for (Side s = Side.WHITE; s <= Side.BLACK; s++)
+        {
+            int dist = goal_distance_estimate(s, dominated);
+            int bucket = dist <= 4 ? 0 : (dist <= 6 ? 1 : (dist <= 8 ? 2 : 3));
+            if (bucket == 3)
+                continue;
+            if (s != pos.side)
+                bucket += 3;
+            score += GOAL_EST[bucket] * SIDE_MUL[s];
+        }
+        return score;
+    }
+
+    /// Pieces next to a stronger enemy piece.
+    private ulong dominated_pieces()
+    {
+        ulong dominated;
+        for (Side s = Side.WHITE; s <= Side.BLACK; s++)
+        {
+            int my = s == Side.WHITE ? 0 : 6;
+            int en = 6 - my;
+            ulong stronger; // enemy pieces stronger than piece type t
+            for (int t = 6; t >= 1; t--)
+            {
+                dominated |= pos.bitBoards[my + t] & neighbors_of(stronger);
+                stronger |= pos.bitBoards[en + t];
+            }
+        }
+        return dominated;
+    }
+
+    private static ulong adj_ns(ulong b)
+    {
+        return (b << 8) | (b >> 8);
+    }
+
+    private static ulong adj_we(ulong b)
+    {
+        return ((b & NOT_H_FILE) >> 1) | ((b & NOT_A_FILE) << 1);
+    }
+
+    /// The nearest rabbit of side pla's estimated distance (see
+    /// goal_estimate), 9 when more than 8.
+    private int goal_distance_estimate(Side pla, ulong dominated)
+    {
+        alias adj = neighbors_of;
+        Side opp = cast(Side)(pla ^ 1);
+        int po = pla == Side.WHITE ? 0 : 6;
+        ulong plas = pos.placement[pla];
+        ulong opps = pos.placement[opp];
+        ulong empty = pos.bitBoards[Piece.EMPTY];
+        ulong open = adj(empty);
+        ulong open_we = adj_we(empty);
+        ulong opp_rab = pos.bitBoards[Piece.WRABBIT + 6 - po];
+        ulong dominatey = TRAPS | adj(opps & ~opp_rab);
+        ulong freezy = ~adj(plas) & dominatey;
+        ulong pushable = opps & dominated & ~dominatey; // dominated, safe to push from
+        // squares within two steps of an unfrozen non-rabbit of pla's
+        ulong helpers = adj(plas & ~pos.bitBoards[Piece.WRABBIT + po] & ~pos.frozen);
+        helpers |= adj(helpers);
+
+        // g[i]: squares a rabbit could goal from in i steps; r[i]: squares
+        // reachable in i more steps from the current g.
+        ulong[9] g;
+        ulong[9] r;
+        g[0] = pla == Side.WHITE ? RANK_8 : RANK_1;
+        r[1] = adj_ns(g[0] & (empty | (plas & open_we)));
+        r[2] = adj_ns(g[0] & plas & open_we & ~dominated);
+        r[3] = adj_ns(g[0] & (plas | (pushable & open_we)));
+        r[4] = adj_ns(g[0] & opp_rab & helpers & open_we);
+        for (int i = 1; i <= 8; i++)
+        {
+            g[i] = g[i - 1] | (~freezy & r[i]);
+            if (i >= 2)
+                g[i] |= r[i - 1] & helpers;
+            if (i >= 3)
+                g[i] |= r[i - 2];
+            if (i < 8)
+                r[i + 1] |= adj(g[i] & (empty | (plas & open)));
+            if (i + 2 <= 8)
+                r[i + 2] |= adj(g[i] & plas);
+            if (i + 3 <= 8)
+                r[i + 3] |= adj(g[i] & opps & dominated & ~dominatey);
+            if (i + 4 <= 8)
+                r[i + 4] |= adj(g[i] & opp_rab & helpers);
+        }
+
+        ulong rabbits = pos.bitBoards[Piece.WRABBIT + po];
+        for (int i = 0; i <= 8; i++)
+            if (rabbits & g[i])
+                return i;
+        return 9;
+    }
+
+    /// GOAL_FIVE for the side to move at the start of its turn when it
+    /// can goal in 5 steps (the other side passing): one step, then a
+    /// goal the 4-step tree finds from a fresh turn. Needs goals set for
+    /// pos with no goal this turn. Positions whose goal distance estimate
+    /// is over 6 are skipped: in positions from games that is 77% of them,
+    /// and 0.13% of the 5-step goals.
+    int goal_five()
+    {
+        if (pos.stepsLeft != 4 || goals.shortest[pos.side] != goals.NOT_FOUND
+                || goal_distance_estimate(pos.side, dominated_pieces()) > 6)
+            return 0;
+        if (five_search is null)
+            five_search = new GoalSearchDT();
+        Side s = pos.side;
+        StepList steps = StepList.allocate();
+        scope (exit) StepList.free(steps);
+        pos.get_steps(steps);
+        bool found = false;
+        foreach (Step st; steps.getsteps())
+        {
+            if (st.frombit == INV_STEP || st.push)
+                continue;
+            Position np = pos.dup;
+            np.do_step(st);
+            np.do_step(NULL_STEP); // ends the turn
+            np.do_step(NULL_STEP); // the other side passes
+            five_search.set_start(np);
+            five_search.find_goals();
+            Position.free(np);
+            if (five_search.shortest[s] != five_search.NOT_FOUND)
+            {
+                found = true;
+                break;
+            }
+        }
+        return found ? (s == Side.WHITE ? tunables.GOAL_FIVE : -tunables.GOAL_FIVE) : 0;
+    }
+
     int material_values(int pop)
     {
         int score = fame.score(pop);
@@ -1588,6 +1742,10 @@ class StaticEval
         score = cast(int)(score + (frozen_pieces() * frozen_w));
         score = cast(int)(score + (map_elephant() * map_e_w));
         score = cast(int)(score + (goal_threat() * goal_w));
+        if (goalest_w != 0)
+            score = cast(int)(score + (goal_estimate() * goalest_w));
+        if (goal5_w != 0)
+            score = cast(int)(score + (goal_five() * goal5_w));
 
         if (pos.side == Side.BLACK)
             score = -score;
@@ -1662,6 +1820,18 @@ class StaticEval
         pscore = score;
         score = cast(int)(score + (goal_threat() * goal_w));
         logger.log("goal threat {}", score-pscore);
+        if (goalest_w != 0)
+        {
+            pscore = score;
+            score = cast(int)(score + (goal_estimate() * goalest_w));
+            logger.log("goal estimate {}", score-pscore);
+        }
+        if (goal5_w != 0)
+        {
+            pscore = score;
+            score = cast(int)(score + (goal_five() * goal5_w));
+            logger.log("goal in five {}", score-pscore);
+        }
 
         if (pos.side == Side.BLACK)
             score = -score;

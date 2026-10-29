@@ -191,3 +191,59 @@ unittest
     assert(s_far > 0);
     assert(s_close > s_far);
 }
+
+private StaticEval goals_evaluator(string board, int steps = 4,
+        Side side = Side.WHITE)
+{
+    StaticEval ev = evaluator(board, steps, side);
+    ev.goals.set_start(ev.pos);
+    ev.goals.find_goals();
+    return ev;
+}
+
+// A gold rabbit alone on the a file, on a3 (5 steps from goal), a2 (6)
+// or a1 (7), and the first's colour flip.
+enum RABBIT_A3 = "[       r" ~ "        " ~ "        " ~ "        "
+    ~ "        " ~ "R       " ~ "        " ~ "     e E]";
+enum RABBIT_A3_FLIPPED = "[     E e" ~ "        " ~ "r       " ~ "        "
+    ~ "        " ~ "        " ~ "        " ~ "       R]";
+enum RABBIT_A2 = "[       r" ~ "        " ~ "        " ~ "        "
+    ~ "        " ~ "        " ~ "R       " ~ "     e E]";
+enum RABBIT_A1 = "[       r" ~ "        " ~ "        " ~ "        "
+    ~ "        " ~ "        " ~ "        " ~ "R    e E]";
+
+@("goal in five finds a 5-step goal at the start of a turn only")
+unittest
+{
+    import tunables : GOAL_FIVE;
+    assert(goals_evaluator(RABBIT_A3).goal_five() == GOAL_FIVE);
+    assert(goals_evaluator(RABBIT_A3_FLIPPED, 4, Side.BLACK).goal_five() == -GOAL_FIVE);
+    assert(goals_evaluator(RABBIT_A2).goal_five() == 0);
+    assert(goals_evaluator(RABBIT_A3, 3).goal_five() == 0);
+    // Not the side waiting.
+    assert(goals_evaluator(RABBIT_A3, 4, Side.BLACK).goal_five() == 0);
+}
+
+@("goal estimate grows as a rabbit nears goal and is colour symmetric")
+unittest
+{
+    int a3 = goals_evaluator(RABBIT_A3).goal_estimate();
+    assert(a3 > goals_evaluator(RABBIT_A1).goal_estimate());
+    assert(goals_evaluator(RABBIT_A3_FLIPPED, 4, Side.BLACK).goal_estimate() == -a3);
+}
+
+@("logged eval matches static eval with the longer goal terms")
+unittest
+{
+    StaticEval logged = goals_evaluator(RABBIT_A3);
+    StaticEval plain = goals_evaluator(RABBIT_A3);
+    foreach (ev; [logged, plain])
+    {
+        assert(ev.set_option("eval_goalest", "1"));
+        assert(ev.set_option("eval_goal5", "1"));
+    }
+    Position pos = plain.pos;
+    int score = plain.static_eval(pos);
+    assert(logged.logged_eval(pos) == score);
+    assert(score != goals_evaluator(RABBIT_A3).static_eval(pos));
+}

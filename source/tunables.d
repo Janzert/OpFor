@@ -183,6 +183,13 @@ __gshared double[9] DEFENSE_NUM_BASE = [1.0, 0.8, 0.7, 0.4, 0.2, 0.1, 0.05, 0.01
 __gshared double[2] DEFENSE_NUM_SHAPE = [0.021778, 0.039086];
 __gshared double[9] DEFENSE_NUM;
 
+// ---- longer goals (StaticEval.goal_estimate, goal_five), used only
+// with eval_goalest / eval_goal5 set ----
+// Nearest rabbit's estimated distance 0-4, 5-6, 7-8: the side to move's,
+// then the other side's.
+__gshared int[6] GOAL_EST = [340, 150, 60, 50, 0, -25];
+__gshared int GOAL_FIVE = 490;  // the side to move can goal in 5 steps
+
 // ---- search (alphabeta.d, bot_opfor.d) ----
 __gshared int NMH_MIN_DEPTH = 4;     // null move only above this depth
 __gshared int NMH_REDUCTION = 4;
@@ -454,6 +461,8 @@ shared static this()
     add_shape("defense_steps", DEFENSE_STEPS_SHAPE[]);
     add("defense_num", DEFENSE_NUM_BASE[], 0, 8);
     add_shape("defense_num", DEFENSE_NUM_SHAPE[]);
+    add("goal_est", GOAL_EST[], 0, 5);
+    add("goal_five", &GOAL_FIVE);
 
     add("nmh_min_depth", &NMH_MIN_DEPTH);
     add("nmh_reduction", &NMH_REDUCTION);
