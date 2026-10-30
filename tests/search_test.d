@@ -28,3 +28,18 @@ unittest
     assert(s.quiesce(pos, 0, MIN_SCORE, MAX_SCORE) == -WIN_SCORE);
     assert(s.quiesce(pos, -1, MIN_SCORE, MAX_SCORE) == -WIN_SCORE);
 }
+
+@("the search won't reach a turn start a third time")
+unittest
+{
+    enum board = "[    e   " ~ "r      r" ~ "        " ~ "        "
+        ~ "        " ~ "        " ~ "R  E   R" ~ "        ]";
+    Position pos = parse_short_str(Side.WHITE, 4, board);
+    ABQSearch s = searcher(pos);
+    Position a = pos.dup;
+    a.do_str_move("Ra2n");
+    assert(!s.illegal_move(a));
+    s.repeated ~= a.zobrist;
+    assert(s.illegal_move(a));
+    assert(!s.illegal_move(pos));
+}

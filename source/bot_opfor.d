@@ -689,6 +689,16 @@ class ThreadEngine : Engine
             {
                 repetitions[past[i].zobrist] += 1;
             }
+            ulong[] twice_seen;
+            foreach (ulong zobrist, int count; repetitions)
+            {
+                if (count > 1)
+                    twice_seen ~= zobrist;
+            }
+            foreach (thread; threads)
+            {
+                thread.searcher.repeated = twice_seen;
+            }
             foreach (Position pos; pstore)
             {
                 PositionNode n = PositionNode.allocate();
@@ -1187,6 +1197,12 @@ class SeqEngine : Engine
             for (int i=0; i < past.length; i++)
             {
                 repetitions[past[i].zobrist] += 1;
+            }
+            searcher.repeated.length = 0;
+            foreach (ulong zobrist, int count; repetitions)
+            {
+                if (count > 1)
+                    searcher.repeated ~= zobrist;
             }
             foreach (Position pos; pstore)
             {

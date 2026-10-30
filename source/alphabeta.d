@@ -670,6 +670,7 @@ class ABSearch
     Position[] nullposition_cache;
 
     Position nullmove;
+    ulong[] repeated;       // turn starts the game has reached twice already
     int max_depth;
 
     ulong nodes_searched;
@@ -726,6 +727,22 @@ class ABSearch
                 break;
         }
         return handled;
+    }
+
+    // A move can't reach the same turn start a third time.
+    bool illegal_move(Position npos)
+    {
+        if (npos == nullmove)
+            return true;
+        if (npos.stepsLeft == 4)
+        {
+            foreach (ulong zobrist; repeated)
+            {
+                if (npos.zobrist == zobrist)
+                    return true;
+            }
+        }
+        return false;
     }
 
     int eval(Position pos, int alpha, int beta)
@@ -892,7 +909,7 @@ class ABSearch
                 npos.copy(pos);
                 npos.do_step(*curstep);
 
-                if (npos == nullmove)
+                if (illegal_move(npos))
                 {
                     cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                             // loss since it's actually an illegal move
@@ -1330,7 +1347,7 @@ class ABQSearch : ABSearch
             npos.copy(pos);
             npos.do_step(steps.steps[six]);
 
-            if (npos == nullmove)
+            if (illegal_move(npos))
             {
                 cal = -(WIN_SCORE+1);   // Make this worse than a normal
                                         // loss since it's actually an illegal move

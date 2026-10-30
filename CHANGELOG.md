@@ -7,6 +7,9 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the search now knows a move can't reach the same position
+  a third time. Only moves at the root were checked, so it could count
+  on either side playing such a move later in a line.
 - **Fixed:** two blockade penalty errors that made the mobility score
   depend on where pieces stood in bit order, so a position and its
   mirror could score differently. A blockader on a trap with no piece
