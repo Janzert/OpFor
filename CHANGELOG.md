@@ -7,20 +7,15 @@ drawn from the commit history.
 
 ## Unreleased
 
-- **Added:** two eval terms for goals more than a turn away,
-  `eval_goalest` (weight 1, on by default; it gained about 80 Elo in
-  self-play at 1s/30s) and `eval_goal5` (weight 0, off until it has
-  been tested with the first on). `eval_goalest` scores each side's
-  nearest rabbit by a bitmap estimate of its goal distance (from
-  bot_Sharp: own pieces stepping aside, enemies pushed, squares where
-  it would freeze; up to 8 steps), with values `tune_goal_est_0` to
-  `_5`, which are for a turn start: mid-turn the side to move counts the
-  steps it has taken as part of the distance, and the other side's
-  values move toward the side to move's as the turn's steps run out.
-  `eval_goal5` gives `tune_goal_five` to the side to move, at the
-  start of its turn, when it can goal in 5 steps (one step, then a goal
-  the 4-step search finds). Their values come from a fit to bot_Sharp's
-  scores, each on its own; use weight 1.
+- **Added:** eval term `eval_goalest` (weight 1, on by default) for
+  goals more than a turn away; it gained about 80 Elo in self-play at
+  1s/30s. It scores each side's nearest rabbit by a bitmap estimate of
+  its goal distance (from bot_Sharp: own pieces stepping aside, enemies
+  pushed, squares where it would freeze; up to 8 steps), with values
+  `tune_goal_est_0` to `_5`, fitted to bot_Sharp's scores. These are for
+  a turn start: mid-turn the side to move counts the steps it has taken
+  as part of the distance, and the other side's values move toward the
+  side to move's as the turn's steps run out.
 - **Fixed:** the goal threat term rounded gold's threat down before
   adding silver's, so a position and its colour mirror could differ by
   one point before weighting (about three after). The term is now
