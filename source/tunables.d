@@ -123,7 +123,13 @@ __gshared double[2] MOBILITY_MUL_SHAPE = [-0.049557, -0.065762];
 __gshared double[4] MOBILITY_MUL;
 __gshared double CLOSE_BLOCKADER_DIV = 76.330529;
 __gshared double FAR_BLOCKADER_DIV = 75.260456;
-__gshared double BLOCKADER_TRAP_DIV = 7.166542;
+// A blockader on a trap with no piece of the blockaded side beside it:
+// its own share of the blockader penalty is multiplied by
+// BLOCKADER_TRAP_OWN_MUL, and the blockade's whole blockader penalty by
+// BLOCKADER_TRAP_TOTAL_MUL (once for each such blockader). The total
+// default is 1 / 7.166542, the old divisor of the running total.
+__gshared double BLOCKADER_TRAP_OWN_MUL = 1.0;
+__gshared double BLOCKADER_TRAP_TOTAL_MUL = 0.139537;
 __gshared double[5] BLOCK_STRONGER_CL_BASE = [1.0, 0.6, 0.4, 0.2, 0.1];
 __gshared double[5] BLOCK_STRONGER_FAR_BASE = [1.0, 0.7, 0.5, 0.3, 0.2];
 __gshared double[3] BLOCK_EVEN_CL_BASE = [1.0, 0.75, 0.55];
@@ -418,7 +424,8 @@ shared static this()
     add_shape("mobility_mul", MOBILITY_MUL_SHAPE[]);
     add("close_blockader_div", &CLOSE_BLOCKADER_DIV);
     add("far_blockader_div", &FAR_BLOCKADER_DIV);
-    add("blockader_trap_div", &BLOCKADER_TRAP_DIV);
+    add("blockader_trap_own_mul", &BLOCKADER_TRAP_OWN_MUL);
+    add("blockader_trap_total_mul", &BLOCKADER_TRAP_TOTAL_MUL);
     add("block_stronger_cl", BLOCK_STRONGER_CL_BASE[], 0, 4);
     add("block_stronger_far", BLOCK_STRONGER_FAR_BASE[], 0, 4);
     add("block_even_cl", BLOCK_EVEN_CL_BASE[], 0, 2);

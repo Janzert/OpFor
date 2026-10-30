@@ -856,10 +856,15 @@ class StaticEval
             }
 
             ulong stronger;
+            // Each enemy piece is charged as a blockader only once, to the
+            // strongest type it blockades. Pieces of the same type check
+            // against what the stronger types took, so they share a
+            // blockader whatever their order on the board.
             ulong blockader_penalized = 0UL;
             for (int p = Piece.WELEPHANT + pieceoffset;
                     p >= Piece.WCAT + pieceoffset; p--)
             {
+                ulong type_penalized = 0UL;
                 int epiece = p + mcorr;
                 int cutpiece = p + mcorr - 1;
                 // the enemy piece of the same rank
@@ -929,34 +934,49 @@ class StaticEval
                         blk_num = (blk_num < 8) ? blk_num : 8;
                         sc *= BLOCK_WEAK_FAR[blk_num];
                         double bpiece_penalty = 0;
+                        int trap_blockaders = 0;
                         while (blockaders[0]) {
                             ulong bbit = blockaders[0] & -blockaders[0];
                             blockaders[0] ^= bbit;
                             if (bbit & blockader_penalized)
                                 continue;
-                            blockader_penalized |= bbit;
+                            type_penalized |= bbit;
                             bitix bix = bitindex(bbit);
-                            bpiece_penalty += -piece_value[pos.pieces[bix]]
+                            double bp = -piece_value[pos.pieces[bix]]
                                 / CLOSE_BLOCKADER_DIV;
+                            // on a trap with no other piece of the
+                            // blockaded side beside it
                             if (bbit & TRAPS
                                     & ~neighbors_of(pos.placement[side]
                                         & ~pbit))
-                                bpiece_penalty /= tunables.BLOCKADER_TRAP_DIV;
+                            {
+                                bp *= tunables.BLOCKADER_TRAP_OWN_MUL;
+                                trap_blockaders++;
+                            }
+                            bpiece_penalty += bp;
                         }
                         while (blockaders[1]) {
                             ulong bbit = blockaders[1] & -blockaders[1];
                             blockaders[1] ^= bbit;
                             if (bbit & blockader_penalized)
                                 continue;
-                            blockader_penalized |= bbit;
+                            type_penalized |= bbit;
                             bitix bix = bitindex(bbit);
-                            bpiece_penalty += -piece_value[pos.pieces[bix]]
+                            double bp = -piece_value[pos.pieces[bix]]
                                 / FAR_BLOCKADER_DIV;
+                            // on a trap with no other piece of the
+                            // blockaded side beside it
                             if (bbit & TRAPS
                                     & ~neighbors_of(pos.placement[side]
                                         & ~pbit))
-                                bpiece_penalty /= tunables.BLOCKADER_TRAP_DIV;
+                            {
+                                bp *= tunables.BLOCKADER_TRAP_OWN_MUL;
+                                trap_blockaders++;
+                            }
+                            bpiece_penalty += bp;
                         }
+                        foreach (i; 0 .. trap_blockaders)
+                            bpiece_penalty *= tunables.BLOCKADER_TRAP_TOTAL_MUL;
                         if ((sc < 0 && sc + bpiece_penalty < 0)
                                 || (sc > 0 && sc + bpiece_penalty > 0))
                             score += sc + bpiece_penalty;
@@ -973,6 +993,7 @@ class StaticEval
                     assert(pnum <= 16,
                             "Had more than 16 pieces in mobility eval");
                 }
+                blockader_penalized |= type_penalized;
                 stronger |= pos.bitBoards[p - enemyoffset];
             }
         }

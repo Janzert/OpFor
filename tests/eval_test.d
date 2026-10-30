@@ -247,3 +247,32 @@ unittest
     assert(off.set_option("eval_goalest", "0"));
     assert(score != off.static_eval(pos));
 }
+
+@("a blockader on a trap counts the same in any bit order")
+unittest
+{
+    // The gold cat on g6 is blockaded, with a silver rabbit on the f6 trap
+    // among its blockaders. In bit order the trap rabbit comes after the
+    // blockaders on rank 5 here, and first in the colour flip, so it must
+    // not matter when it's counted.
+    enum board = "[h erEr  " ~ " r    H " ~ "     rC " ~ "d    rmh"
+        ~ "M   D H " ~ "        " ~ "        " ~ "      R ]";
+    enum flipped = "[      r " ~ "        " ~ "        " ~ "m   d h "
+        ~ "D    RMH" ~ "     Rc " ~ " R    h " ~ "H EReR  ]";
+    assert(evaluator(board, 1, Side.BLACK).mobility()
+            == -evaluator(flipped, 1, Side.WHITE).mobility());
+}
+
+@("pieces of the same type share their blockaders")
+unittest
+{
+    // The gold horses on e8 and f8 share blockaders. Which horse comes
+    // first in bit order changes in the file flip, so it must not decide
+    // which of them gets charged with the shared blockaders.
+    enum board = "[  M HH  " ~ " r m e R" ~ "   h  C " ~ " ED     "
+        ~ " R      " ~ "      R " ~ "   R  d " ~ "      h ]";
+    enum mirror = "[  HH M  " ~ "R e m r " ~ " C  h   " ~ "     DE "
+        ~ "      R " ~ " R      " ~ " d  R   " ~ " h      ]";
+    assert(evaluator(board, 2, Side.BLACK).mobility()
+            == evaluator(mirror, 2, Side.BLACK).mobility());
+}

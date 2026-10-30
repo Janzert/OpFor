@@ -7,6 +7,24 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** two blockade penalty errors that made the mobility score
+  depend on where pieces stood in bit order, so a position and its
+  mirror could score differently. A blockader on a trap with no piece
+  of the blockaded side beside it divided the blockader penalty counted
+  so far by `blockader_trap_div`, so blockaders counted before it were
+  divided too and those after it weren't. And when two pieces of the
+  same type (two horses, say) shared blockaders, the first in bit order
+  was charged with all of them and the other with none; they now both
+  count them, while a blockader already charged to a stronger type
+  still isn't counted again.
+- **Changed:** option `blockader_trap_div` is replaced by
+  `blockader_trap_own_mul` (1.0), which scales such a trap blockader's
+  own share of the blockader penalty, and `blockader_trap_total_mul`
+  (0.139537, one over the old divisor), which scales the blockade's
+  whole blockader penalty once for each such blockader, after all of
+  them are counted. The defaults are the order-independent version
+  closest to the old behaviour. 5046 games against the build before at
+  1s/30s/100/0/100t: +7.3 Elo [-2.2, +16.8].
 - **Added:** eval term `eval_goalest` (weight 1, on by default) for
   goals more than a turn away; it gained about 80 Elo in self-play at
   1s/30s. It scores each side's nearest rabbit by a bitmap estimate of
