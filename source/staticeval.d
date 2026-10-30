@@ -88,7 +88,7 @@ class StaticEval
     double mobility_w = 0.669584;
     double threat_w = 0.529335;
     // Longer goal terms, off by default (see goal_estimate, goal_five).
-    double goalest_w = 0;
+    double goalest_w = 1;
     double goal5_w = 0;
     private GoalSearchDT five_search; // goal_five's, so goals is left as it is
 
