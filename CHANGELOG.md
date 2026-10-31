@@ -9,7 +9,9 @@ drawn from the commit history.
 
 - **Fixed:** the search now knows a move can't reach the same position
   a third time. Only moves at the root were checked, so it could count
-  on either side playing such a move later in a line.
+  on either side playing such a move later in a line. Undecided in
+  its match test, +3.1 Elo [-6.6, +12.9] over 4889 games, and kept
+  since it makes the search follow the rules.
 - **Fixed:** two blockade penalty errors that made the mobility score
   depend on where pieces stood in bit order, so a position and its
   mirror could score differently. A blockader on a trap with no piece
