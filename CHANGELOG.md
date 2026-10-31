@@ -7,6 +7,10 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Fixed:** the move went out at least 0.2 s after the search ended,
+  which at 1s/move cost a fifth of the clock with nothing searching.
+  Stopping the search threads waited 200 ms a check; it now waits 1 ms.
+  `stop` takes about 0.05 s, not 0.2 to 0.3 s.
 - **Fixed:** the search now knows a move can't reach the same position
   a third time. Only moves at the root were checked, so it could count
   on either side playing such a move later in a line. Undecided in

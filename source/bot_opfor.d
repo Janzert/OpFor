@@ -801,7 +801,8 @@ class ThreadEngine : Engine
                     if (thread.is_searching())
                     {
                         still_searching = true;
-                        Thread.sleep(dur!"msecs"(200));
+                        Thread.sleep(dur!"msecs"(1));
+                        break;
                     }
                 }
             }
