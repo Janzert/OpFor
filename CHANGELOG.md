@@ -7,6 +7,8 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Added:** `tune_root_margin_scale`, one factor on all the root search's
+  reduction margins for tuning. Its default of 1 leaves play unchanged.
 - **Removed:** the frozen pieces eval term, with its options
   `eval_frozen`, `tune_frozen_penalty_1` to `_5`,
   `tune_frozen_pop_level_0` to `_4` and

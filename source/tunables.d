@@ -197,6 +197,7 @@ __gshared int GOAL_EXT_EXTRA = 8;    // PV goal checks up to max_depth plus this
 __gshared int HISTORY_DECAY = 10;
 __gshared int Q_CAPTURE_EXTRA = 2;   // qsearch captures up to stepsLeft plus this long
 __gshared int[7] ROOT_REDUCTION_MARGINS = [150, 350, 1000, 2600, 6000, 15000, 30000];
+__gshared double ROOT_MARGIN_SCALE = 1.0;  // multiplies all of them, in eval units
 
 /// A tunable value: an option name and where its value lives.
 struct Tunable
@@ -462,6 +463,7 @@ shared static this()
     add("history_decay", &HISTORY_DECAY);
     add("q_capture_extra", &Q_CAPTURE_EXTRA);
     add("root_reduction_margins", ROOT_REDUCTION_MARGINS[], 0, 6);
+    add("root_margin_scale", &ROOT_MARGIN_SCALE);
 
     derive();
 }

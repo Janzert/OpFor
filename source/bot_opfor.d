@@ -228,6 +228,7 @@ class SearchThread : Thread
 
     bool root_lmr = true;
     alias reduction_margins = tunables.ROOT_REDUCTION_MARGINS;
+    alias margin_scale = tunables.ROOT_MARGIN_SCALE;
     }
 
     this(ThreadEngine ctl)
@@ -340,7 +341,7 @@ class SearchThread : Thread
                 while ((search_depth > 2+margin_num)
                         && (margin_num < reduction_margins.length)
                         && (search.last_score < (cur_score
-                                - reduction_margins[margin_num])))
+                                - reduction_margins[margin_num] * margin_scale)))
                 {
                     search_depth--;
                     margin_num++;
@@ -1075,6 +1076,7 @@ class SeqEngine : Engine
 
     bool root_lmr = true;
     alias reduction_margins = tunables.ROOT_REDUCTION_MARGINS;
+    alias margin_scale = tunables.ROOT_MARGIN_SCALE;
 
     StopWatch search_length;
 
@@ -1304,7 +1306,7 @@ class SeqEngine : Engine
                     search_depth--;
                 uint margin_num = 0;
                 while ((search_depth > 2+margin_num) && (margin_num < reduction_margins.length)
-                        && (next_pos.last_score < (best_score - reduction_margins[margin_num])))
+                        && (next_pos.last_score < (best_score - reduction_margins[margin_num] * margin_scale)))
                 {
                     search_depth--;
                     margin_num++;
