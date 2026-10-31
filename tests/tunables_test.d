@@ -38,11 +38,8 @@ unittest
     {
         assert(RS_PIECEVAL[p + 6] == -RS_PIECEVAL[p]);
         assert(PS_PIECEVAL[p + 6] == -PS_PIECEVAL[p]);
-        assert(FROZEN_PENALTY[p + 6] == -FROZEN_PENALTY[p]);
     }
     assert(PS_MAX_POWER == PS_PIECEVAL[6] * PS_DISTVAL[0] && PS_MIN_POWER == -PS_MAX_POWER);
-    foreach (n; 0 .. 33)
-        assert(POPULATION_MUL[n] == FROZEN_POP_LEVEL[n <= 8 ? 0 : n <= 16 ? 1 : n <= 24 ? 2 : n <= 28 ? 3 : 4]);
     assert(MOBILE_SIDE_MUL == [MOBILE_SIDE, -MOBILE_SIDE]);
 }
 
@@ -92,7 +89,7 @@ unittest
     foreach (t; registry)
         if (t.name.length > 8 && t.name[$ - 8 .. $ - 1] == "_shape_")
             shapes++;
-    assert(shapes == 56);
+    assert(shapes == 54);
 
     // On local tables, so the shared values stay as they are.
     int[8] base = [2, 2, 2, 3, 10, 20, 40, 0];

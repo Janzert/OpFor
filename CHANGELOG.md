@@ -7,6 +7,14 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Removed:** the frozen pieces eval term, with its options
+  `eval_frozen`, `tune_frozen_penalty_1` to `_5`,
+  `tune_frozen_pop_level_0` to `_4` and
+  `tune_frozen_pop_level_shape_0` and `_1`. Tuning had taken its weight
+  to about 0, since piece strength already counts frozen pieces. Other
+  eval terms still use frozen pieces, so `tune_frozen_holder_div` and
+  `tune_frozen_per` stay. +7.3 Elo [-5.5, +20.1] over 2865 games
+  (passed SPRT [-10, 0]).
 - **Fixed:** the move went out at least 0.2 s after the search ended,
   which at 1s/move cost a fifth of the clock with nothing searching.
   Stopping the search threads waited 200 ms a check; it now waits 1 ms.

@@ -73,7 +73,6 @@ class StaticEval
     double map_e_w = 5.968485;
     double tsafety_w = 0.449359;
     double ontrap_w = 0.221773;
-    double frozen_w = -0.076083;
     double rwall_w = 3.895628;
     double ropen_w = 2.415587;
     double rhome_w = 7.199276;
@@ -108,9 +107,6 @@ class StaticEval
                 break;
             case "eval_tsafety":
                 tsafety_w = to!double(value);
-                break;
-            case "eval_frozen":
-                frozen_w = to!double(value);
                 break;
             case "eval_ontrap":
                 ontrap_w = to!double(value);
@@ -625,26 +621,6 @@ class StaticEval
             logger.log("overall board piece strength {}", score);
         }
         return score;
-    }
-
-    int frozen_pieces()
-    {
-        alias FROZEN_PENALTY = tunables.FROZEN_PENALTY;
-        alias POPULATION_MUL = tunables.POPULATION_MUL;
-
-        int score = 0;
-        // Stops before the silver elephant (12) to save a step: elephants
-        // are never frozen. Gold's (6) is left in, since skipping it would
-        // take an extra test.
-        for (int p=1; p < 12; p++)
-        {
-            score += popcount(pos.bitBoards[p] & pos.frozen) * FROZEN_PENALTY[p];
-        }
-
-        uint total_pop = popcount(~pos.bitBoards[Piece.EMPTY]);
-        assert (total_pop <= 32, "Less than 32 empty spaces on the board");
-
-        return cast(int)(score * POPULATION_MUL[total_pop]);
     }
 
     int mobility()
@@ -1726,7 +1702,6 @@ class StaticEval
         score = cast(int)(score + (rabbit_wall() * rwall_w));
         score = cast(int)(score + (rabbit_open() * ropen_w));
         score = cast(int)(score + (rabbit_home() * rhome_w));
-        score = cast(int)(score + (frozen_pieces() * frozen_w));
         score = cast(int)(score + (map_elephant() * map_e_w));
         score = cast(int)(score + (goal_threat() * goal_w));
         if (goalest_w != 0)
@@ -1796,9 +1771,6 @@ class StaticEval
         pscore = score;
         score = cast(int)(score + (rabbit_home() * rhome_w));
         logger.log("rabbit home {}", score-pscore);
-        pscore = score;
-        score = cast(int)(score + (frozen_pieces() * frozen_w));
-        logger.log("frozen pieces {}", score-pscore);
         pscore = score;
         score = cast(int)(score + (map_elephant() * map_e_w));
         logger.log("map elephant {}", score-pscore);

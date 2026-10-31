@@ -93,15 +93,6 @@ __gshared int[16] PS_DISTVAL;
 __gshared int PS_MAX_POWER;  // the elephant's value at distance 0
 __gshared int PS_MIN_POWER;
 
-// ---- frozen pieces (StaticEval.frozen_pieces) ----
-__gshared int[13] FROZEN_PENALTY = [0, -7, -7, -12, -17, -37, -88, 0, 0, 0, 0, 0, 0];
-/// The penalty's multiplier by the number of pieces on the board, in
-/// five levels: up to 8, 9 to 16, 17 to 24, 25 to 28 and 29 to 32.
-__gshared double[5] FROZEN_POP_LEVEL_BASE = [0.8, 0.9, 1.0, 1.1, 1.2];
-__gshared double[2] FROZEN_POP_LEVEL_SHAPE = [0.137512, -0.056618];
-__gshared double[5] FROZEN_POP_LEVEL;
-__gshared double[33] POPULATION_MUL;
-
 // ---- hostages, frames and blockades (StaticEval.mobility) ----
 __gshared double HOSTAGE_DIV = 2.205811;
 __gshared double HOLDER_DIV = 13.208918;
@@ -321,7 +312,6 @@ void derive()
         }
     scale_curve(RS_DISTVAL[], RS_DISTVAL_BASE[], 0, 15, RS_DISTVAL_SHAPE[]);
     scale_curve(PS_DISTVAL[], PS_DISTVAL_BASE[], 0, 15, PS_DISTVAL_SHAPE[]);
-    scale_curve(FROZEN_POP_LEVEL[], FROZEN_POP_LEVEL_BASE[], 0, 4, FROZEN_POP_LEVEL_SHAPE[]);
     scale_curve(MOBILE_MUL[], MOBILE_MUL_BASE[], 0, 3, MOBILE_MUL_SHAPE[]);
     scale_curve(MOBILITY_MUL[], MOBILITY_MUL_BASE[], 0, 3, MOBILITY_MUL_SHAPE[]);
     scale_curve(BLOCK_STRONGER_CL[], BLOCK_STRONGER_CL_BASE[], 0, 4, BLOCK_STRONGER_CL_SHAPE[]);
@@ -353,12 +343,9 @@ void derive()
     {
         RS_PIECEVAL[p + 6] = -RS_PIECEVAL[p];
         PS_PIECEVAL[p + 6] = -PS_PIECEVAL[p];
-        FROZEN_PENALTY[p + 6] = -FROZEN_PENALTY[p];
     }
     PS_MAX_POWER = PS_PIECEVAL[6] * PS_DISTVAL[0];
     PS_MIN_POWER = -PS_MAX_POWER;
-    foreach (n; 0 .. 33)
-        POPULATION_MUL[n] = FROZEN_POP_LEVEL[n <= 8 ? 0 : n <= 16 ? 1 : n <= 24 ? 2 : n <= 28 ? 3 : 4];
     MOBILE_SIDE_MUL = [MOBILE_SIDE, -MOBILE_SIDE];
 }
 
@@ -401,10 +388,6 @@ shared static this()
     add("ps_pieceval", PS_PIECEVAL[], 2, 6);
     add("ps_distval", PS_DISTVAL_BASE[], 0, 15);
     add_shape("ps_distval", PS_DISTVAL_SHAPE[]);
-
-    add("frozen_penalty", FROZEN_PENALTY[], 1, 6);
-    add("frozen_pop_level", FROZEN_POP_LEVEL_BASE[], 0, 4);
-    add_shape("frozen_pop_level", FROZEN_POP_LEVEL_SHAPE[]);
 
     add("hostage_div", &HOSTAGE_DIV);
     add("holder_div", &HOLDER_DIV);
