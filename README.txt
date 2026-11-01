@@ -99,6 +99,8 @@ Besides the standard AEI time control options, setoption accepts:
                         seconds to aim for, independent of the time control
     setup_rabbits       ANY, STANDARD, 99OF9 or FRITZ
     setup_random_minor  1 to randomize the minor pieces in the setup
+    setup_book          file of setups to pick from instead of the above, empty
+                        for none; its format is in source/setupboard.d
     log_console         true to echo the log to stderr
     check_eval          log an evaluation breakdown of the current position
 

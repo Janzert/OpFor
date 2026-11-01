@@ -11,6 +11,7 @@ alias Modules = AliasSeq!(
     "goal_test",
     "eval_test",
     "search_test",
+    "setup_test",
     "tunables_test",
 );
 

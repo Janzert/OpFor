@@ -577,6 +577,9 @@ class ThreadEngine : Engine
             case "setup_random_minor":
                 board_setup.random_minor = cast(bool)to!int(value);
                 break;
+            case "setup_book":
+                board_setup.load_book(value);
+                break;
             case "history":
                 StepSorter.use_history = to!(bool)(value);
                 tables_stale = true;
@@ -1127,6 +1130,9 @@ class SeqEngine : Engine
                 break;
             case "setup_random_minor":
                 board_setup.random_minor = cast(bool)to!int(value);
+                break;
+            case "setup_book":
+                board_setup.load_book(value);
                 break;
             case "set_steps":
                 if (position !is null) {

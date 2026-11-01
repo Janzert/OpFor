@@ -11,6 +11,9 @@ drawn from the commit history.
   which at 1s/move cost a fifth of the clock with nothing searching.
   Stopping the search threads waited 200 ms a check; it now waits 1 ms.
   `stop` takes about 0.05 s, not 0.2 to 0.3 s.
+- **Added:** option `setup_book`, a file of weighted setups to pick from
+  at random, each played as written or mirrored. Without it the setups
+  are as before.
 - **Fixed:** the search now knows a move can't reach the same position
   a third time. Only moves at the root were checked, so it could count
   on either side playing such a move later in a line. Undecided in

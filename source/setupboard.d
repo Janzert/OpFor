@@ -1,7 +1,132 @@
 
-import std.random : uniform;
+import std.array : split;
+import std.conv : to;
+import std.file : readText;
+import std.format : format;
+import std.random : uniform, uniform01;
+import std.string : indexOf, lineSplitter, strip;
 
 import position;
+
+/**
+ * Setups to pick from at random, by weight. A line of a book file is
+ *
+ *     <colours> <weight> <front>/<back>
+ *
+ * with colours g, s or gs, and the two rows written a to h as they stand
+ * on the board, so `gs 2.5 RHCMECHR/RRRDDRRR`. Anything after a # is a
+ * comment. A setup is played as written or mirrored, each half the time.
+ */
+class SetupBook
+{
+    private struct Entry
+    {
+        bool[2] sides;
+        double weight;
+        string front;
+        string back;
+    }
+
+    private Entry[] entries;
+    private double[2] total_weight = [0.0, 0.0];
+
+    this(string text)
+    {
+        foreach (raw; text.lineSplitter)
+        {
+            auto hash = raw.indexOf('#');
+            string line = strip(hash == -1 ? raw : raw[0 .. hash]);
+            if (line.length)
+                add_line(line);
+        }
+        foreach (side; [Side.WHITE, Side.BLACK])
+        {
+            if (total_weight[side] <= 0.0)
+                throw new ValueException(format("Setup book has no setups for side %s", side));
+        }
+    }
+
+    private void add_line(string line)
+    {
+        auto fields = line.split;
+        if (fields.length != 3)
+            throw new ValueException("Bad setup book line: " ~ line);
+        Entry entry;
+        foreach (c; fields[0])
+        {
+            if (c == 'g')
+                entry.sides[Side.WHITE] = true;
+            else if (c == 's')
+                entry.sides[Side.BLACK] = true;
+            else
+                throw new ValueException("Bad setup book line: " ~ line);
+        }
+        entry.weight = to!double(fields[1]);
+        auto rows = fields[2].split("/");
+        if (entry.weight <= 0.0 || rows.length != 2 || rows[0].length != 8
+                || rows[1].length != 8)
+            throw new ValueException("Bad setup book line: " ~ line);
+        entry.front = rows[0];
+        entry.back = rows[1];
+        int[char] counts;
+        foreach (c; entry.front ~ entry.back)
+            counts[c]++;
+        foreach (c, count; ['R': 8, 'C': 2, 'D': 2, 'H': 2, 'M': 1, 'E': 1])
+        {
+            if ((c in counts) is null || counts[c] != count)
+                throw new ValueException("Bad setup book line: " ~ line);
+        }
+        entries ~= entry;
+        foreach (side; [Side.WHITE, Side.BLACK])
+        {
+            if (entry.sides[side])
+                total_weight[side] += entry.weight;
+        }
+    }
+
+    private Entry pick(Side s)
+    {
+        double choice = uniform01() * total_weight[s];
+        Entry last;
+        foreach (entry; entries)
+        {
+            if (!entry.sides[s])
+                continue;
+            last = entry;
+            choice -= entry.weight;
+            if (choice < 0.0)
+                break;
+        }
+        return last;
+    }
+
+    void place(Side s, ref Position pos)
+    {
+        static immutable string piece_chars = "RCDHME";
+        static immutable int[] front_rank = [1, 6];
+        static immutable int[] back_rank = [0, 7];
+
+        Entry entry = pick(s);
+        bool mirror = uniform(0, 2) == 1;
+        int offset = (s == Side.WHITE) ? 0 : 6;
+        ulong[6] boards;
+        foreach (r; 0 .. 2)
+        {
+            int rank = (r == 0) ? front_rank[s] : back_rank[s];
+            string row = (r == 0) ? entry.front : entry.back;
+            foreach (file, c; row)
+            {
+                // The h file is the low bit of a rank.
+                int shift = mirror ? cast(int) file : 7 - cast(int) file;
+                boards[piece_chars.indexOf(c)] |= 1UL << (rank * 8 + shift);
+            }
+        }
+        for (int i = 0; i < 6; i++)
+            pos.place_piece(cast(Piece)(Piece.WRABBIT + offset + i), 0, true);
+        for (int i = 0; i < 6; i++)
+            pos.place_piece(cast(Piece)(Piece.WRABBIT + offset + i), boards[i]);
+    }
+}
 
 class SetupGenerator
 {
@@ -24,6 +149,15 @@ class SetupGenerator
     bool random_all = false;
 
     int[] setup_weights = [19, 80, 1];
+
+    /// When set, setups come from this instead of the formations above.
+    SetupBook book = null;
+
+    /// Load a book file, or go back to the formations with an empty path.
+    void load_book(string path)
+    {
+        book = path.length ? new SetupBook(readText(path)) : null;
+    }
 
     private ulong gold_to_silver(ulong bitboard)
     {
@@ -107,6 +241,12 @@ class SetupGenerator
 
     void setup_board(Side s, ref Position pos)
     {
+        if (book !is null)
+        {
+            book.place(s, pos);
+            return;
+        }
+
         int offset = (s == Side.WHITE) ? 0 : 6;
         RabbitSetup rsetup = rabbit_style;
         if (rsetup == RabbitSetup.ANY)
