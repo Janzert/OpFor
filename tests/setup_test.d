@@ -68,3 +68,38 @@ unittest
     assertThrown(new SetupBook(silver ~ "x 1 RHCMECHR/RRRDDRRR\n"));
     assertThrown(new SetupBook(silver ~ "g RHCMECHR/RRRDDRRR\n"));
 }
+
+@("the book is the default, and the formations can be chosen instead")
+unittest
+{
+    SetupGenerator generator = new SetupGenerator();
+    assert(generator.book !is null);
+    Position pos = empty_board(Side.WHITE);
+    generator.setup_board(Side.WHITE, pos);
+    assert(popcount(pos.bitBoards[Piece.WRABBIT]) == 8);
+    Position.free(pos);
+
+    generator.use_formations();
+    pos = empty_board(Side.WHITE);
+    generator.setup_board(Side.WHITE, pos);
+    // Every formation has the elephant on e2.
+    assert(pos.bitBoards[Piece.WELEPHANT] == 1UL << 11);
+    Position.free(pos);
+}
+
+@("random_all still shuffles everything with the book in place")
+unittest
+{
+    SetupGenerator generator = new SetupGenerator();
+    generator.random_all = true;
+    ulong squares = 0;
+    for (int i = 0; i < 100; i++)
+    {
+        Position pos = empty_board(Side.WHITE);
+        generator.setup_board(Side.WHITE, pos);
+        squares |= pos.bitBoards[Piece.WELEPHANT];
+        Position.free(pos);
+    }
+    // The book uses 12 squares for it, mirrored, so more means a shuffle.
+    assert(popcount(squares) > 12);
+}

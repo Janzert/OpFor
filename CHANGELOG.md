@@ -11,9 +11,15 @@ drawn from the commit history.
   which at 1s/move cost a fifth of the clock with nothing searching.
   Stopping the search threads waited 200 ms a check; it now waits 1 ms.
   `stop` takes about 0.05 s, not 0.2 to 0.3 s.
+- **Changed:** setups now come from a built-in book of 200 gold setups,
+  equally likely, and 30 silver ones, weighted, each played as written
+  or mirrored. They were chosen from 304 candidates per colour by about
+  3,500 self-play games. The old formations gave 18 setups per side.
+  Against them, +13.2 Elo [-13.7, +40.4] over 630 games (passed SPRT
+  [-25, -5]), and about +29 Elo [-20, +78] against bot_Sharp at depth 4.
 - **Added:** option `setup_book`, a file of weighted setups to pick from
-  at random, each played as written or mirrored. Without it the setups
-  are as before.
+  at random, each played as written or mirrored. `setup_rabbits` or
+  `setup_random_minor` go back to the old formations.
 - **Fixed:** the search now knows a move can't reach the same position
   a third time. Only moves at the root were checked, so it could count
   on either side playing such a move later in a line. Undecided in

@@ -555,6 +555,7 @@ class ThreadEngine : Engine
                 log_tt_stats = to!(bool)(value);
                 break;
             case "setup_rabbits":
+                board_setup.use_formations();
                 switch (toUpper(value))
                 {
                     case "ANY":
@@ -575,6 +576,7 @@ class ThreadEngine : Engine
                 }
                 break;
             case "setup_random_minor":
+                board_setup.use_formations();
                 board_setup.random_minor = cast(bool)to!int(value);
                 break;
             case "setup_book":
@@ -1109,6 +1111,7 @@ class SeqEngine : Engine
                 tables_stale = true;
                 break;
             case "setup_rabbits":
+                board_setup.use_formations();
                 switch (toUpper(value))
                 {
                     case "ANY":
@@ -1129,6 +1132,7 @@ class SeqEngine : Engine
                 }
                 break;
             case "setup_random_minor":
+                board_setup.use_formations();
                 board_setup.random_minor = cast(bool)to!int(value);
                 break;
             case "setup_book":

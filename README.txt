@@ -97,10 +97,13 @@ Besides the standard AEI time control options, setoption accepts:
     threads             number of search threads for --threads
     target_min_time, target_max_time
                         seconds to aim for, independent of the time control
-    setup_rabbits       ANY, STANDARD, 99OF9 or FRITZ
-    setup_random_minor  1 to randomize the minor pieces in the setup
-    setup_book          file of setups to pick from instead of the above, empty
-                        for none; its format is in source/setupboard.d
+    setup_rabbits       ANY, STANDARD, 99OF9 or FRITZ, to use those formations
+                        instead of the setup book
+    setup_random_minor  1 to randomize the minor pieces in those formations
+                        (either option turns the book off)
+    setup_book          file of setups to pick from instead of the built-in
+                        book, empty for the formations; the format is in
+                        source/setupboard.d
     log_console         true to echo the log to stderr
     check_eval          log an evaluation breakdown of the current position
 

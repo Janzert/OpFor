@@ -7,6 +7,7 @@ import std.random : uniform, uniform01;
 import std.string : indexOf, lineSplitter, strip;
 
 import position;
+import setupbook;
 
 /**
  * Setups to pick from at random, by weight. A line of a book file is
@@ -151,9 +152,20 @@ class SetupGenerator
     int[] setup_weights = [19, 80, 1];
 
     /// When set, setups come from this instead of the formations above.
-    SetupBook book = null;
+    SetupBook book;
 
-    /// Load a book file, or go back to the formations with an empty path.
+    this()
+    {
+        book = new SetupBook(DEFAULT_SETUP_BOOK);
+    }
+
+    /// Use the formations above, for options that choose among them.
+    void use_formations()
+    {
+        book = null;
+    }
+
+    /// Load a book file, or use the formations with an empty path.
     void load_book(string path)
     {
         book = path.length ? new SetupBook(readText(path)) : null;
@@ -241,7 +253,7 @@ class SetupGenerator
 
     void setup_board(Side s, ref Position pos)
     {
-        if (book !is null)
+        if (book !is null && !random_all)
         {
             book.place(s, pos);
             return;
