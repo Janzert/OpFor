@@ -7,6 +7,9 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Added:** `tools/spsa_spec.py`, which writes an SPSA tuning run of the
+  `tune_*` and `eval_*` options for howdah-tourney, starting from a
+  commit's defaults.
 - **Added:** `tune_root_margin_scale`, one factor on all the root search's
   reduction margins for tuning. Its default of 1 leaves play unchanged.
 - **Removed:** the frozen pieces eval term, with its options

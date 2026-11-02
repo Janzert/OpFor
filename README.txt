@@ -70,6 +70,15 @@ The node total it prints is the same on every machine (with the same OS)
 for the same OpFor version, which shows the runs did the same work.
 --help has the rest.
 
+tools/spsa_spec.py writes an SPSA tuning run of the tune_* and eval_*
+options for howdah-tourney (https://github.com/Janzert/howdah), starting
+from the defaults at a commit:
+
+    python3 tools/spsa_spec.py --program bot_opfor [--rev REV] > spsa.toml
+
+The ranges it gives each option are listed in it; a new tunable needs an
+entry there.
+
 Each push and pull request on GitHub builds the bot and the tools, runs
 the unit tests and plays a self-play game on Linux, Windows and macOS
 (.github/workflows/ci.yml).
