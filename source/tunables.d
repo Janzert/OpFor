@@ -31,7 +31,7 @@ import std.math : lround;
 
 // ---- trap safety (StaticEval.trap_safety) ----
 __gshared int TSAFE_HOME = 17;  // one side holds its own home trap
-__gshared int TSAFE_AWAY = 83;  // one side holds a trap in the other's half
+__gshared int TSAFE_AWAY = 81;  // one side holds a trap in the other's half
 __gshared int TSAFE_BOTH = 6;   // both hold it: a small edge to the away side
 __gshared int[2] BOTH_SAFE;
 __gshared int[2] WHITE_SAFE;
@@ -42,10 +42,10 @@ __gshared int[8] NORABBIT_FILE_BASE = [1, 1, 1, 2, 3, 5, 7, 0];
 __gshared int[8] NORABBIT_ADJ_BASE = [1, 1, 1, 2, 2, 4, 4, 0];
 __gshared int[8] OPEN_FILE_BASE = [2, 2, 2, 3, 10, 20, 40, 0];
 __gshared int[8] OPEN_ADJ_BASE = [2, 2, 3, 20, 40, 80, 120, 0];
-__gshared double[3] NORABBIT_FILE_SHAPE = [0.230025, -0.066508, -0.078639];
-__gshared double[3] NORABBIT_ADJ_SHAPE = [-0.065227, 0.13054, 0.065696];
-__gshared double[3] OPEN_FILE_SHAPE = [0.459365, 0.143103, -0.032555];
-__gshared double[3] OPEN_ADJ_SHAPE = [0.111877, 0.035459, 0.063384];
+__gshared double[3] NORABBIT_FILE_SHAPE = [0.204747, -0.004259, -0.024262];
+__gshared double[3] NORABBIT_ADJ_SHAPE = [-0.031269, 0.09214, 0.108683];
+__gshared double[3] OPEN_FILE_SHAPE = [0.418346, 0.057581, -0.08029];
+__gshared double[3] OPEN_ADJ_SHAPE = [0.206241, 0.017915, 0.128856];
 // [side][rank], read by the eval
 __gshared int[8][2] NORABBIT_FILE;
 __gshared int[8][2] NORABBIT_ADJ;
@@ -56,15 +56,15 @@ __gshared int[8][2] OPEN_ADJ;
 __gshared int RHOME_FIRST_ROW = 3;
 
 // ---- rabbit strength (StaticEval.rabbit_strength) ----
-__gshared int[13] RS_PIECEVAL = [0, 0, 47, 94, 148, 194, 239, 0, 0, 0, 0, 0, 0];
+__gshared int[13] RS_PIECEVAL = [0, 0, 46, 94, 139, 181, 245, 0, 0, 0, 0, 0, 0];
 __gshared int[16] RS_DISTVAL_BASE = [100, 100, 90, 75, 50, 10, 6, 3, 2, 1, 0, 0, 0, 0, 0, 0];
-__gshared double[2] RS_DISTVAL_SHAPE = [-0.169837, -0.114968];
+__gshared double[2] RS_DISTVAL_SHAPE = [-0.199141, -0.1158];
 __gshared int[16] RS_DISTVAL;
 __gshared double[8] RS_RANKVAL_BASE = [0, 0, 0.1, 0.2, 0.4, 1.0, 1.2, 0];
-__gshared double[3] RS_RANKVAL_SHAPE = [0.084818, 0.30079, 0.276114];
+__gshared double[3] RS_RANKVAL_SHAPE = [0.216937, 0.374189, 0.341413];
 __gshared double[8][2] RS_RANKVAL;
 __gshared double[8] RS_WEAK_MUL_BASE = [0.0, 0.00, 0.02, 0.05, 0.10, 0.20, 0.08, 0];
-__gshared double[3] RS_WEAK_MUL_SHAPE = [-0.384001, -0.116113, -0.066178];
+__gshared double[3] RS_WEAK_MUL_SHAPE = [-0.42764, -0.132835, -0.048465];
 __gshared double[8][2] RS_WEAK_MUL;
 /// Rabbit square table, files a to d (e to h mirror them).
 __gshared double[64] RS_SQ_BASE = [0.0, 0, 0, 0, 0, 0, 0, 0,
@@ -75,64 +75,64 @@ __gshared double[64] RS_SQ_BASE = [0.0, 0, 0, 0, 0, 0, 0, 0,
       0.09, 0.10, 0.10, 0.11, 0, 0, 0, 0,
       0.07, 0.08, 0.08, 0.09, 0, 0, 0, 0,
       0   , 0   , 0   , 0   , 0, 0, 0, 0];
-__gshared double[4] RS_SQ_SHAPE = [0.481112, 0.206469, 0.021342, 0.962988];
+__gshared double[4] RS_SQ_SHAPE = [0.658498, 0.164343, -0.160352, 0.91973];
 __gshared double[64] RS_SQ;
-__gshared int RS_INIT_BALANCE = -1717;
-__gshared int RS_DEFENDER_BALANCE = 416;
-__gshared int RS_WEAK_SPAN = 9743;
-__gshared int RS_STRONG_SPAN = 8539;
-__gshared double RS_STRONG_VAL = 146.047159;
-__gshared double RS_STRONG_TRAP_MUL = 0.577971;
-__gshared double RS_STRONG_UNSAFE_MUL = 0.508187;
+__gshared int RS_INIT_BALANCE = -1830;
+__gshared int RS_DEFENDER_BALANCE = 396;
+__gshared int RS_WEAK_SPAN = 9982;
+__gshared int RS_STRONG_SPAN = 8622;
+__gshared double RS_STRONG_VAL = 151.540607;
+__gshared double RS_STRONG_TRAP_MUL = 0.537686;
+__gshared double RS_STRONG_UNSAFE_MUL = 0.526482;
 
 // ---- piece strength (StaticEval.piece_strength) ----
-__gshared int[13] PS_PIECEVAL = [0, 0, 8, 13, 20, 27, 47, 0, 0, 0, 0, 0, 0];
+__gshared int[13] PS_PIECEVAL = [0, 0, 8, 13, 20, 27, 45, 0, 0, 0, 0, 0, 0];
 __gshared int[16] PS_DISTVAL_BASE = [100, 100, 95, 90, 85, 80, 40, 35, 30, 20, 1, 1, 1, 1, 0, 0];
-__gshared double[2] PS_DISTVAL_SHAPE = [0.038346, -0.017819];
+__gshared double[2] PS_DISTVAL_SHAPE = [0.028686, -0.025172];
 __gshared int[16] PS_DISTVAL;
 __gshared int PS_MAX_POWER;  // the elephant's value at distance 0
 __gshared int PS_MIN_POWER;
 
 // ---- hostages, frames and blockades (StaticEval.mobility) ----
-__gshared double HOSTAGE_DIV = 2.205811;
-__gshared double HOLDER_DIV = 13.208918;
-__gshared double FROZEN_HOLDER_DIV = 3.951234;
-__gshared double HOSTAGE_POWER_MUL = 0.794406;  // with the other side's power at the clamp
-__gshared double HOSTAGE_POWER_SLOPE = 0.1;  // fraction off it with the hostage's own power at the clamp
+__gshared double HOSTAGE_DIV = 2.119899;
+__gshared double HOLDER_DIV = 13.020423;
+__gshared double FROZEN_HOLDER_DIV = 4.025191;
+__gshared double HOSTAGE_POWER_MUL = 0.807531;  // with the other side's power at the clamp
+__gshared double HOSTAGE_POWER_SLOPE = 0.101624;  // fraction off it with the hostage's own power at the clamp
 __gshared double[4] MOBILE_MUL_BASE = [1.0, 0.3, 0.1, 0.05];
-__gshared double[2] MOBILE_MUL_SHAPE = [0.014129, 0.06538];
+__gshared double[2] MOBILE_MUL_SHAPE = [-0.067432, 0.055928];
 __gshared double[4] MOBILE_MUL;
-__gshared double EON_TRAP = 0.902444;
-__gshared double EN_OF_TRAP = 0.944406;
-__gshared double ENN_OF_TRAP = 0.977821;
-__gshared double FRAMED_DIV = 3.470697;
-__gshared double PINNED_DIV = 34.073626;
-__gshared double FRAMER_DIV = 129.381951;
-__gshared double BLOCKADE_DIV = 4.313951;
+__gshared double EON_TRAP = 0.902534;
+__gshared double EN_OF_TRAP = 0.941303;
+__gshared double ENN_OF_TRAP = 0.97798;
+__gshared double FRAMED_DIV = 3.321189;
+__gshared double PINNED_DIV = 34.486464;
+__gshared double FRAMER_DIV = 126.174232;
+__gshared double BLOCKADE_DIV = 4.330791;
 __gshared double[4] MOBILITY_MUL_BASE = [1.0, 0.75, 0.5, 0.25];
-__gshared double[2] MOBILITY_MUL_SHAPE = [-0.049557, -0.065762];
+__gshared double[2] MOBILITY_MUL_SHAPE = [-0.046179, -0.085382];
 __gshared double[4] MOBILITY_MUL;
-__gshared double CLOSE_BLOCKADER_DIV = 76.330529;
-__gshared double FAR_BLOCKADER_DIV = 75.260456;
+__gshared double CLOSE_BLOCKADER_DIV = 78.354392;
+__gshared double FAR_BLOCKADER_DIV = 76.488;
 // A blockader on a trap with no piece of the blockaded side beside it:
 // its own share of the blockader penalty is multiplied by
 // BLOCKADER_TRAP_OWN_MUL, and the blockade's whole blockader penalty by
 // BLOCKADER_TRAP_TOTAL_MUL (once for each such blockader). The total
 // default is 1 / 7.166542, the old divisor of the running total.
-__gshared double BLOCKADER_TRAP_OWN_MUL = 1.0;
-__gshared double BLOCKADER_TRAP_TOTAL_MUL = 0.139537;
+__gshared double BLOCKADER_TRAP_OWN_MUL = 1.037782;
+__gshared double BLOCKADER_TRAP_TOTAL_MUL = 0.165611;
 __gshared double[5] BLOCK_STRONGER_CL_BASE = [1.0, 0.6, 0.4, 0.2, 0.1];
 __gshared double[5] BLOCK_STRONGER_FAR_BASE = [1.0, 0.7, 0.5, 0.3, 0.2];
 __gshared double[3] BLOCK_EVEN_CL_BASE = [1.0, 0.75, 0.55];
 __gshared double[3] BLOCK_EVEN_FAR_BASE = [1.0, 0.9, 0.8];
 __gshared double[7] BLOCK_WEAK_CL_BASE = [1.0, 1.0, 1.0, 0.95, 0.9, 0.85, 0.8];
 __gshared double[9] BLOCK_WEAK_FAR_BASE = [1.0, 1.0, 1.0, 1.0, 0.98, 0.95, 0.92, 0.9, 0.88];
-__gshared double[2] BLOCK_STRONGER_CL_SHAPE = [-0.017203, 0.007771];
-__gshared double[2] BLOCK_STRONGER_FAR_SHAPE = [0.054073, 0.00201];
-__gshared double[2] BLOCK_EVEN_CL_SHAPE = [0.014157, -0.039371];
-__gshared double[2] BLOCK_EVEN_FAR_SHAPE = [-0.00499, -0.041705];
-__gshared double[2] BLOCK_WEAK_CL_SHAPE = [-0.189942, 0.00101];
-__gshared double[2] BLOCK_WEAK_FAR_SHAPE = [-0.142564, 0.04225];
+__gshared double[2] BLOCK_STRONGER_CL_SHAPE = [-0.024124, -0.005906];
+__gshared double[2] BLOCK_STRONGER_FAR_SHAPE = [0.018594, -0.019003];
+__gshared double[2] BLOCK_EVEN_CL_SHAPE = [0.033435, 0.020807];
+__gshared double[2] BLOCK_EVEN_FAR_SHAPE = [-0.043616, -0.060761];
+__gshared double[2] BLOCK_WEAK_CL_SHAPE = [-0.182634, -0.013131];
+__gshared double[2] BLOCK_WEAK_FAR_SHAPE = [-0.137309, 0.057119];
 __gshared double[5] BLOCK_STRONGER_CL;
 __gshared double[5] BLOCK_STRONGER_FAR;
 __gshared double[3] BLOCK_EVEN_CL;
@@ -140,50 +140,50 @@ __gshared double[3] BLOCK_EVEN_FAR;
 __gshared double[7] BLOCK_WEAK_CL;
 __gshared double[9] BLOCK_WEAK_FAR;
 __gshared int[4] MOBILE_VAL = [0, 25, 9, 1];
-__gshared double MOBILE_SIDE = 0.108046;
+__gshared double MOBILE_SIDE = 0.115379;
 __gshared double[2] MOBILE_SIDE_MUL;
 
 // ---- threats (StaticEval.mobility) ----
-__gshared double NK_TOUCH_DIV = 13.261376;
-__gshared double NK_CLOSE_DIV = 18.485988;
-__gshared double NK_FAR_DIV = 40.230512;
-__gshared double KEPT_DIV = 67.924662;
-__gshared double THREAT_COVER_DIV = 2.212211;      // a covered touch, close or kept threat
-__gshared double THREAT_COVER_FAR_DIV = 4.355255;  // a covered far threat
+__gshared double NK_TOUCH_DIV = 12.732053;
+__gshared double NK_CLOSE_DIV = 18.054188;
+__gshared double NK_FAR_DIV = 39.941723;
+__gshared double KEPT_DIV = 67.143464;
+__gshared double THREAT_COVER_DIV = 2.340743;      // a covered touch, close or kept threat
+__gshared double THREAT_COVER_FAR_DIV = 4.299655;  // a covered far threat
 
 // ---- static capture threats (StaticEval.static_trap_eval) ----
 __gshared double[3] VICTIM_PER_BASE = [0.65, 0.75, 0.85];
-__gshared double[2] VICTIM_PER_SHAPE = [-0.141978, 0.070352];
+__gshared double[2] VICTIM_PER_SHAPE = [-0.133256, 0.070124];
 __gshared double[3] VICTIM_PER;
-__gshared double FROZEN_PER = 0.252596;
-__gshared double MULTIVIC_PER = 0.393274;
-__gshared double MULTITRAP_PER = 1.399249;
+__gshared double FROZEN_PER = 0.255026;
+__gshared double MULTIVIC_PER = 0.384856;
+__gshared double MULTITRAP_PER = 1.405958;
 __gshared double[13] LENGTH_PER_BASE = [1.0, 1.0, 1.0, 0.9, 0.9,
       0.3, 0.3, 0.2, 0.1, 0.05, 0.05, 0.01, 0.01];
-__gshared double[2] LENGTH_PER_SHAPE = [0.084041, -0.003003];
+__gshared double[2] LENGTH_PER_SHAPE = [0.03199, 0.002626];
 __gshared double[13] LENGTH_PER;
 __gshared double[5] DEFENSE_PER_BASE = [1.0, 0.9, 0.8, 0.6, 0.4];
-__gshared double[2] DEFENSE_PER_SHAPE = [0.037926, -0.080372];
+__gshared double[2] DEFENSE_PER_SHAPE = [0.116785, -0.065332];
 __gshared double[5] DEFENSE_PER;
-__gshared double MAX_VICTIM_PER = 0.88553;
-__gshared double NOW_VICTIM_PER = 0.88553;  // a capture the side to move can finish this turn
+__gshared double MAX_VICTIM_PER = 0.879207;
+__gshared double NOW_VICTIM_PER = 0.959288;  // a capture the side to move can finish this turn
 
 // ---- goal threats (StaticEval.goal_threat) ----
 __gshared int[18] GOAL_THREAT_BASE = [10000, 800, 750, 650, 600,
       100, 100, 80, 80, 40, 40, 30, 30, 10, 10, 5, 5, 0];
-__gshared double[2] GOAL_THREAT_SHAPE = [-0.028108, 0.143206];
+__gshared double[2] GOAL_THREAT_SHAPE = [-0.0463, 0.166468];
 __gshared int[18] GOAL_THREAT;
 __gshared double[5] DEFENSE_STEPS_BASE = [1.0, 0.8, 0.66, 0.5, 0.33];
-__gshared double[2] DEFENSE_STEPS_SHAPE = [-0.014425, -0.042258];
+__gshared double[2] DEFENSE_STEPS_SHAPE = [-0.067725, -0.056975];
 __gshared double[5] DEFENSE_STEPS;
 __gshared double[9] DEFENSE_NUM_BASE = [1.0, 0.8, 0.7, 0.4, 0.2, 0.1, 0.05, 0.01, 0.01];
-__gshared double[2] DEFENSE_NUM_SHAPE = [0.021778, 0.039086];
+__gshared double[2] DEFENSE_NUM_SHAPE = [0.041452, 0.033228];
 __gshared double[9] DEFENSE_NUM;
 
 // ---- longer goals (StaticEval.goal_estimate) ----
 // Nearest rabbit's estimated distance 0-4, 5-6, 7-8: the side to move's,
 // then the other side's.
-__gshared int[6] GOAL_EST = [340, 150, 60, 50, 0, -25];
+__gshared int[6] GOAL_EST = [343, 149, 63, 67, 8, -28];
 
 // ---- search (alphabeta.d, bot_opfor.d) ----
 __gshared int NMH_MIN_DEPTH = 4;     // null move only above this depth
@@ -197,7 +197,7 @@ __gshared int GOAL_EXT_EXTRA = 8;    // PV goal checks up to max_depth plus this
 __gshared int HISTORY_DECAY = 10;
 __gshared int Q_CAPTURE_EXTRA = 2;   // qsearch captures up to stepsLeft plus this long
 __gshared int[7] ROOT_REDUCTION_MARGINS = [150, 350, 1000, 2600, 6000, 15000, 30000];
-__gshared double ROOT_MARGIN_SCALE = 1.0;  // multiplies all of them, in eval units
+__gshared double ROOT_MARGIN_SCALE = 0.942879;  // multiplies all of them, in eval units
 
 /// A tunable value: an option name and where its value lives.
 struct Tunable

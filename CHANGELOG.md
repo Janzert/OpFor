@@ -7,6 +7,18 @@ drawn from the commit history.
 
 ## Unreleased
 
+- **Changed:** new defaults for the tuned evaluation values, from a
+  second 2,000-iteration SPSA run (32,000 games at 1s/move) of 129
+  values, starting from the previous defaults with everything below:
+  118 of them changed, most only a little. The largest moves are piece
+  strength's weight (`eval_pstrength` 237.9 to 216.5), the rabbit
+  strength values of horses and camels (`tune_rs_pieceval_4` and `_5`,
+  148 to 139 and 194 to 181) and the trap terms (`eval_static_otrap`
+  0.57 to 0.67, `eval_ontrap` 0.22 to 0.29). Against the run's start,
+  +24.3 Elo [+8.5, +40.2] over 1,805 games (passed SPRT [0, 10]). The
+  new build with no options searches as the run's build with the tuned
+  values set by option: fixed-depth comparison 200 of 200 positions
+  identical.
 - **Added:** `tools/spsa_spec.py`, which writes an SPSA tuning run of the
   `tune_*` and `eval_*` options for howdah-tourney, starting from a
   commit's defaults.
