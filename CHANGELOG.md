@@ -5,7 +5,7 @@ Notable changes to OpFor. Releases since 2026 are tagged with their date
 version is tagged `ArimaaCC_<year>`. Entries up to 2012 are a summary
 drawn from the commit history.
 
-## Unreleased
+## 2026.11.8 (2026-11-08)
 
 - **Changed:** new defaults for the tuned evaluation values, from a
   second 2,000-iteration SPSA run (32,000 games at 1s/move) of 129
