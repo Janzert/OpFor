@@ -5,6 +5,14 @@ Notable changes to OpFor. Releases since 2026 are tagged with their date
 version is tagged `ArimaaCC_<year>`. Entries up to 2012 are a summary
 drawn from the commit history.
 
+## Unreleased
+
+- **Changed:** setup book 2. Book 1's setups were refit on about 37,000
+  self-play games, and those with a horse, camel or elephant on the back
+  row dropped, leaving 186 gold setups, equally likely, and 27 silver,
+  weighted more evenly. +8.1 Elo [-16.4, +32.6] over 774 games against
+  book 1 (passed SPRT [-25, -5]).
+
 ## 2026.11.8 (2026-11-08)
 
 - **Changed:** new defaults for the tuned evaluation values, from a
