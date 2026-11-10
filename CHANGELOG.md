@@ -12,6 +12,18 @@ drawn from the commit history.
   row dropped, leaving 186 gold setups, equally likely, and 27 silver,
   weighted more evenly. +8.1 Elo [-16.4, +32.6] over 774 games against
   book 1 (passed SPRT [-25, -5]).
+- **Changed:** the time left unsearched at the end of a move is now 11
+  seconds or half the move time plus starting reserve, whichever is
+  less, scaled toward 1 second by the share of unused move time that is
+  lost instead of going to the reserve (`tcpercent` below 100): at 0%
+  it's 1 second at any control. It was always 11 seconds, so with 11
+  seconds or less a move and no reserve OpFor moved after one 0.1 s
+  search slice, and up to 22 seconds it searched less than half the
+  move. Controls at 100% with 22 seconds or more of move time plus
+  reserve play as before. 47–0 against the previous build at 5s/0s/0%,
+  all by goal (passed SPRT [0, 10]).
+- **Added:** `tc_safety_margin`, the time in seconds to leave unsearched
+  at the end of a move. Below zero (the default) uses the rule above.
 
 ## 2026.11.8 (2026-11-08)
 

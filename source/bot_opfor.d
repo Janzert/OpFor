@@ -1625,7 +1625,15 @@ int main(string[] args)
     TimeSpan tc_wreserve = TimeSpan.zero; // white's reserve time
     TimeSpan tc_breserve = TimeSpan.zero; // black's reserve time
     TimeSpan tc_lastmove = TimeSpan.zero; // time used for opponents last move
-    TimeSpan tc_safety_margin = TimeSpan.fromSeconds(11); // safety margin in seconds to end the search
+    TimeSpan tc_startreserve = TimeSpan.zero; // reserve at the start of the game
+    double tc_percent = 100; // percent of unused move time added to the reserve
+    // Time left unsearched at the end of a move for latency, set by the
+    // tc_safety_margin option. Below zero (the default) it's 11 seconds,
+    // or half the move time plus starting reserve if that's less, and
+    // from there scaled toward 1 second by the share of unused time that
+    // is lost instead of going to the reserve.
+    double tc_safety_margin_opt = -1;
+    TimeSpan tc_safety_margin;
     double tc_min_search_per = 0.6;  // minimum percentage of permove time to search
     double tc_confidence_denom = 3;
     double tc_time_left_denom = 3;
@@ -1737,6 +1745,25 @@ int main(string[] args)
                         {
                             tc_max_search = tc_maxmove;
                         }
+                        if (tc_safety_margin_opt < 0)
+                        {
+                            tc_safety_margin = TimeSpan.fromSeconds(11);
+                            auto half = TimeSpan(
+                                    (tc_permove + tc_startreserve).ticks / 2);
+                            if (half < tc_safety_margin)
+                                tc_safety_margin = half;
+                            auto floor = TimeSpan.fromSeconds(1);
+                            if (tc_safety_margin > floor)
+                            {
+                                double kept = tc_percent / 100;
+                                kept = kept < 0 ? 0 : (kept > 1 ? 1 : kept);
+                                tc_safety_margin = floor + TimeSpan(cast(long)(
+                                        (tc_safety_margin - floor).ticks * kept));
+                            }
+                        } else {
+                            tc_safety_margin = TimeSpan.fromInterval(
+                                    tc_safety_margin_opt);
+                        }
                         tc_max_search -= tc_safety_margin;
                         if (tc_max_search < TimeSpan.zero)
                             tc_max_search = TimeSpan.zero;
@@ -1753,8 +1780,9 @@ int main(string[] args)
                                 logger.log("Stopping ponder because of low time for next move.");
                             }
                         }
-                        logger.log("Min search: {} Max: {}",
-                                tc_min_search.interval, tc_max_search.interval);
+                        logger.log("Min search: {} Max: {} Margin: {}",
+                                tc_min_search.interval, tc_max_search.interval,
+                                tc_safety_margin.interval);
                     } else {
                         tc_min_search = TimeSpan.zero;
                         tc_max_search = TimeSpan.zero;
@@ -1821,6 +1849,16 @@ int main(string[] args)
                                     GC.enable();
                                 gc_disabled = false;
                             }
+                            break;
+                        case "tcreserve":
+                            tc_startreserve = TimeSpan.fromInterval(
+                                    to!double(scmd.value));
+                            break;
+                        case "tcpercent":
+                            tc_percent = to!double(scmd.value);
+                            break;
+                        case "tc_safety_margin":
+                            tc_safety_margin_opt = to!double(scmd.value);
                             break;
                         case "tcmax":
                             tc_maxreserve = TimeSpan.fromInterval(
